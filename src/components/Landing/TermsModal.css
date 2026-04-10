@@ -1,0 +1,212 @@
+/* Terms Modal Styles */
+
+.terms-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.terms-modal {
+    background: #FFFFFF;
+    width: 100%;
+    max-width: 800px;
+    height: calc(100vh - 48px);
+    max-height: 950px; /* Optional cap for very large screens */
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Header */
+.terms-header {
+    padding: 24px 32px;
+    border-bottom: 1px solid #E5E7EB;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #F9FAFB;
+}
+
+.terms-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+    margin-right: 16px;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.terms-progress {
+    font-size: 13px;
+    color: #4B5563;
+    font-weight: 600;
+    background: #F3F4F6;
+    border: 1px solid #E5E7EB;
+    padding: 6px 16px;
+    border-radius: 99px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Content Area */
+.terms-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px;
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    color: #374151;
+}
+
+.terms-section-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 20px;
+    margin-top: 40px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #E5E7EB;
+    display: block;
+}
+
+.terms-section-title:first-child {
+    margin-top: 0;
+}
+
+.terms-subsection-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1F2937;
+    margin-bottom: 12px;
+    margin-top: 24px;
+    display: block;
+}
+
+.terms-text p {
+    margin-bottom: 18px;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.terms-text ul {
+    margin-bottom: 24px;
+    padding-left: 20px;
+}
+
+.terms-text li {
+    margin-bottom: 12px;
+}
+
+.terms-text strong {
+    color: #1F2937;
+}
+
+/* Warning/Notice Box inside terms */
+.terms-notice {
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    color: #92400E;
+    margin-bottom: 24px;
+}
+
+/* Scroll prompt */
+.scroll-prompt {
+    position: absolute;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.scroll-prompt.visible {
+    opacity: 1;
+}
+
+/* Footer Actions */
+.terms-actions {
+    padding: 24px 32px;
+    border-top: 1px solid #E5E7EB;
+    background: #FFFFFF;
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    align-items: center;
+}
+
+.terms-cancel {
+    background: none;
+    border: none;
+    color: #6B7280;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.terms-cancel:hover {
+    background: #F3F4F6;
+    color: #111827;
+}
+
+.terms-accept {
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.terms-accept:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #E5E7EB;
+    color: #9CA3AF;
+    box-shadow: none;
+}
+
+.terms-accept:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}

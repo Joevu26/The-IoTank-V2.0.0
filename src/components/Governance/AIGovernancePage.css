@@ -1,0 +1,16 @@
+/* specific styles if needed, though most layout achieved via semantic classes and Tailwind */
+.governance-page .ds-card-panel {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.governance-page .ds-card-panel:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.governance-page table th {
+    font-weight: 700;
+}
+
+.governance-page table tbody tr:last-child td {
+    border-bottom: none;
+}

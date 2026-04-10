@@ -1,0 +1,245 @@
+.main-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-bg-primary);
+    position: relative;
+    overflow-x: hidden;
+    /* Prevent horizontal scroll from large blurs */
+}
+
+/* Ambient Ambient Glow - Premium Travel Aesthetic */
+.main-layout::before {
+    content: '';
+    position: absolute;
+    top: -10%;
+    left: 20%;
+    right: 20%;
+    height: 80vh;
+    background: radial-gradient(circle at 50% 50%,
+            var(--color-glow-pink) 0%,
+            var(--color-glow-purple) 30%,
+            var(--color-glow-peach) 60%,
+            transparent 80%);
+    filter: blur(120px);
+    opacity: 0.25;
+    pointer-events: none;
+    /* Let clicks pass through */
+    z-index: 0;
+}
+
+.content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    transition: margin-left var(--transition-base);
+    /* Specifically transition margin */
+    margin-left: var(--sidebar-width);
+    position: relative;
+    padding-top: var(--navbar-height);
+    /* Ensure content starts below fixed navbar */
+}
+
+.collapsed .content-wrapper {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+.main-content {
+    flex: 1;
+    width: 100%;
+    max-width: var(--container-max-width);
+    margin: 0 auto;
+    padding: var(--spacing-xl);
+    min-height: calc(100vh - var(--navbar-height));
+    transition: all var(--transition-base);
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content.full-bleed {
+    padding: 0;
+    max-width: none;
+    margin: 0;
+}
+
+/* --- Mission Control Portal Footer --- */
+.mission-control-footer {
+    background: var(--color-bg-secondary-glass) !important;
+    border-top: 1px solid var(--color-divider) !important;
+    padding: 32px 40px !important;
+    backdrop-filter: blur(10px) !important;
+    margin-top: auto !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.mission-control-footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--color-accent-primary), transparent);
+    opacity: 0.3;
+}
+
+.footer-main {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-bottom: 24px !important;
+}
+
+.footer-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+}
+
+.footer-brand-logo {
+    height: 32px !important;
+    width: auto !important;
+    opacity: 0.8 !important;
+    transition: all 0.3s ease !important;
+}
+
+.footer-brand-logo:hover {
+    opacity: 1 !important;
+    transform: scale(1.05) !important;
+}
+
+.v-divider {
+    width: 1px !important;
+    height: 24px !important;
+    background: var(--color-divider) !important;
+}
+
+.system-tag {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.tag-label {
+    font-size: 0.6rem !important;
+    font-weight: 800 !important;
+    color: var(--color-text-disabled) !important;
+    text-transform: uppercase !important;
+    line-height: 1 !important;
+    margin-bottom: 2px !important;
+}
+
+.tag-version {
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    color: var(--color-accent-primary) !important;
+    font-family: var(--font-family-mono) !important;
+    line-height: 1 !important;
+}
+
+.footer-nav {
+    display: flex !important;
+    gap: 24px !important;
+}
+
+.footer-nav-link {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    color: var(--color-text-secondary) !important;
+    text-decoration: none !important;
+    transition: all 0.2s !important;
+    text-transform: lowercase;
+}
+
+.footer-nav-link:hover {
+    color: var(--color-accent-primary) !important;
+    transform: translateY(-1px) !important;
+}
+
+.footer-social {
+    display: flex !important;
+    gap: 12px !important;
+}
+
+.social-pill {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: var(--color-text-secondary) !important;
+    transition: all 0.2s !important;
+}
+
+.social-pill:hover {
+    background: var(--color-accent-primary-light) !important;
+    color: var(--color-accent-primary) !important;
+    border-color: var(--color-accent-primary) !important;
+    transform: translateY(-2px) !important;
+}
+
+.footer-legal {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-top: 24px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.legal-text {
+    font-size: 0.7rem !important;
+    font-weight: 500 !important;
+    color: var(--color-text-disabled) !important;
+    letter-spacing: 0.02em !important;
+}
+
+.uptime-index {
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    color: var(--color-success) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: var(--z-modal-backdrop);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .content-wrapper {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    .main-content {
+        padding: var(--spacing-base);
+        padding-top: calc(var(--navbar-height) + env(safe-area-inset-top, 0));
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content {
+        padding: var(--spacing-sm);
+    }
+
+    .footer-content {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        text-align: center;
+    }
+
+    .portal-footer {
+        padding: var(--spacing-lg) var(--spacing-base) !important;
+    }
+}

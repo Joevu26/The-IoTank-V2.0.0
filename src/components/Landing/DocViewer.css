@@ -1,0 +1,94 @@
+.doc-viewer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(8px);
+}
+
+.doc-viewer-container {
+    position: relative;
+    width: 90%;
+    height: 90%;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.doc-viewer-header {
+    height: 50px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.doc-viewer-title {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.doc-viewer-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #64748b;
+    transition: color 0.2s;
+}
+
+.doc-viewer-close:hover {
+    color: #ef4444;
+}
+
+.doc-viewer-content {
+    width: 100%;
+    height: calc(100% - 50px);
+    position: relative;
+    overflow: auto;
+}
+
+.doc-viewer-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    pointer-events: auto;
+    /* Allow scrolling/zoom inside iframe if possible */
+}
+
+/* Protection Overlay */
+.doc-viewer-protection-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 10;
+    pointer-events: none;
+    /* Allows scrolling but blocks right-click on content if managed in JS */
+}
+
+.watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 8rem;
+    color: rgba(0, 0, 0, 0.03);
+    pointer-events: none;
+    z-index: 5;
+    white-space: nowrap;
+}

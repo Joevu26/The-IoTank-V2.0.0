@@ -1,0 +1,297 @@
+/* ============================================================
+   INVENTORY COMMAND — Bento HUD Layout
+   Amethyst Design System | IoTank V2.0
+   ============================================================ */
+
+.inventory-page-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2rem;
+    min-height: 100%;
+}
+
+/* ──────────────────────────────────────────
+   FLEET INTELLIGENCE STRIP (Top KPI Bar)
+────────────────────────────────────────── */
+.fleet-summary-strip {
+    display: flex;
+    align-items: center;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    padding: 14px 24px;
+    gap: 0;
+    box-shadow: 0 2px 12px var(--color-shadow);
+    overflow: hidden;
+    position: relative;
+}
+
+.fleet-summary-strip::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #a855f7 0%, #7c3aed 50%, #6d28d9 100%);
+}
+
+/* ──────────────────────────────────────────
+   INVENTORY CONTROLS BAR
+────────────────────────────────────────── */
+.inventory-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Modern View Toggle */
+.view-mode-toggle-modern {
+    display: flex;
+    background: var(--color-bg-tertiary);
+    padding: 5px;
+    border-radius: 14px;
+    gap: 4px;
+    border: 1px solid var(--color-border);
+}
+
+.toggle-btn-modern {
+    background: transparent;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    min-width: 155px;
+}
+
+.toggle-btn-modern .btn-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.toggle-btn-modern .icon {
+    font-size: 1.15rem;
+    color: var(--color-text-disabled);
+    transition: all 0.25s;
+}
+
+.toggle-btn-modern .text-stack {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    gap: 1px;
+}
+
+.toggle-btn-modern .label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    transition: all 0.25s;
+    line-height: 1.2;
+}
+
+.toggle-btn-modern .sub {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--color-text-disabled);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.toggle-btn-modern.active {
+    background: var(--color-bg-secondary);
+    box-shadow: 0 4px 12px var(--color-shadow-medium);
+}
+
+.toggle-btn-modern.active .icon {
+    color: #a855f7;
+}
+
+.toggle-btn-modern.active .label {
+    color: var(--color-text-primary);
+}
+
+.toggle-btn-modern:not(.active):hover {
+    background: rgba(168, 85, 247, 0.06);
+}
+
+.toggle-btn-modern:not(.active):hover .icon {
+    color: #a855f7;
+}
+
+/* Page Actions */
+.page-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.btn-premium-action {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+    letter-spacing: 0.01em;
+}
+
+.btn-premium-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.45);
+    background: linear-gradient(135deg, #9333ea 0%, #6d28d9 100%);
+}
+
+.btn-premium-action:active {
+    transform: translateY(0);
+}
+
+/* ──────────────────────────────────────────
+   ALERT BANNERS
+────────────────────────────────────────── */
+.refuel-alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 12px 18px;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.1), rgba(245, 158, 11, 0.04));
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-left: 4px solid #f59e0b;
+    border-radius: 12px;
+    color: #b45309;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+[data-theme='dark'] .refuel-alert-banner {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
+    color: #fbbf24;
+}
+
+/* ──────────────────────────────────────────
+   BENTO SPLIT-PANE LAYOUT — Main HUD
+────────────────────────────────────────── */
+.inventory-content {
+    flex: 1;
+}
+
+/* Detailed Split-Pane View */
+.detailed-inventory-view {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 280px);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px var(--color-shadow);
+    gap: 0;
+}
+
+.detailed-inventory-view.ghost-mode {
+    opacity: 0.9;
+}
+
+/* Tank Selector Panel (Top Strip) */
+.tank-selector-panel {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-tertiary);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 24px;
+    gap: 24px;
+    overflow: hidden;
+}
+
+.tank-selector-header {
+    border-right: 1px solid var(--color-border);
+    padding-right: 24px;
+    flex-shrink: 0;
+}
+
+.tank-selector-header h4 {
+    margin: 0 0 2px 0;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-disabled);
+    line-height: 1;
+}
+
+.tank-selector-header p {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    line-height: 1.2;
+}
+
+/* Active Tank Detail Pane (Right Area) */
+.active-tank-container {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ──────────────────────────────────────────
+   GRID VIEW CONTAINER
+────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────
+   ANIMATIONS
+────────────────────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* ──────────────────────────────────────────
+   RESPONSIVE
+────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .detailed-inventory-view {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+    }
+
+    .tank-selector-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+}
+
+@media (max-width: 768px) {
+    .inventory-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .view-mode-toggle-modern {
+        width: 100%;
+    }
+
+    .toggle-btn-modern {
+        flex: 1;
+        min-width: unset;
+    }
+}

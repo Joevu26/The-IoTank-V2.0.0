@@ -1,0 +1,195 @@
+/* =============================================================================
+   Tour Guide Internal Overrides
+   Adding glass morphism and modern typography to intro.js
+   ============================================================================= */
+
+/* Main Tooltip Container */
+.custom-tour-tooltip {
+    /* Hardcoded solid dark-slate background to guarantee distinct contrast */
+    background: #0f172a !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--color-accent-primary) !important;
+    border-radius: var(--border-radius-lg, 12px) !important;
+    box-shadow: var(--shadow-xl), 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+    
+    font-family: var(--font-family-primary) !important;
+    color: #f8fafc !important; /* Force high contrast white text */
+    padding: var(--spacing-base, 16px) !important;
+    max-width: 320px !important;
+    min-width: 260px !important;
+    
+    /* Animation definition */
+    animation: tourTooltipPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+}
+
+/* Tooltip Text (The main explainer paragraph) */
+.custom-tour-tooltip .introjs-tooltiptext {
+    font-size: var(--font-size-base, 15px) !important;
+    line-height: var(--line-height-normal, 1.6) !important;
+    padding: 0 0 var(--spacing-sm, 12px) 0 !important;
+    color: #cbd5e1 !important; /* Light slate text */
+}
+
+/* Progress Bar Container */
+.custom-tour-tooltip .introjs-progress {
+    background-color: var(--color-border) !important;
+    border-radius: var(--border-radius-full, 9999px) !important;
+    height: 6px !important;
+    margin: var(--spacing-sm, 8px) 0 var(--spacing-lg, 24px) 0 !important;
+    overflow: hidden !important;
+}
+
+/* Progress Bar Fill */
+.custom-tour-tooltip .introjs-progressbar {
+    background: linear-gradient(90deg, var(--color-accent-primary), var(--color-accent-pink)) !important;
+    border-radius: var(--border-radius-full, 9999px) !important;
+    height: 100% !important;
+    transition: width var(--transition-base) !important;
+}
+
+/* Tooltip Buttons Container */
+.custom-tour-tooltip .introjs-tooltipbuttons {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-top: none !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Common Button Styles */
+.custom-tour-tooltip .introjs-button {
+    font-family: inherit !important;
+    font-size: var(--font-size-sm, 14px) !important;
+    font-weight: var(--font-weight-medium, 500) !important;
+    border-radius: var(--border-radius-md, 8px) !important;
+    padding: var(--spacing-sm) var(--spacing-base) !important;
+    transition: all var(--transition-fast) !important;
+    text-shadow: none !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 80px !important;
+}
+
+/* Next / Get Started Button */
+.custom-tour-tooltip .introjs-nextbutton {
+    background: var(--color-accent-primary) !important;
+    color: var(--color-text-inverse) !important;
+    border: 1px solid transparent !important;
+}
+
+.custom-tour-tooltip .introjs-nextbutton:hover {
+    background: var(--color-accent-primary-hover) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 0 15px var(--color-accent-primary-light) !important;
+}
+
+/* Prev / Back Button */
+.custom-tour-tooltip .introjs-prevbutton {
+    background: transparent !important;
+    color: #f8fafc !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.custom-tour-tooltip .introjs-prevbutton:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--color-accent-primary) !important;
+}
+
+.custom-tour-tooltip .introjs-prevbutton.introjs-disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Skip / Close Button */
+.custom-tour-tooltip .introjs-skipbutton {
+    color: #f8fafc !important;
+    top: -10px !important;
+    right: -10px !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 0.9 !important;
+    transition: all var(--transition-base) !important;
+    border-radius: 50% !important;
+    background: #1e293b !important; /* Darker slate for circular button */
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+    text-decoration: none !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    z-index: 10 !important;
+}
+
+.custom-tour-tooltip .introjs-skipbutton:hover {
+    opacity: 1 !important;
+    transform: scale(1.1) rotate(90deg) !important;
+    color: var(--color-text-inverse) !important;
+    background: var(--color-accent-pink) !important;
+    border-color: var(--color-accent-pink) !important;
+    box-shadow: 0 0 12px var(--color-glow-pink) !important;
+}
+
+/* Highlight / Focus Overlay */
+.custom-tour-highlight {
+    background: transparent !important;
+    box-shadow: 0 0 0 10000px rgba(18, 18, 18, 0.75) !important; /* Richer dark overlay */
+    opacity: 1 !important;
+    border-radius: var(--border-radius-lg, 12px) !important;
+    border: 2px solid var(--color-accent-primary) !important;
+    transition: all var(--transition-base) !important;
+}
+
+/* Make sure the element being highlighted retains elevated z-index */
+.introjs-showElement {
+    z-index: 9999999 !important;
+}
+
+.introjs-fixParent {
+    z-index: auto !important;
+    opacity: 1.0 !important;
+    transform: none !important;
+}
+
+/* Tooltip Arrows - Use borders to simulate matching the glassmorphism edge */
+.custom-tour-tooltip.introjs-bottom::after {
+    border-bottom-color: var(--color-bg-secondary-glass) !important;
+    border-bottom-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-top::after {
+    border-top-color: var(--color-bg-secondary-glass) !important;
+    border-top-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-left::after {
+    border-left-color: var(--color-bg-secondary-glass) !important;
+    border-left-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-right::after {
+    border-right-color: var(--color-bg-secondary-glass) !important;
+    border-right-color: var(--color-bg-elevated) !important;
+}
+
+/* Helper class for the arrow shadow workaround */
+.custom-tour-tooltip .introjs-arrow.top-middle {
+    top: -10px !important;
+}
+
+/* Animations */
+@keyframes tourTooltipPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.92) translateY(12px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}

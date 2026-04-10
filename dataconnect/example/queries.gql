@@ -1,0 +1,30 @@
+mutation CreateAlert($dataSourceId: UUID!, $userId: UUID!, $condition: String!, $message: String!, $name: String!, $triggerType: String!) @auth(level: USER) {
+  alert_insert(data: {dataSourceId: $dataSourceId, userId: $userId, condition: $condition, message: $message, name: $name, triggerType: $triggerType, createdAt_expr: "request.time"})
+}
+
+query ListPublicDashboards @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  dashboards(where: {isPublic: {eq: true}}) {
+    id
+    name
+    description
+    owner {
+      id
+      displayName
+    }
+  }
+}
+
+mutation UpdateWidgetConfiguration($id: UUID!, $configuration: String!) @auth(level: USER) {
+  widget_update(id: $id, data: {configuration: $configuration})
+}
+
+query GetDataSourceDetails($id: UUID!) @auth(level: USER) {
+  dataSource(id: $id) {
+    id
+    name
+    description
+    collectionPath
+    createdAt
+    lastSyncAt
+  }
+}

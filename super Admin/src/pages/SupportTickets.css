@@ -1,0 +1,292 @@
+.support-page {
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
+    padding: 32px;
+}
+
+/* Tab Navigation */
+.support-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 100px;
+    backdrop-filter: blur(10px);
+    width: fit-content;
+    margin-bottom: 32px;
+    overflow-x: auto;
+}
+
+.support-tab-btn {
+    padding: 8px 18px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.support-tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.3);
+}
+
+/* Metrics Dashboard */
+.support-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.support-stats-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    border-radius: 24px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.support-stats-card.highlight {
+    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(255,255,255,0.02) 100%);
+    border-color: rgba(var(--primary-rgb), 0.3);
+}
+
+.support-stats-card.urgent {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255,255,255,0.02) 100%);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+.stat-subtext {
+    font-size: 0.7rem;
+    font-weight: 600;
+    opacity: 0.5;
+}
+
+/* SLA Status Bars */
+.sla-status-row {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 24px;
+}
+
+.sla-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    padding: 20px;
+}
+
+.sla-progress-bg {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    margin: 12px 0;
+    overflow: hidden;
+}
+
+.sla-progress {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s ease;
+}
+
+/* Ticket Queue Table */
+.ticket-table-container {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    overflow: hidden;
+    margin-top: 24px;
+}
+
+.ticket-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ticket-table th {
+    text-align: left;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.ticket-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 0.85rem;
+    vertical-align: middle;
+}
+
+.ticket-table tr:hover td {
+    background: rgba(255, 255, 255, 0.01);
+}
+
+/* Badges */
+.badge {
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-urgent { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-high { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+.badge-medium { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-low { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+/* Conversation Thread */
+.conversation-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+    max-height: 600px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.1);
+    border-radius: 16px;
+}
+
+.message-bubble {
+    max-width: 80%;
+    padding: 16px;
+    border-radius: 18px;
+    position: relative;
+}
+
+.message-bubble.client {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom-left-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.message-bubble.admin {
+    align-self: flex-end;
+    background: var(--primary-color);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message-bubble.internal {
+    align-self: center;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px dashed rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+    font-size: 0.8rem;
+    max-width: 90%;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    opacity: 0.6;
+}
+
+/* Detail View Layout */
+.ticket-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 24px;
+}
+
+.info-panel-section {
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.info-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Forms */
+.support-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: white;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.support-input:focus {
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* Knowledge Base */
+.kb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.kb-card {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.kb-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+    opacity: 0.6;
+}

@@ -1,0 +1,29 @@
+.tank-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-2xl);
+    width: 100%;
+    max-width: 1600px; /* Prevent over-spreading on 4K screens */
+}
+
+/* Responsive - single column on mobile for full-width cards */
+@media (max-width: 768px) {
+    .tank-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-base);
+    }
+}
+
+@media (max-width: 480px) {
+    .tank-grid {
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-lg);
+    }
+}
+
+@media (min-width: 1440px) {
+    .tank-grid {
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    }
+}

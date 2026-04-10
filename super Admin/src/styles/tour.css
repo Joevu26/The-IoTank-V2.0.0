@@ -1,0 +1,185 @@
+/* =============================================================================
+   Tour Guide Internal Overrides
+   Adding glass morphism and modern typography to intro.js
+   ============================================================================= */
+
+/* Main Tooltip Container */
+.custom-tour-tooltip {
+    background: var(--color-bg-secondary-glass) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2)) !important;
+    border-radius: var(--border-radius-xl, 16px) !important;
+    box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1)) !important;
+    
+    font-family: var(--font-family-primary) !important;
+    color: var(--color-text-primary) !important;
+    padding: var(--spacing-lg, 24px) !important;
+    max-width: 380px !important;
+    min-width: 300px !important;
+    
+    /* Animation definition */
+    animation: tourTooltipPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+}
+
+/* Tooltip Text (The main explainer paragraph) */
+.custom-tour-tooltip .introjs-tooltiptext {
+    font-size: var(--font-size-base, 15px) !important;
+    line-height: var(--line-height-normal, 1.6) !important;
+    padding: 0 0 var(--spacing-base, 16px) 0 !important;
+    color: var(--color-text-secondary) !important;
+}
+
+/* Progress Bar Container */
+.custom-tour-tooltip .introjs-progress {
+    background-color: var(--color-border) !important;
+    border-radius: var(--border-radius-full, 9999px) !important;
+    height: 6px !important;
+    margin: var(--spacing-sm, 8px) 0 var(--spacing-lg, 24px) 0 !important;
+    overflow: hidden !important;
+}
+
+/* Progress Bar Fill */
+.custom-tour-tooltip .introjs-progressbar {
+    background: var(--color-accent-primary) !important;
+    border-radius: var(--border-radius-full, 9999px) !important;
+    height: 100% !important;
+    transition: width var(--transition-base) !important;
+}
+
+/* Tooltip Buttons Container */
+.custom-tour-tooltip .introjs-tooltipbuttons {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-top: none !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Common Button Styles */
+.custom-tour-tooltip .introjs-button {
+    font-family: inherit !important;
+    font-size: var(--font-size-sm, 14px) !important;
+    font-weight: var(--font-weight-medium, 500) !important;
+    border-radius: var(--border-radius-md, 8px) !important;
+    padding: var(--spacing-sm) var(--spacing-base) !important;
+    transition: all var(--transition-fast) !important;
+    text-shadow: none !important;
+    cursor: pointer !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 80px !important;
+}
+
+/* Next / Get Started Button */
+.custom-tour-tooltip .introjs-nextbutton {
+    background: var(--color-accent-primary) !important;
+    color: var(--color-text-inverse) !important;
+    border: 1px solid transparent !important;
+}
+
+.custom-tour-tooltip .introjs-nextbutton:hover {
+    background: var(--color-accent-primary-hover) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Prev / Back Button */
+.custom-tour-tooltip .introjs-prevbutton {
+    background: transparent !important;
+    color: var(--color-text-primary) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+.custom-tour-tooltip .introjs-prevbutton:hover {
+    background: var(--color-bg-tertiary) !important;
+    border-color: var(--color-accent-primary) !important;
+}
+
+.custom-tour-tooltip .introjs-prevbutton.introjs-disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Skip / Close Button */
+.custom-tour-tooltip .introjs-skipbutton {
+    color: var(--color-text-secondary) !important;
+    top: var(--spacing-md, 12px) !important;
+    right: var(--spacing-md, 12px) !important;
+    width: 24px !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 0.6 !important;
+    transition: all var(--transition-fast) !important;
+    border-radius: var(--border-radius-full) !important;
+    background: transparent !important;
+}
+
+.custom-tour-tooltip .introjs-skipbutton:hover {
+    opacity: 1 !important;
+    color: var(--color-danger) !important;
+    background: var(--color-danger-bg) !important;
+}
+
+/* Highlight / Focus Overlay */
+.custom-tour-highlight {
+    background: transparent !important;
+    box-shadow: 0 0 0 10000px rgba(0, 0, 0, 0.65) !important; /* Dim the background more for better focus */
+    opacity: 1 !important;
+    border-radius: var(--border-radius-lg, 12px) !important;
+    border: 2px solid var(--color-accent-primary) !important;
+    transition: all var(--transition-base) !important;
+}
+
+/* Make sure the element being highlighted retains elevated z-index */
+.introjs-showElement {
+    z-index: 9999999 !important;
+}
+
+.introjs-fixParent {
+    z-index: auto !important;
+    opacity: 1.0 !important;
+    transform: none !important;
+}
+
+/* Tooltip Arrows - Use borders to simulate matching the glassmorphism edge */
+.custom-tour-tooltip.introjs-bottom::after {
+    border-bottom-color: var(--color-bg-secondary-glass) !important;
+    border-bottom-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-top::after {
+    border-top-color: var(--color-bg-secondary-glass) !important;
+    border-top-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-left::after {
+    border-left-color: var(--color-bg-secondary-glass) !important;
+    border-left-color: var(--color-bg-elevated) !important;
+}
+.custom-tour-tooltip.introjs-right::after {
+    border-right-color: var(--color-bg-secondary-glass) !important;
+    border-right-color: var(--color-bg-elevated) !important;
+}
+
+/* Helper class for the arrow shadow workaround */
+.custom-tour-tooltip .introjs-arrow.top-middle {
+    top: -10px !important;
+}
+
+/* Animations */
+@keyframes tourTooltipPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.92) translateY(12px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}

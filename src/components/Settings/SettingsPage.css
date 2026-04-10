@@ -1,0 +1,302 @@
+/* SettingsPage.css - Standardized Design System Implementation */
+
+.settings-container {
+    width: 100%;
+    min-height: 100vh;
+    padding: 40px;
+    background: var(--ds-color-bg-light);
+    font-family: var(--ds-font-family);
+    color: var(--ds-color-body);
+}
+
+.settings-layout {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* HUD Header Standardized */
+.settings-header {
+    margin-bottom: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.settings-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--ds-color-title);
+    margin: 0 0 8px 0;
+}
+
+.settings-subtitle {
+    font-size: 16px;
+    color: var(--ds-color-body);
+    opacity: 0.8;
+}
+
+.diagnostic-readout {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.readout-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ds-color-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Sections */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 32px;
+}
+
+.settings-section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ds-color-title);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-section-desc {
+    font-size: 14px;
+    color: var(--ds-color-body);
+    margin-bottom: 24px;
+    opacity: 0.7;
+}
+
+/* Forms */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ds-color-title);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.settings-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    background: #FFFFFF;
+}
+
+.settings-input:focus {
+    outline: none;
+    border-color: var(--ds-color-accent);
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+.settings-input:disabled {
+    background: #F8FAFC;
+    cursor: not-allowed;
+    color: #94A3B8;
+}
+
+/* Avatar/Logo */
+.avatar-upload-container {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 8px;
+}
+
+.avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    position: relative;
+    cursor: pointer;
+}
+
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.avatar-preview:hover .avatar-overlay {
+    opacity: 1;
+}
+
+/* Fleet Management Table */
+.fleet-card {
+    grid-column: 1 / -1;
+}
+
+.fleet-table-container {
+    margin-top: 16px;
+    overflow-x: auto;
+}
+
+.fleet-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.fleet-table th {
+    text-align: left;
+    padding: 16px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    border-bottom: 2px solid #F1F5F9;
+}
+
+.fleet-table td {
+    padding: 16px;
+    font-size: 14px;
+    color: var(--ds-color-body);
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.fleet-table tr:hover {
+    background: #F8FAFC;
+}
+
+.tank-id-tag {
+    font-family: 'Roboto Mono', monospace;
+    font-weight: 600;
+    color: #64748B;
+    font-size: 12px;
+}
+
+.retail-input {
+    width: 100px;
+    padding: 6px 10px;
+    border: 1px solid #E2E8F0;
+    border-radius: 4px;
+    font-weight: 700;
+    color: var(--ds-color-title);
+}
+
+/* Lock Screen Redesign */
+.security-lock-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.security-card {
+    width: 100%;
+    max-width: 440px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    text-align: center;
+}
+
+.security-icon-box {
+    width: 64px;
+    height: 64px;
+    background: #F0F9FF;
+    color: var(--ds-color-accent);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+}
+
+.security-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ds-color-title);
+    margin-bottom: 12px;
+}
+
+.security-desc {
+    font-size: 15px;
+    color: #64748B;
+    margin-bottom: 32px;
+    line-height: 1.5;
+}
+
+.security-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.password-input-wrapper {
+    position: relative;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+/* Actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}

@@ -1,0 +1,69 @@
+.time-series-chart-container {
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-base);
+    background-color: var(--color-bg-elevated);
+}
+
+.chart-header {
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-title {
+    margin: 0;
+    font-size: var(--font-size-md);
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.chart-wrapper {
+    width: 100%;
+}
+
+.chart-tooltip {
+    background-color: var(--color-bg-elevated);
+    border: var(--border-width-thin) solid var(--color-border-light);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(4px);
+}
+
+.tooltip-label {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.tooltip-value {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+}
+
+/* Customize Recharts Brush */
+.recharts-brush-slide {
+    fill: var(--color-accent-primary-light);
+    fill-opacity: 0.2;
+}
+
+.recharts-brush-texts {
+    font-size: 10px;
+    fill: var(--color-text-secondary);
+}
+
+.chart-legend {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--color-bg-secondary);
+    border-radius: 20px;
+}
+
+.legend-dot {
+    display: inline-block;
+    vertical-align: middle;
+}

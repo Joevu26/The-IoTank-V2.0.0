@@ -1,0 +1,26 @@
+Usage:
+  supabase db pull [migration name] [flags]
+
+Flags:
+      --db-url string     Pulls from the database specified by the connection string (must be percent-encoded).
+  -h, --help              help for pull
+      --linked            Pulls from the linked project. (default true)
+      --local             Pulls from the local database.
+  -p, --password string   Password to your remote Postgres database.
+  -s, --schema strings    Comma separated list of schema to include.
+      --use-pg-delta      Use pg-delta to pull declarative schema.
+
+Global Flags:
+      --agent [ auto | yes | no ]                      Override agent detection: yes, no, or auto (default auto) (default auto)
+      --create-ticket                                  create a support ticket for any CLI error
+      --debug                                          output debug logs to stderr
+      --dns-resolver [ native | https ]                lookup domain names using the specified resolver (default native)
+      --experimental                                   enable experimental features
+      --network-id string                              use the specified docker network instead of a generated one
+  -o, --output [ env | pretty | json | toml | yaml ]   output format of status variables (default pretty)
+      --profile string                                 use a specific profile for connecting to Supabase API (default "supabase")
+      --workdir string                                 path to a Supabase project directory
+      --yes                                            answer yes to all prompts
+
+unknown flag: --include-all
+Try rerunning the command with --debug to troubleshoot the error.

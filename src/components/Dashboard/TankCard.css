@@ -1,0 +1,361 @@
+.tank-card.live-command-center {
+    cursor: pointer;
+    /* make whole card clickable */
+    display: flex;
+    flex-direction: column;
+    min-height: auto;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 20px;
+    overflow: hidden;
+    padding: 1rem;
+    padding-bottom: 0.75rem;
+}
+
+.tank-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.tank-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: -0.01em;
+}
+
+.live-telemetry-badge {
+    font-size: 0.65rem;
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.command-center-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 1.5rem;
+    align-items: center;
+    width: 100%;
+}
+
+/* Gauge Area */
+.gauge-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.fuel-gauge {
+    width: 100%;
+    max-width: 160px;
+    height: auto;
+}
+
+.gauge-value {
+    font-size: 38px;
+    font-weight: 700;
+    fill: #1e293b;
+    text-shadow: none;
+    letter-spacing: 0;
+}
+
+.volume-action-btn {
+    margin-top: -6px; /* Less negative margin to prevent overlap */
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 6px 20px;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    letter-spacing: 0.02em;
+}
+
+.volume-action-btn:hover:not(:disabled) {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.45);
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+}
+
+.volume-action-btn:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.gauge-arc {
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.15));
+    transition: stroke-dasharray 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Metrics Detail Grid */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.metric-box {
+    background: rgba(248, 250, 252, 0.85);
+    padding: 0.6rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid rgba(226, 232, 240, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 0;
+    overflow: hidden;
+}
+
+.metric-box.clickable {
+    cursor: pointer;
+}
+
+.metric-box.clickable:hover {
+    background: #fff;
+    border-color: #8b5cf6;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+}
+
+.metric-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: none;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.metric-value {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: 100%;
+}
+
+.metric-desc {
+    font-size: 10px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.waiting-tag {
+    color: #94a3b8;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.metric-box.metric-critical {
+    border-left: 3px solid #ef4444;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
+}
+
+.metric-box.metric-warning {
+    border-left: 3px solid #f59e0b;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+}
+
+.inline-icon {
+    display: inline;
+    vertical-align: middle;
+    margin-right: 4px;
+}
+
+/* Command Footer */
+.command-footer {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.last-update-tag {
+    color: #4f46e5;
+    background: rgba(79, 70, 229, 0.1);
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+}
+
+.sync-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(241, 245, 249, 0.8);
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    font-size: 18px;
+}
+
+.sync-btn:hover:not(:disabled) {
+    color: #8b5cf6;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+    transform: translateY(-2px);
+}
+
+.sync-btn.syncing svg {
+    animation: rotate 1s linear infinite;
+    color: #8b5cf6;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Statuses */
+.status-ok {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-critical {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-offline {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+/* Pulse animation for freshness */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 640px) {
+    .command-center-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .gauge-section {
+        max-width: 140px;
+        margin: 0 auto;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .tank-card.live-command-center {
+        padding: 1rem;
+    }
+
+    .tank-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .tank-name {
+        font-size: 1.1rem;
+    }
+
+    .gauge-value {
+        font-size: 28px;
+    }
+
+    .metric-value {
+        font-size: 1rem;
+    }
+
+    .metric-label {
+        font-size: 9px;
+    }
+}
+
+.view-hint-glass {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-primary);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.tank-card.live-command-center:hover .view-hint-glass {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.8);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.15);
+}

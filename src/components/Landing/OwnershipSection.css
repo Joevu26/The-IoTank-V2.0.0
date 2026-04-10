@@ -1,0 +1,183 @@
+/* =============================================================================
+   OWNERSHIP SECTION - HIGH-FIDELITY TELEMETRY ERROR CARD
+   ============================================================================= */
+
+.ownership-section {
+    padding: var(--section-padding-desktop, 140px) 0;
+    width: calc(100% - 48px);
+    margin: 0 auto; /* Removed 40px vertical margin */
+    display: flex;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .ownership-section {
+        padding: var(--section-padding-mobile, 60px) 0;
+        width: 100%;
+        margin: 0;
+    }
+}
+
+
+.ownership-card {
+    background-color: #0F172A; /* Deep Dark Navy */
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Left Side: Error Header */
+.ownership-header-side {
+    padding: 40px; /* Reduced from 80px */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+
+
+.ownership-header-side .eyebrow {
+    color: #EAB308; /* Industrial Yellow */
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+}
+
+.ownership-header-side .main-title {
+    font-size: 48px;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 20px;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+}
+
+.ownership-header-side .subtitle {
+    font-size: 16px;
+    color: #94A3B8; /* Muted Slate */
+    line-height: 1.6;
+    font-weight: 400;
+    max-width: 400px;
+    margin: 0;
+}
+
+/* Right Side: Status List */
+.ownership-status-side {
+    padding: 40px; /* Reduced from 80px */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 24px; /* Reduced from 32px */
+    background: rgba(255, 255, 255, 0.01);
+}
+
+
+
+.status-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    transition: transform 0.3s ease;
+}
+
+.status-item:hover {
+    transform: translateX(8px);
+}
+
+.status-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    border: 1.5px solid transparent;
+}
+
+/* Specific Status Colors */
+.status-item.signal .status-icon-box {
+    background: rgba(234, 179, 8, 0.1);
+    border-color: rgba(234, 179, 8, 0.2);
+    color: #EAB308;
+}
+
+.status-item.module .status-icon-box {
+    background: rgba(244, 63, 94, 0.1);
+    border-color: rgba(244, 63, 94, 0.2);
+    color: #F43F5E;
+}
+
+.status-item.fallback .status-icon-box {
+    background: rgba(148, 163, 184, 0.1);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: #94A3B8;
+}
+
+.status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.status-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin: 0;
+}
+
+.status-desc {
+    font-size: 14px;
+    color: #94A3B8;
+    line-height: 1.5;
+    margin: 0;
+    max-width: 320px;
+}
+
+/* Responsive Styles */
+@media (max-width: 968px) {
+    .ownership-card {
+        grid-template-columns: 1fr;
+    }
+
+    .ownership-header-side {
+        padding: 40px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .ownership-status-side {
+        padding: 40px;
+    }
+
+    .ownership-header-side .main-title {
+        font-size: 36px;
+    }
+}
+
+@media (max-width: 640px) {
+    .ownership-section {
+        width: 100%;
+        margin: 20px 0;
+        padding: 0 16px;
+    }
+
+    .ownership-header-side {
+        padding: 30px 20px;
+    }
+
+    .ownership-status-side {
+        padding: 30px 20px;
+        gap: 24px;
+    }
+}

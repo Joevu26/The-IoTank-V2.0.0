@@ -1,0 +1,261 @@
+/* Dashboard.css - Amethyst Pro Bento Design System */
+
+:root {
+    --dash-spacing: 24px;
+    --dash-border-radius: 24px;
+    --dash-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.08);
+    --dash-bg-card: #ffffff;
+    --dash-bg-sub: #f8fafc;
+    --dash-gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --dash-glass-bg: rgba(255, 255, 255, 0.7);
+    --dash-glass-border: rgba(255, 255, 255, 0.4);
+}
+
+.dashboard-container {
+    padding: var(--dash-spacing);
+    max-width: 1600px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-areas:
+        "h h h h h h h h h h h h"
+        "s s s s s s s s q q q q"
+        "f f f f f f f f f f f f"
+        "o o o o o o o o a a a a";
+    gap: var(--dash-spacing);
+}
+
+/* 1. Mission Control Hero Area */
+.mission-control-hero {
+    grid-area: h;
+    background: var(--dash-bg-card);
+    border-radius: var(--dash-border-radius);
+    padding: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--dash-shadow);
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    position: relative;
+    overflow: hidden;
+}
+
+.mission-control-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+    z-index: 0;
+}
+
+.hero-content { position: relative; z-index: 1; }
+.hero-content h1 {
+    font-size: 3.5rem;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+
+/* 2. System Health - High Density Stats */
+.health-grid-bento {
+    grid-area: s;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.health-status-card-v2 {
+    background: var(--dash-bg-card);
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-shadow: var(--dash-shadow);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 180px;
+}
+
+.health-status-card-v2:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.12);
+    border-color: #e2e8f0;
+}
+
+.health-label-v2 {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+}
+
+.health-value-v2 {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1;
+}
+
+/* Integrity Progress Bar */
+.integrity-container {
+    margin-top: 16px;
+    width: 100%;
+}
+.integrity-label-small {
+    font-size: 0.6rem;
+    font-weight: 900;
+    color: #64748b;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.integrity-bar-bg {
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.integrity-bar-fill {
+    height: 100%;
+    background: var(--dash-gradient-primary);
+    border-radius: 2px;
+    transition: width 1s ease-out;
+}
+
+/* 3. Quick Actions - Command Bar */
+.command-center-bar {
+    grid-area: q;
+    background: #1e293b;
+    border-radius: var(--dash-border-radius);
+    padding: 32px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.command-title {
+    font-size: 0.9rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cmd-btn {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s;
+    cursor: pointer;
+    text-align: left;
+}
+
+.cmd-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #6366f1;
+    transform: translateX(4px);
+}
+
+.cmd-icon {
+    font-size: 1.1rem;
+    color: #818cf8;
+}
+
+.cmd-details .title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #f1f5f9;
+    line-height: 1.2;
+}
+
+.cmd-details .desc {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+/* 4. Financial Command Area */
+.financial-bento-area {
+    grid-area: f;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.fin-card-premium {
+    background: white;
+    border-radius: 24px;
+    padding: 32px;
+    box-shadow: var(--dash-shadow);
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px;
+}
+
+.fin-card-premium.accent {
+    background: #0f172a;
+    color: white;
+}
+
+/* 5. Support & Activity */
+.ops-grid-wrapper {
+    grid-area: o;
+}
+.audit-feed-wrapper {
+    grid-area: a;
+}
+
+.ops-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* Utility Classes */
+.glass-panel {
+    background: var(--dash-glass-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--dash-glass-border);
+}
+
+.text-gradient {
+    background: var(--dash-gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Scrollbar Refinement */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+
+/* Responsive Overrides */
+@media (max-width: 1200px) {
+    .dashboard-container {
+        grid-template-areas:
+            "h h h h"
+            "s s s s"
+            "q q q q"
+            "f f f f"
+            "o o o o"
+            "a a a a";
+        grid-template-columns: 1fr;
+    }
+}

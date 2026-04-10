@@ -1,0 +1,170 @@
+.analytics-page {
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
+    padding: 32px;
+}
+
+/* KPI Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.kpi-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kpi-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+}
+
+.kpi-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+.kpi-growth {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.kpi-growth.positive { color: #10b981; }
+.kpi-growth.negative { color: #ef4444; }
+
+/* Business Chart Layouts */
+.analytics-dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.chart-container {
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    padding: 24px;
+    min-height: 300px;
+}
+
+/* Usage Stats */
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.usage-card {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.adoption-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.progress-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 2px;
+}
+
+/* Financial Reports */
+.report-template-card {
+    background: #0a0a0a;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+
+.report-template-card:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(var(--primary-rgb), 0.2);
+}
+
+/* Custom Builder Sidebar */
+.builder-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+}
+
+.builder-controls {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Behavioral Funnel */
+.funnel-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 600px;
+    margin: 40px auto;
+}
+
+.funnel-step {
+    height: 60px;
+    background: linear-gradient(90deg, var(--primary-color), rgba(var(--primary-rgb), 0.3));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.funnel-step::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 10%;
+    width: 80%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+}
+
+/* Scheduled Reports */
+.scheduler-list {
+    margin-top: 24px;
+}
+
+.schedule-item {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 16px 0;
+}

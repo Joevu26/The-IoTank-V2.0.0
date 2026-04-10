@@ -1,0 +1,275 @@
+/* =============================================================================
+   Skeleton Loader Components
+   Modern loading states with smooth animations
+   ============================================================================= */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-tertiary) 0%,
+    rgba(180, 140, 255, 0.1) 50%,
+    var(--color-bg-tertiary) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--border-radius-sm);
+  display: inline-block;
+  line-height: 1;
+}
+
+/* Pulse Animation */
+.skeleton-pulse {
+  animation: skeleton-pulse 2s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Wave Animation */
+.skeleton-wave {
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-wave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Skeleton Variants */
+.skeleton-text {
+  height: 1em;
+  margin: 0;
+}
+
+.skeleton-rectangular {
+  border-radius: var(--border-radius-md);
+}
+
+.skeleton-circular {
+  border-radius: 50%;
+}
+
+/* Dark mode adjustments */
+:root[data-theme='dark'] .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Text Container */
+.skeleton-text-container {
+  width: 100%;
+}
+
+/* Card Skeletons */
+.skeleton-card {
+  margin-bottom: var(--spacing-lg);
+}
+
+.skeleton-card-header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-lg);
+  border-bottom: var(--border-width-thin) solid var(--color-divider);
+}
+
+.skeleton-card-body {
+  padding: var(--spacing-lg);
+}
+
+/* Tank Card Skeleton */
+.skeleton-tank-card {
+  min-height: 280px;
+}
+
+.skeleton-tank-header {
+  padding: var(--spacing-lg) var(--spacing-lg) 0;
+}
+
+.skeleton-tank-visual {
+  padding: 0 var(--spacing-lg);
+}
+
+.skeleton-tank-metrics {
+  padding: var(--spacing-lg);
+}
+
+.skeleton-tank-footer {
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+/* Dashboard Skeleton */
+.skeleton-dashboard {
+  padding: var(--spacing-lg);
+}
+
+.skeleton-dashboard-header {
+  padding-bottom: var(--spacing-lg);
+  border-bottom: var(--border-width-thin) solid var(--color-divider);
+}
+
+/* Table Skeleton */
+.skeleton-table-header {
+  padding: var(--spacing-base);
+  border-bottom: var(--border-width-thin) solid var(--color-border);
+}
+
+.skeleton-table-row {
+  padding: var(--spacing-base);
+}
+
+/* Chart Skeleton */
+.skeleton-chart-header {
+  padding: var(--spacing-lg) var(--spacing-lg) 0;
+}
+
+.skeleton-chart-body {
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+/* Analytics Skeleton */
+.skeleton-analytics {
+  padding: var(--spacing-lg);
+}
+
+/* Settings Skeleton */
+.skeleton-settings {
+  padding: var(--spacing-lg);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .skeleton-dashboard {
+    padding: var(--spacing-base);
+  }
+  
+  .skeleton-tank-card {
+    min-height: 240px;
+  }
+  
+  .skeleton-card-header {
+    padding: var(--spacing-base);
+  }
+  
+  .skeleton-card-body {
+    padding: var(--spacing-base);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-pulse,
+  .skeleton-wave {
+    animation: none;
+  }
+  
+  .skeleton {
+    background: var(--color-bg-tertiary);
+    opacity: 0.7;
+  }
+  
+  :root[data-theme='dark'] .skeleton {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .skeleton {
+    background: var(--color-border);
+    opacity: 0.8;
+  }
+  
+  :root[data-theme='dark'] .skeleton {
+    background: var(--color-text-secondary);
+    opacity: 0.6;
+  }
+}
+
+/* Loading overlay for full page skeletons */
+.skeleton-page-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--color-bg-primary);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+}
+
+.skeleton-page-content {
+  width: 100%;
+  max-width: var(--container-max-width);
+}
+
+/* Skeleton group for multiple related skeletons */
+.skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-base);
+}
+
+.skeleton-group-horizontal {
+  flex-direction: row;
+  align-items: center;
+}
+
+/* Skeleton with shimmer effect for premium feel */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 2s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+:root[data-theme='dark'] .skeleton-shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+}

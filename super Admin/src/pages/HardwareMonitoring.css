@@ -1,0 +1,478 @@
+:root {
+    --neon-cyan: var(--color-accent-primary);
+    --neon-cyan-rgb: 0, 212, 255;
+    --neon-pink: var(--color-accent-pink);
+    --neon-emerald: var(--color-success);
+    --neon-amber: var(--color-warning);
+    --neon-rose: var(--color-danger);
+    --bg-darker: var(--color-bg-primary);
+    --bg-surface: var(--color-bg-secondary);
+    --glass-border: var(--color-border);
+}
+
+.hardware-page {
+    background: var(--bg-darker);
+    min-height: 100vh;
+    color: var(--color-text-primary);
+    padding: 2rem;
+    font-family: var(--font-family-primary);
+}
+
+/* 1. Futuristic Header */
+.hw-header-advanced {
+    margin-bottom: 2.5rem;
+}
+
+.hw-title-glitch {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    color: var(--neon-cyan);
+    text-transform: lowercase;
+    position: relative;
+    display: inline-block;
+}
+
+.hw-live-pulse {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: var(--color-success-bg);
+    border: 1px solid var(--color-success-border);
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-success);
+}
+
+/* 2. Industrial Navigation */
+.hw-tabs-modern {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--bg-surface);
+    padding: 0.4rem;
+    border-radius: 1rem;
+    border: 1px solid var(--glass-border);
+    width: fit-content;
+    margin-bottom: 2.5rem;
+}
+
+.hw-tab-btn-modern {
+    padding: 0.6rem 1.25rem;
+    border-radius: 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.hw-tab-btn-modern:hover {
+    color: var(--color-text-primary);
+    background: rgba(122, 122, 149, 0.05); /* soft neutral hover */
+}
+
+
+.hw-tab-btn-modern.active {
+    background: var(--color-accent-primary-light);
+    color: var(--color-accent-primary);
+    box-shadow: 0 0 20px var(--color-accent-primary-light);
+    border: 1px solid var(--color-accent-primary);
+}
+
+/* 3. Metrics Modules */
+.hw-node-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.hw-node-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.hw-node-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.hw-node-card.active::before { background: var(--neon-emerald); box-shadow: 0 0 15px var(--neon-emerald); }
+.hw-node-card.warning::before { background: var(--neon-amber); box-shadow: 0 0 15px var(--neon-amber); }
+.hw-node-card.critical::before { background: var(--neon-rose); box-shadow: 0 0 15px var(--neon-rose); }
+
+/* 4. Circular Gauges (CSS-only basis) */
+.gauge-container {
+    width: 120px;
+    height: 120px;
+    position: relative;
+}
+
+.gauge-svg-ring {
+    transform: rotate(-90deg);
+}
+
+.gauge-circle-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.03);
+    stroke-width: 8;
+}
+
+.gauge-circle-val {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease-in-out;
+}
+
+/* 5. High-Density Mission Table */
+.mission-table-container {
+    background: var(--bg-surface);
+    border-radius: 1.5rem;
+    border: 1px solid var(--glass-border);
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.mission-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.mission-table th {
+    background: var(--color-bg-tertiary);
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-secondary);
+}
+
+.mission-table td {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--glass-border);
+    font-size: 0.8rem;
+    color: var(--color-text-primary);
+}
+
+.mission-table tr:hover td {
+    background: var(--color-bg-tertiary);
+}
+
+/* Status Pills */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.status-pill.online { background: rgba(16, 185, 129, 0.1); color: var(--neon-emerald); }
+.status-pill.offline { background: rgba(244, 63, 94, 0.1); color: var(--neon-rose); }
+
+/* RSSI Signal Bars */
+.signal-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 12px;
+}
+
+.signal-bar {
+    width: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 1px;
+}
+
+.signal-bar.active { background: var(--neon-emerald); box-shadow: 0 0 5px var(--neon-emerald); }
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-mission-control {
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 6. Terminal System */
+.hw-terminal-wrapper {
+    background: #08081a; /* Deep Branded Navy */
+    border-radius: 1.5rem;
+    border: 1px solid rgba(var(--neon-cyan-rgb), 0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: inset 0 0 30px rgba(var(--neon-cyan-rgb), 0.05);
+}
+
+.hw-terminal-header {
+    background: rgba(0, 212, 255, 0.05);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hw-terminal-body {
+    padding: 1.5rem;
+    font-family: var(--font-family-mono);
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--neon-cyan);
+    overflow-y: auto;
+}
+
+/* 7. Filter & Actions */
+.hw-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    background: var(--bg-surface);
+    padding: 1rem;
+    border-radius: 1.25rem;
+    border: 1px solid var(--glass-border);
+}
+
+.hw-search-input {
+    width: 100%;
+    background: var(--bg-darker);
+    border: 1px solid var(--glass-border);
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    color: var(--color-text-primary);
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.hw-search-input:focus {
+    outline: none;
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 0 3px var(--color-accent-primary-light);
+}
+
+.hw-action-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--neon-cyan);
+    color: #fff;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.hw-action-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+/* 8. Binary Repository */
+.hw-binary-card {
+    padding: 1.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.hw-binary-card:hover {
+    border-color: var(--neon-cyan);
+    transform: translateY(-2px);
+}
+
+.hw-binary-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: var(--color-accent-primary-light);
+    color: var(--neon-cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+}
+
+.hw-binary-type {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    background: var(--color-accent-primary-light);
+    color: var(--neon-cyan);
+    border-radius: 4px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+}
+
+.hw-deploy-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-darker);
+    border: 1px solid var(--glass-border);
+    border-radius: 0.75rem;
+    color: var(--color-text-primary);
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.hw-deploy-btn:hover {
+    background: var(--neon-cyan);
+    color: #fff;
+    border-color: var(--neon-cyan);
+}
+
+/* Scrollbars */
+.terminal-view::-webkit-scrollbar {
+    width: 4px;
+}
+.terminal-view::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.2);
+    border-radius: 10px;
+}
+
+/* 9. Safety Switches & Command Interlocks */
+.hw-command-plate {
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.hw-command-plate.destructive {
+    border-color: rgba(var(--neon-rose), 0.1);
+}
+
+.hw-command-plate.destructive:hover {
+    border-color: var(--neon-rose);
+    box-shadow: 0 0 20px rgba(var(--neon-rose), 0.05);
+}
+
+.hw-safety-switch {
+    width: 64px;
+    height: 32px;
+    background: var(--bg-darker);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.hw-safety-switch.armed {
+    background: var(--neon-rose);
+    border-color: var(--neon-rose);
+}
+
+.hw-switch-toggle {
+    width: 24px;
+    height: 24px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hw-safety-switch.armed .hw-switch-toggle {
+    left: 35px;
+}
+
+/* 10. Deployment Monitor Panels */
+.hw-rollout-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.5rem;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.hw-rollout-header {
+    background: var(--color-bg-tertiary);
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.hw-metric-ring-large {
+    width: 140px;
+    height: 140px;
+    position: relative;
+}
+
+/* 11. Developer Environment Boards */
+.hw-env-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.hw-env-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 1.25rem;
+    padding: 1.5rem;
+    position: relative;
+}
+
+.hw-env-led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    position: relative;
+}
+
+.hw-env-led.live { background: #10b981; box-shadow: 0 0 10px #10b981; }
+.hw-env-led.down { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+.hw-env-led.testing { background: #00D4FF; box-shadow: 0 0 10px #00D4FF; }
+
+/* 12. Data Workstation Frame */
+.hw-data-station-frame {
+    border-radius: 1.5rem;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-darker);
+    padding: 1.5rem;
+    height: 800px;
+    display: flex;
+    flex-direction: column;
+}
+

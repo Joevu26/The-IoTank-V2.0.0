@@ -1,0 +1,382 @@
+/* =============================================================================
+   EXCELLENCE SECTION - GOLDEN CIRCLE OVERHAUL
+   ============================================================================= */
+
+.excellence-section {
+    padding: var(--section-padding-desktop, 60px) 0;
+    background-color: transparent;
+    width: 100%;
+    overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    .excellence-section {
+        padding: var(--section-padding-mobile, 32px) 0;
+    }
+}
+
+
+.excellence-container {
+    max-width: 1550px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1.2fr 1.2fr;
+    gap: 30px;
+    padding: 0 40px;
+    align-items: center;
+}
+
+/* Left Column: Header */
+.excellence-header {
+    text-align: left;
+}
+
+.excellence-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border: 1.5px solid #CCAAE6;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #CCAAE6;
+    margin-bottom: 12px; /* Reduced from 20px */
+    background: rgba(204, 170, 230, 0.05);
+}
+
+.excellence-title {
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    line-height: 1.05;
+    font-weight: 900;
+    color: #FFFFFF;
+    margin-bottom: 0.5rem; /* Reduced from 0.75rem */
+    letter-spacing: -2px;
+}
+
+
+
+.excellence-title .excellence-highlight {
+    color: #00D2BE;
+}
+
+.excellence-intro {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.7;
+    max-width: 400px;
+}
+
+/* Middle Column: Golden Circle Art */
+.excellence-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.circle-infographic {
+    width: 450px;
+    height: 450px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Central Hub - Lilac with Amethyst/Plum Halo */
+.central-hub {
+    width: 140px;
+    height: 140px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #1b0a2e;
+    z-index: 20;
+    position: relative;
+    /* Purple Glow */
+    box-shadow: 
+        0 0 40px rgba(167, 136, 220, 0.4),
+        0 0 80px rgba(79, 17, 118, 0.2);
+    border: 1px solid rgba(167, 136, 220, 0.1);
+}
+
+.hub-core {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hub-value {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #1A202C;
+}
+
+.hub-label {
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #f59e0b;
+    /* Orange text */
+}
+
+/* Warm Circle Gradient Orbits */
+.orbit-ring {
+    position: absolute;
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+.ring-1 {
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0) 70%);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.ring-2 {
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0) 70%);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.ring-3 {
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0) 70%);
+    border: 1px solid rgba(245, 158, 11, 0.1);
+}
+
+/* Orbiting Encircled Text Nodes - Lilac Style */
+.orbit-node {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #CCAAE6;
+    box-shadow: 0 0 15px rgba(204, 170, 230, 0.3);
+}
+
+.node-label {
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #1A202C;
+    /* Black Text */
+    letter-spacing: 0.5px;
+    text-align: center;
+    line-height: 1;
+}
+
+@keyframes activeOrbit {
+    from {
+        offset-distance: 0%;
+    }
+
+    to {
+        offset-distance: 100%;
+    }
+}
+
+/* Reliability Node - Inner Orbit */
+.node-reliability {
+    offset-path: circle(110px at 50% 50%);
+    animation: activeOrbit 12s linear infinite;
+    transform: none;
+    /* Let animation verify position */
+}
+
+/* Safety Node - Middle Orbit */
+.node-safety {
+    offset-path: circle(160px at 50% 50%);
+    animation: activeOrbit 18s linear infinite reverse;
+    transform: none;
+}
+
+/* Accuracy Node - Outer Orbit (Fixed 3rd Path) */
+.node-accuracy {
+    offset-path: circle(210px at 50% 50%);
+    animation: activeOrbit 24s linear infinite;
+    transform: none;
+}
+
+/* Right Column: Features - Closer Proximity */
+.excellence-features {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* Tighter gap */
+    position: relative;
+    padding-left: 0;
+    /* Remove left padding to bring closer */
+}
+
+/* Correct Convex Curvature ( hugging the circle from the right) */
+.excellence-feature-item:nth-child(1) {
+    transform: translateX(-60px) translateY(10px);
+}
+
+.excellence-feature-item:nth-child(2) {
+    transform: translateX(0px) translateY(0);
+}
+
+.excellence-feature-item:nth-child(3) {
+    transform: translateX(0px) translateY(0);
+}
+
+.excellence-feature-item:nth-child(4) {
+    transform: translateX(-60px) translateY(-10px);
+}
+
+/* Glassmorphic Features - Dark Mode Harmony */
+.excellence-feature-item:hover {
+    transform: translateY(-8px) !important;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #00D2BE;
+}
+
+.excellence-feature-item {
+    display: flex;
+    gap: 16px; /* Reduced from 20px */
+    align-items: flex-start;
+    padding: 16px 20px; /* Reduced from 24px */
+    background: rgba(59, 22, 92, 0.3); /* Plum Translucent */
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(204, 170, 230, 0.1);
+    border-radius: 16px; /* Slightly tighter radius */
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    max-width: 440px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+
+.feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.feature-content {
+    text-align: left;
+}
+
+.feature-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.feature-desc {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.55);
+    line-height: 1.6;
+    margin-bottom: 0;
+}
+
+/* Responsiveness */
+@media (max-width: 1300px) {
+    .excellence-container {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .excellence-visual {
+        grid-row: 1;
+        grid-column: 2;
+    }
+
+    .excellence-features {
+        grid-column: 1 / span 2;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .excellence-feature-item {
+        flex: 1 1 45%;
+    }
+}
+
+@media (max-width: 640px) {
+    .excellence-section {
+        padding: 5px 0 20px 0;
+    }
+
+    .excellence-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 0 16px;
+    }
+
+    .circle-infographic {
+        width: 260px;
+        height: 260px;
+        transform: scale(0.7);
+        margin: -40px auto; /* Tighter for mobile density */
+    }
+
+
+    .excellence-title {
+        font-size: 24px;
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+    }
+
+    .excellence-tagline {
+        margin-bottom: 0.5rem;
+        font-size: 11px;
+    }
+
+    .excellence-intro {
+        font-size: 14px;
+        max-width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .excellence-features {
+        gap: 10px;
+    }
+
+    .excellence-feature-item {
+        padding: 10px 14px;
+        gap: 12px;
+        border-radius: 14px;
+    }
+
+    .feature-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    .feature-title {
+        font-size: 16px;
+        margin-bottom: 4px;
+    }
+
+    .feature-desc {
+        font-size: 12px;
+        line-height: 1.4;
+    }
+}

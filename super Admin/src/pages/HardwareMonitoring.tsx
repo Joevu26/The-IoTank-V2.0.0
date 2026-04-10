@@ -1,0 +1,554 @@
+import React, { useState, useEffect } from 'react';
+import Layout from '../components/Layout';
+import { hardwareService, Device, FirmwareVersion, OTACampaign, DevTask } from '../services/hardwareService';
+import { 
+    FiCpu, FiHardDrive, FiActivity, FiMapPin, 
+    FiWifi, FiServer, FiSettings, FiRefreshCw, 
+    FiUploadCloud, FiDownload, FiAlertTriangle, FiCheckCircle, FiClock,
+    FiPlus, FiFilter, FiSearch, FiMoreVertical, FiTerminal,
+    FiGitCommit, FiLayers, FiList, FiTrendingUp, FiChevronRight, FiMaximize2,
+    FiShield, FiDatabase, FiCloudLightning, FiCode
+} from 'react-icons/fi';
+import { BackendTab } from '../components/Hardware/BackendTab';
+import './HardwareMonitoring.css';
+
+const HardwareMonitoring: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<'overview' | 'registry' | 'detail' | 'firmware' | 'actions' | 'dev' | 'backend'>('overview');
+    const [stats, setStats] = useState<any>(null);
+    const [devices, setDevices] = useState<Device[]>([]);
+    const [firmware, setFirmware] = useState<FirmwareVersion[]>([]);
+    const [campaigns, setCampaigns] = useState<OTACampaign[]>([]);
+    const [tasks, setTasks] = useState<DevTask[]>([]);
+    const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [safetyArmed, setSafetyArmed] = useState(false);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [statsData, devicesData, firmwareData, campaignsData, tasksData] = await Promise.all([
+                    hardwareService.getDeviceStats(),
+                    hardwareService.getDevices(),
+                    hardwareService.getFirmwareLibrary(),
+                    hardwareService.getOTACampaigns(),
+                    hardwareService.getDevTasks()
+                ]);
+                setStats(statsData);
+                setDevices(devicesData);
+                setFirmware(firmwareData);
+                setCampaigns(campaignsData);
+                setTasks(tasksData);
+            } catch (error) {
+                console.error('Error fetching hardware data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const handleDeviceClick = (device: Device) => {
+        setSelectedDevice(device);
+        setActiveTab('detail');
+    };
+
+    const renderCircularGauge = (value: number, label: string, color: string) => {
+        const radius = 45;
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (value / 100) * circumference;
+
+        return (
+            <div className="flex flex-col items-center">
+                <div className="gauge-container mb-4">
+                    <svg className="w-full h-full gauge-svg-ring" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r={radius} className="gauge-circle-bg" />
+                        <circle 
+                            cx="50" cy="50" r={radius} 
+                            className="gauge-circle-val" 
+                            stroke={color}
+                            strokeDasharray={circumference}
+                            strokeDashoffset={offset}
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-black tracking-tighter" style={{ color }}>{value}%</span>
+                    </div>
+                </div>
+                <span className="text-[10px] font-black uppercase opacity-40 tracking-widest">{label}</span>
+            </div>
+        );
+    };
+
+    const renderOverview = () => (
+        <div className="hw-overview animate-mission-control">
+            <div className="hw-node-grid">
+                {[
+                    { label: 'Active Nodes', val: stats?.online, total: `${stats?.total} total`, status: 'active', color: 'text-emerald-500' },
+                    { label: 'Uptime Integrity', val: `${stats?.avgUptime}%`, total: 'Target 99.9%', status: 'active', color: 'text-cyan-400' },
+                    { label: 'Terminal Offline', val: stats?.offline, total: 'Critically Low', status: 'critical', color: 'text-rose-500' },
+                    { label: 'Update Pipeline', val: stats?.needingUpdate, total: 'Awaiting Rollout', status: 'warning', color: 'text-amber-500' }
+                ].map((node, i) => (
+                    <div key={i} className={`hw-node-card ${node.status}`}>
+                        <div className="flex justify-between items-start mb-4">
+                            <span className="text-[10px] font-black uppercase opacity-40 tracking-widest">{node.label}</span>
+                            <FiMaximize2 className="opacity-20 hover:opacity-100 cursor-pointer" />
+                        </div>
+                        <h2 className={`text-4xl font-black tracking-tighter mb-1 ${node.color}`}>{node.val}</h2>
+                        <div className="text-[9px] font-bold opacity-30 uppercase">{node.total}</div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-12 gap-8">
+                <div className="col-span-8">
+                    <div className="mission-table-container">
+                        <div className="p-6 border-b border-white border-opacity-5 flex justify-between items-center">
+                            <h3 className="text-xs font-black uppercase tracking-widest">Recent node telemetry</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="mission-table">
+                                <thead>
+                                    <tr>
+                                        <th>Node ID</th>
+                                        <th>Target Profile</th>
+                                        <th>Last Pulse</th>
+                                        <th>Link Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {devices.slice(0, 5).map(d => (
+                                        <tr key={d.id} className="cursor-pointer" onClick={() => handleDeviceClick(d)}>
+                                            <td className="font-mono text-xs font-black text-neon-cyan">#{d.device_id.substring(0, 8)}</td>
+                                            <td className="font-bold text-xs uppercase opacity-80">{d.station_name}</td>
+                                            <td className="text-[10px] opacity-40 font-bold italic">{new Date().toLocaleTimeString()}</td>
+                                            <td>
+                                                <div className={`status-pill ${d.status === 'online' ? 'online' : 'offline'}`}>
+                                                    {d.status}
+                                                </div>
+                                            </td>
+                                            <td><FiChevronRight className="opacity-20" /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="col-span-4">
+                    <div className="hw-terminal-wrapper h-full">
+                        <div className="hw-terminal-header">
+                           <div className="flex items-center gap-2">
+                                <FiTerminal className="text-neon-cyan" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-neon-cyan">Node_Stream.sh</span>
+                           </div>
+                        </div>
+                        <div className="hw-terminal-body terminal-view min-h-[300px]">
+                            <div>[SYSTEM] INITIALIZING TELEMETRY STREAM...</div>
+                            <div className="opacity-40"># FETCHING CORE METRICS...</div>
+                            <div className="mt-2 text-neon-emerald">SUCCESS: Link established with HUB_01</div>
+                            <div className="mt-4 text-neon-rose">WARNING: HUB_04 latencies exceeding 400ms</div>
+                            <div className="mt-4 text-neon-cyan animate-pulse">_ EXEC_CMD_0X92... LOADING</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderRegistry = () => (
+        <div className="hw-registry animate-mission-control">
+            <div className="hw-filter-bar mb-8">
+                <div className="relative flex-1">
+                    <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" />
+                    <input type="text" placeholder="Search Node Fleet..." className="hw-search-input pl-12" />
+                </div>
+                <button className="hw-action-btn">
+                    <FiDownload /> Export Cluster.log
+                </button>
+            </div>
+
+            <div className="mission-table-container">
+                <table className="mission-table">
+                    <thead>
+                        <tr>
+                            <th>UID / NODE_NAME</th>
+                            <th>Station Segment</th>
+                            <th>Firmware</th>
+                            <th>Operational State</th>
+                            <th>Link Strength</th>
+                            <th className="text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {devices.map(d => (
+                            <tr key={d.id} className="cursor-pointer" onClick={() => handleDeviceClick(d)}>
+                                <td>
+                                    <div className="flex flex-col">
+                                        <span className="font-mono text-xs font-black text-neon-cyan">{d.device_id}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="font-bold text-xs">{d.station_name}</div>
+                                    <div className="text-[10px] opacity-40 uppercase font-black">{d.client_name}</div>
+                                </td>
+                                <td>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${d.firmware_version === '2.6.0' ? 'bg-emerald-500' : 'bg-amber-500 shadow-[0_0_10px_#f59e0b]'}`}></div>
+                                        <span className="text-xs font-bold font-mono opacity-80">{d.firmware_version}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className={`status-pill ${d.status === 'online' ? 'online' : 'offline'}`}>
+                                        {d.status}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div className="signal-bars">
+                                        {[1,2,3,4,5].map(b => (
+                                            <div key={b} className={`signal-bar ${b <= (d.signal_strength === 'excellent' ? 5 : 2) ? 'active' : ''}`} style={{ height: `${b * 3}px` }}></div>
+                                        ))}
+                                    </div>
+                                </td>
+                                <td className="text-right">
+                                    <button className="icon-btn hover:text-neon-cyan" onClick={(e) => {e.stopPropagation();}}><FiSettings /></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
+    const renderDetail = () => {
+        if (!selectedDevice) return <div className="text-center py-20 opacity-40">No device selected</div>;
+        return (
+            <div className="hw-detail animate-mission-control">
+                <div className="flex justify-between items-center mb-10">
+                    <div className="flex items-center gap-4">
+                        <button className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-[var(--glass-border)] bg-[var(--bg-surface)] hover:bg-[var(--color-bg-tertiary)]" onClick={() => setActiveTab('registry')}>Back to Cluster</button>
+                        <div>
+
+                             <h2 className="text-3xl font-black lowercase tracking-tighter">node: <span className="text-neon-cyan">{selectedDevice.device_id}</span></h2>
+                             <span className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em]">{selectedDevice.station_name} /// SEGMENT_DELTA_09</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="hw-node-card p-10 flex flex-col items-center justify-center bg-[var(--bg-surface)]">
+                        {renderCircularGauge(selectedDevice.cpu_usage, 'CPU Load', 'var(--neon-cyan)')}
+                    </div>
+
+                    <div className="hw-node-card p-10 flex flex-col items-center justify-center bg-[var(--bg-surface)]">
+                        {renderCircularGauge(selectedDevice.ram_usage, 'RAM Memory', 'var(--neon-emerald)')}
+                    </div>
+
+                    <div className="hw-node-card p-0 flex flex-col border-[var(--glass-border)] h-full bg-[var(--bg-surface)]">
+                        <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--color-bg-tertiary)] bg-opacity-50">
+                            <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Live Telemetric Feed</span>
+                        </div>
+                        <div className="p-8 flex-1 flex flex-col gap-6">
+                            <div className="flex justify-between items-end border-b border-white border-opacity-5 pb-4">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase opacity-30 tracking-widest block mb-1">Dip Distance</span>
+                                    <span className="text-3xl font-black font-mono tracking-tighter">1,245 <small className="text-xs opacity-30 font-bold">mm</small></span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase opacity-30 tracking-widest block mb-1">Ambient Temp</span>
+                                    <span className="text-3xl font-black font-mono tracking-tighter" style={{ color: selectedDevice.temp > 50 ? 'var(--neon-rose)' : 'inherit' }}>{selectedDevice.temp}°C</span>
+                                </div>
+                                <FiActivity className={selectedDevice.temp > 50 ? 'text-rose-500 animate-pulse' : 'text-neon-cyan opacity-30'} size={24} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderFirmware = () => (
+        <div className="hw-firmware animate-mission-control">
+            <div className="grid grid-cols-12 gap-8">
+                <div className="col-span-12 xl:col-span-8">
+                     <div className="hw-node-card p-0 bg-[var(--bg-surface)]">
+                        <div className="p-6 border-b border-[var(--glass-border)] flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xs font-black uppercase tracking-widest">Binary Repository / Repository_v2</h3>
+                                <span className="text-[10px] font-bold opacity-30 mt-1 block uppercase font-mono">Rollout Management Console</span>
+                            </div>
+                            <button className="hw-action-btn bg-neon-pink">
+                                <FiUploadCloud /> Upload New Binary
+                            </button>
+                        </div>
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {firmware.map(f => (
+                                <div key={f.id} className="hw-binary-card group">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="hw-binary-icon">
+                                                <FiLayers size={20} />
+                                            </div>
+                                            <div>
+                                                <div className="text-lg font-black tracking-tighter">{f.version}</div>
+                                                <span className="hw-binary-type">{f.type}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mb-6 flex flex-col gap-2">
+                                        <div className="flex justify-between text-[10px] font-bold uppercase opacity-30">
+                                            <span>Compatibility</span>
+                                            <span className="text-neon-cyan">ESP32-S3</span>
+                                        </div>
+                                        <div className="h-1 bg-[var(--glass-border)] rounded-full overflow-hidden">
+                                            <div className="h-full bg-neon-cyan w-full opacity-30"></div>
+                                        </div>
+                                    </div>
+                                    <button className="hw-deploy-btn">
+                                        Initiate Deployment
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                     </div>
+                </div>
+
+                <div className="col-span-12 xl:col-span-4">
+                    <div className="hw-rollout-panel">
+                        <div className="hw-rollout-header">
+                            <span className="status-pill online mb-4">Rollout Monitor</span>
+                            <h4 className="text-xl font-black tracking-tighter lowercase mb-6">{campaigns[0]?.name || 'Global Rollout 2.6.0'}</h4>
+                            <div className="flex justify-center mb-8">
+                                 <div className="hw-metric-ring-large text-emerald-500">
+                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+                                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="283" strokeDashoffset={283 - (283 * 0.45)} />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-3xl font-black">45%</span>
+                                        <span className="text-[10px] font-bold opacity-30 uppercase">Synced</span>
+                                    </div>
+                                 </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-[#08081a] flex-1 min-h-[300px]">
+                            <div className="flex items-center gap-2 mb-4 text-neon-cyan opacity-50">
+                                <FiActivity size={12} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Deployment_Buffer.log</span>
+                            </div>
+                            <div className="font-mono text-[9px] text-[#A2A4B8] space-y-2">
+                                <div>[10:42] HUB_01: ACK SEGMENT 0XFF_READY</div>
+                                <div className="text-neon-emerald">[10:42] HUB_02: DOWNLOAD_START (2.4MB)</div>
+                                <div>[10:43] HUB_05: VERIFYING CHECKSUM...</div>
+                                <div className="text-neon-rose">[10:43] HUB_09: LINK_TIMEOUT (RETRY 2/5)</div>
+                                <div className="animate-pulse">_ EXEC_ROLLOUT_BURST...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderActions = () => (
+        <div className="hw-actions animate-mission-control">
+            <div className="flex justify-between items-end mb-10">
+                <div>
+                   <h2 className="text-3xl font-black lowercase tracking-tighter">Remote Fleet Control</h2>
+                   <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] mt-1">Super Admin Administrative Overrides</p>
+                </div>
+                <div className="flex items-center gap-4 bg-[var(--bg-surface)] p-4 rounded-2xl border border-[var(--glass-border)]">
+                    <div className="text-right">
+                        <span className="text-[9px] font-black uppercase opacity-40 block">Safety Mode</span>
+                        <span className={`text-[10px] font-black uppercase ${safetyArmed ? 'text-neon-rose' : 'text-emerald-500'}`}>{safetyArmed ? 'ARMED / DANGEROUS' : 'LOCKED / SECURE'}</span>
+                    </div>
+                    <div 
+                        className={`hw-safety-switch ${safetyArmed ? 'armed' : ''}`}
+                        onClick={() => setSafetyArmed(!safetyArmed)}
+                    >
+                        <div className="hw-switch-toggle shadow-lg"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {[
+                    { icon: <FiRefreshCw />, title: 'Bulk System Reboot', desc: 'Propagate graceful restart command across all online nodes in the fleet.', action: 'Broadcast Reboot', risk: 'safe' },
+                    { icon: <FiCloudLightning />, title: 'Force Connectivity Sync', desc: 'Interrupt current radio state and perform a full handshake with Supabase edge.', action: 'Force Sync', risk: 'safe' },
+                    { icon: <FiTerminal />, title: 'Remote Diagnostic Scan', desc: 'Execute comprehensive sensory and radio diagnostic routine on all nodes.', action: 'Trigger Diagnostic', risk: 'safe' },
+                    { icon: <FiShield />, title: 'Clear Security Buffers', desc: 'Flush all local telemetry cache and security event buffers from node flash.', action: 'Flush Buffers', risk: 'warning' },
+                    { icon: <FiDatabase />, title: 'Node Re-Provisioning', desc: 'Securely re-bind node identity keys and infrastructure parameters.', action: 'Re-Provision', risk: 'warning' },
+                    { icon: <FiAlertTriangle />, title: 'Fleet Factory Reset', desc: 'CRITICAL: Wipe all flash segments and return entire fleet to base OS binaries.', action: 'Execute Wipe', risk: 'destructive' }
+                ].map((act, i) => (
+                    <div key={i} className={`hw-command-plate ${act.risk}`}>
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-xl ${act.risk === 'destructive' ? 'bg-neon-rose/10 text-neon-rose' : 'bg-neon-cyan/10 text-neon-cyan'}`}>
+                            {act.icon}
+                        </div>
+                        <h4 className="font-bold text-xl mb-3 tracking-tight">{act.title}</h4>
+                        <p className="text-xs opacity-50 mb-8 leading-relaxed h-12 overflow-hidden">{act.desc}</p>
+                        <button 
+                            className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                act.risk === 'destructive' 
+                                    ? (safetyArmed ? 'bg-neon-rose text-white hover:scale-[1.02]' : 'bg-[var(--glass-border)] text-[var(--color-text-disabled)] cursor-not-allowed')
+                                    : 'bg-[var(--bg-surface)] border border-[var(--glass-border)] hover:bg-neon-cyan hover:text-white hover:border-neon-cyan'
+                            }`}
+                            disabled={act.risk === 'destructive' && !safetyArmed}
+                        >
+                            {act.action}
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    const renderDev = () => (
+        <div className="hw-dev animate-mission-control">
+            <div className="flex justify-between items-start mb-12">
+                <div>
+                   <h2 className="text-3xl font-black lowercase tracking-tighter">Developer Supervision</h2>
+                   <p className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] mt-1">Environment Health & CI/CD Pipelines</p>
+                </div>
+                <button className="hw-action-btn bg-[var(--bg-surface)] border border-[var(--glass-border)] text-[var(--color-text-primary)]">
+                    <FiGitCommit /> Platform Logs
+                </button>
+            </div>
+
+            <div className="hw-env-board mb-12">
+                {[
+                    { name: 'Production', url: 'api.iotank.co.ke', status: 'live', uptime: '99.98%', latency: '24ms' },
+                    { name: 'Staging', url: 'stage-v2.iotank.co.ke', status: 'testing', uptime: '98.50%', latency: '42ms' },
+                    { name: 'Development', url: 'dev-local.hub', status: 'down', uptime: '0.00%', latency: 'N/A' }
+                ].map(en => (
+                    <div key={en.name} className="hw-env-card">
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h5 className="font-black text-sm uppercase mb-1">{en.name}</h5>
+                                <span className="text-[10px] font-mono opacity-30">{en.url}</span>
+                            </div>
+                            <div className={`hw-env-led ${en.status}`}></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 pt-6 border-t border-[var(--glass-border)]">
+                            <div>
+                                <span className="text-[9px] font-black uppercase opacity-20 block">Uptime</span>
+                                <span className="text-xs font-black font-mono">{en.uptime}</span>
+                            </div>
+                            <div>
+                                <span className="text-[9px] font-black uppercase opacity-20 block">Latency</span>
+                                <span className="text-xs font-black font-mono">{en.latency}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="hw-terminal-wrapper border-none shadow-none">
+                <div className="hw-terminal-header">
+                    <div className="flex items-center gap-3">
+                        <FiCode className="text-neon-cyan" />
+                        <span className="text-[10px] font-black uppercase opacity-30 tracking-widest">Global_System_Observer.sh</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <span className="text-[8px] font-black px-2 py-0.5 bg-neon-cyan/10 text-neon-cyan rounded">SU: ACTIVE</span>
+                    </div>
+                </div>
+                <div className="hw-terminal-body min-h-[400px]">
+                    <div className="text-neon-emerald">[09:30:12] KERNEL: BOOT SEQUENCE OK</div>
+                    <div>[09:30:15] SUPABASE: LINK_ESTABLISHED (REGION: EU-WEST)</div>
+                    <div className="opacity-20"># ------------------------------------------------------------</div>
+                    <div>[09:31:05] SENSOR_BUFFER: MAPPING 4 I2C ENDPOINTS...</div>
+                    <div className="text-neon-pink">[09:31:42] ERROR: SPI_BUS_COLLISION DETECTED (AUTO-FIXING)</div>
+                    <div className="text-neon-cyan">[09:32:00] PIPELINE: BUILD_SUCCESS (COMMIT: 8fa2c03)</div>
+                    <div className="animate-pulse mt-4 text-neon-cyan">_ SYSTEM_IDLE // LISTENING_FOR_INPUT...</div>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderBackend = () => (
+        <div className="hw-backend animate-mission-control">
+             <div className="hw-data-station-frame">
+                <div className="flex justify-between items-center mb-8 px-4">
+                    <div>
+                        <h2 className="text-2xl font-black lowercase tracking-tighter">Analytical Workbook</h2>
+                        <span className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Correction Tables & Volume Lookup Workstation</span>
+                    </div>
+                    <FiDatabase className="opacity-20" size={24} />
+                </div>
+                <div className="flex-1 overflow-hidden relative rounded-2xl border border-[var(--glass-border)]">
+                    <BackendTab />
+                </div>
+             </div>
+        </div>
+    );
+
+    return (
+        <Layout>
+            <div className="hardware-page">
+                <header className="hw-header-advanced flex justify-between items-start">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Mission Control // Core </span>
+                            <div className="h-px w-10 bg-white opacity-10"></div>
+                        </div>
+                        <h1 className="hw-title-glitch">system hardware</h1>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2 opacity-40">ESP32 Fleet Command & Telemetry HUB</p>
+                    </div>
+                    <div className="flex gap-4">
+                         <div className="hw-live-pulse">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]"></div>
+                            <span>TELEMETRY_LINK: STABLE</span>
+                         </div>
+                    </div>
+                </header>
+
+                <div className="hw-tabs-modern">
+                    {[
+                        { id: 'overview', label: 'Overview' },
+                        { id: 'registry', label: 'Cluster' },
+                        { id: 'detail', label: 'Diagnostics', hidden: !selectedDevice },
+                        { id: 'firmware', label: 'Binaries' },
+                        { id: 'actions', label: 'Remote' },
+                        { id: 'dev', label: 'Developer' },
+                        { id: 'backend', label: 'Backend' }
+                    ].map(t => (!t.hidden && (
+                        <button 
+                            key={t.id} 
+                            className={`hw-tab-btn-modern ${activeTab === t.id ? 'active' : ''}`} 
+                            onClick={() => setActiveTab(t.id as any)}
+                        >
+                            {t.label}
+                        </button>
+                    )))}
+                </div>
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-40">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-t-2 border-neon-cyan rounded-full animate-spin"></div>
+                            <FiSettings className="absolute inset-0 m-auto text-neon-cyan/30" />
+                        </div>
+                        <p className="mt-8 font-black tracking-[0.3em] uppercase text-[10px] text-neon-cyan animate-pulse">Initializing Fleet_Terminal.sh...</p>
+                    </div>
+                ) : (
+                    <div className="animate-mission-control">
+                        {activeTab === 'overview' && renderOverview()}
+                        {activeTab === 'registry' && renderRegistry()}
+                        {activeTab === 'detail' && renderDetail()}
+                        {activeTab === 'firmware' && renderFirmware()}
+                        {activeTab === 'actions' && renderActions()}
+                        {activeTab === 'dev' && renderDev()}
+                        {activeTab === 'backend' && renderBackend()}
+                    </div>
+                )}
+            </div>
+        </Layout>
+    );
+};
+
+export default HardwareMonitoring;

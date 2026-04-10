@@ -1,0 +1,514 @@
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useTanks, useLatestReading } from '@/hooks/useSupabase';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/config/supabase';
+import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUploadCloud, FiChevronDown } from 'react-icons/fi';
+import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
+import './QuickActions.css';
+
+interface DeliveryModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose }) => {
+    const { currentUser } = useAuth();
+    const orgId = currentUser?.stationId || '';
+    const { tanks } = useTanks(orgId);
+
+    const [isHibernating, setIsHibernating] = useState(false);
+    const [formData, setFormData] = useState({
+        tankId: '',
+        supplier: '',
+        invoiceNumber: '',
+        expectedVolume: '',
+        existingVolume: '',
+        totalVolume: '',
+        temperature: '', // Delivered Fuel Temp
+        timestamp: new Date().toISOString().slice(0, 16),
+        varianceReason: '',
+        // Testing fields
+        visualCheck: '',
+        waterContaminationType: 'height' as 'percentage' | 'height',
+        waterContaminationValue: '',
+        density: '',
+        existingTemp: ''
+    });
+    const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+    const [uploadingInvoice, setUploadingInvoice] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [step, setStep] = useState<1 | 2>(1);
+
+    const { reading: latestReading } = useLatestReading(orgId, formData.tankId);
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(prev => ({
+                ...prev,
+                timestamp: new Date().toISOString().slice(0, 16)
+            }));
+        } else {
+            // Reset to step 1 when closed
+            setStep(1);
+        }
+    }, [isOpen]);
+
+    // Auto-fetch existing temperature
+    useEffect(() => {
+        if (latestReading?.temperature && !formData.existingTemp) {
+            setFormData(prev => ({ ...prev, existingTemp: String(latestReading.temperature) }));
+        }
+    }, [latestReading, formData.tankId]);
+
+    // Temp Gradient Calculation
+    const tempGradient = (formData.temperature && formData.existingTemp)
+        ? (Number(formData.temperature) - Number(formData.existingTemp)).toFixed(2)
+        : '0.00';
+
+    if (!isOpen) return null;
+
+    const executeSubmission = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!currentUser?.stationId) {
+            alert('Organization context missing. Please sign in again.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            let invoiceUrl = null;
+            if (invoiceFile) {
+                setUploadingInvoice(true);
+                const fileExt = invoiceFile.name.split('.').pop();
+                const fileName = `${Math.random()}.${fileExt}`;
+                const filePath = `deliveries/invoices/${orgId}/${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('uploads')
+                    .upload(filePath, invoiceFile);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('uploads')
+                    .getPublicUrl(filePath);
+
+                invoiceUrl = publicUrl;
+                setUploadingInvoice(false);
+            }
+
+            const payload = {
+                station_id: currentUser.stationId,
+                tank_id: formData.tankId,
+                auth_user_id: currentUser.authUserId, // Fully migrated to Supabase Native ID
+                delivery_date: new Date(formData.timestamp).toISOString(),
+                supplier_name: formData.supplier.trim(),
+                bol_number: formData.invoiceNumber.trim() || null,
+                bol_claimed_volume: Number(formData.expectedVolume),
+                bol_temperature: formData.temperature ? Number(formData.temperature) : null,
+                bol_photo_url: invoiceUrl,
+                tank_before_volume: Number(formData.existingVolume),
+                tank_after_volume: Number(formData.totalVolume),
+                actual_received_volume: Number(formData.expectedVolume), // Initial log treats expected as actual
+                actual_temperature: formData.temperature ? Number(formData.temperature) : null,
+                metadata: {
+                    variance: variance,
+                    variance_percentage: variancePcnt,
+                    variance_reason: formData.varianceReason || null,
+                    // Quality testing data
+                    visual_check: formData.visualCheck,
+                    water_contamination: {
+                        type: formData.waterContaminationType,
+                        value: formData.waterContaminationValue
+                    },
+                    density_api: formData.density,
+                    temp_gradient: tempGradient,
+                    existing_temp_at_delivery: formData.existingTemp
+                }
+            };
+
+            const { data: deliveryData, error } = await supabase.from('deliveries').insert([payload]).select().single();
+            if (error) throw error;
+
+            // 2. Automatically generate and store a formal Forensic Report
+            if (deliveryData) {
+                const reportPayload = {
+                    station_id: currentUser.stationId,
+                    delivery_id: deliveryData.id,
+                    name: `Delivery Verification - ${formData.supplier.trim()}`,
+                    report_type: 'delivery_verification',
+                    report_data: {
+                        delivery_id: deliveryData.id,
+                        tank_name: selectedTank?.name || 'Unknown',
+                        bol_number: formData.invoiceNumber,
+                        variance: variance,
+                        variance_percentage: variancePcnt,
+                        quality_status: {
+                            visual: formData.visualCheck || 'OK',
+                            water: Number(formData.waterContaminationValue) > 0 ? 'Contaminated' : 'OK',
+                            thermal_gradient: tempGradient
+                        },
+                        timestamp: new Date().toISOString(),
+                        operator: currentUser.displayName
+                    },
+                    generated_by: currentUser.authUserId
+                };
+
+                const { error: reportError } = await supabase.from('reports').insert([reportPayload]);
+                if (reportError) console.error("Forensic report storage failed:", reportError);
+            }
+
+            alert('Delivery logged successfully and stored as a forensic report.');
+            onClose();
+        } catch (err: any) {
+            alert(`Failed to log delivery: ${err.message || 'Unknown error'}`);
+        } finally {
+            setSubmitting(false);
+            setUploadingInvoice(false);
+        }
+    };
+
+    const triggerHibernate = () => {
+        setIsHibernating(true);
+        setTimeout(() => setIsHibernating(false), 800);
+    };
+
+    const handleNextStep = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (showVariance) {
+            setStep(2);
+        } else {
+            executeSubmission();
+        }
+    };
+
+    const selectedTank = tanks.find(t => t.id === formData.tankId);
+
+    // Variance Computation
+    const existing = Number(formData.existingVolume) || 0;
+    const expected = Number(formData.expectedVolume) || 0;
+    const total = Number(formData.totalVolume) || 0;
+
+    const expectedFinal = existing + expected;
+    let variance = 0;
+    let variancePcnt = 0;
+    let showVariance = false;
+
+    if (expectedFinal > 0 && formData.totalVolume !== '') {
+        showVariance = true;
+        variance = total - expectedFinal;
+        variancePcnt = (variance / expectedFinal) * 100;
+    }
+
+    return createPortal(
+        <div className="add-tank-modal-overlay animate-in fade-in duration-300" onClick={triggerHibernate}>
+            <div className="add-tank-modal-content max-w-2xl" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="header-text-container">
+                        <h2>New Fuel Delivery {selectedTank && `- ${selectedTank.name}`}</h2>
+                        <p>Log incoming fuel stock for inventory reconciliation.</p>
+                        <div className="modal-header-badges">
+                            <span className="modal-badge plum">Delivery</span>
+                            <span className="modal-badge amethyst">INCOMING</span>
+                        </div>
+                    </div>
+                    <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose}><FiX size={18} /></button>
+                </div>
+
+                <form onSubmit={step === 1 ? handleNextStep : executeSubmission} className="add-tank-form">
+                    {step === 1 ? (
+                        <div className="max-h-[70vh] overflow-y-auto px-1 pr-3">
+                            <div className="atm-section violet">
+                                <div className="atm-section-header">
+                                    <div className="atm-section-icon"><FiInfo size={14} /></div>
+                                    <span className="atm-section-title">Logistics & Identity</span>
+                                </div>
+
+                                <div className="atm-section-body atm-grid atm-grid-2">
+                                    <div className="form-group atm-col-2">
+                                        <label>Target Tank</label>
+                                        <select required value={formData.tankId} onChange={e => {
+                                            const newTankId = e.target.value;
+                                            const tank = tanks.find(t => t.id === newTankId);
+                                            setFormData({
+                                                ...formData,
+                                                tankId: newTankId,
+                                                existingVolume: tank?.currentVolume ? String(tank.currentVolume) : '',
+                                                existingTemp: '' // Will be updated by useEffect
+                                            });
+                                        }}>
+                                            <option value="">Select Target Storage...</option>
+                                            {tanks.map(t => (
+                                                <option key={t.id} value={t.id}>{t.name} ({t.fuelType})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Supplier Name</label>
+                                        <input required placeholder="e.g. Shell / TotalEnergies" value={formData.supplier} onChange={e => setFormData({ ...formData, supplier: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Fuel Type (Pre-filled)</label>
+                                        <input readOnly value={selectedTank?.fuelType || ''} className="bg-slate-50 cursor-not-allowed" placeholder="Select tank first..." />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>BOL / Delivery Note Number</label>
+                                        <input required placeholder="BOL-YYYY-MM-DD-XXXX" value={formData.invoiceNumber} onChange={e => setFormData({ ...formData, invoiceNumber: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Expected Volume (from BOL) (L)</label>
+                                        <input required type="number" placeholder="10000" value={formData.expectedVolume} onChange={e => setFormData({ ...formData, expectedVolume: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="atm-section plum">
+                                <div className="atm-section-header">
+                                    <div className="atm-section-icon"><FiDroplet size={14} /></div>
+                                    <span className="atm-section-title">Quantities & Timing</span>
+                                </div>
+
+                                <div className="atm-section-body atm-grid atm-grid-2">
+                                    <div className="form-group">
+                                        <label>Existing Volume (L)</label>
+                                        <input required type="number" placeholder="ESP32 Measured" value={formData.existingVolume} onChange={e => setFormData({ ...formData, existingVolume: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Total Volume (After Delivery) (L)</label>
+                                        <input type="number" placeholder="9500.0" value={formData.totalVolume} onChange={e => setFormData({ ...formData, totalVolume: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Delivered Fuel Temp (°C)</label>
+                                        <input type="number" placeholder="25.0" value={formData.temperature} onChange={e => setFormData({ ...formData, temperature: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Delivery Timestamp</label>
+                                        <input type="datetime-local" value={formData.timestamp} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* New Quality & Testing Section */}
+                            <div className="atm-section emerald">
+                                <div className="atm-section-header">
+                                    <div className="atm-section-icon bg-emerald-500 text-white"><FiActivity size={14} /></div>
+                                    <span className="atm-section-title text-emerald-700">Quality & Testing Control</span>
+                                </div>
+
+                                <div className="atm-section-body atm-grid atm-grid-2">
+                                    <div className="form-group">
+                                        <label className="flex items-center gap-1.5">
+                                            Visual Check
+                                            <FiInfo className="text-emerald-400 cursor-help" size={12} title="Pour sample into clean glass container and inspect against light source." />
+                                        </label>
+                                        <select
+                                            value={formData.visualCheck}
+                                            onChange={e => setFormData({ ...formData, visualCheck: e.target.value })}
+                                            className="w-full border-emerald-100 focus:border-emerald-500 focus:ring-emerald-50"
+                                        >
+                                            <option value="">Select Observation...</option>
+                                            <option value="Clear & Bright">Clear & Bright: Sparkling and free of haze</option>
+                                            <option value="Cloudy/Hazy">Cloudy/Hazy: Water contamination</option>
+                                            <option value="Darker Color">Darker Color: Indicates degradation</option>
+                                            <option value="Sediment">Sediment: Debris or Tanker rust</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Water & Contamination</label>
+                                        <div className="flex relative">
+                                            <input
+                                                type="number"
+                                                className="flex-1 rounded-r-none border-r-0"
+                                                placeholder={formData.waterContaminationType === 'percentage' ? "0.00" : "0.0"}
+                                                value={formData.waterContaminationValue}
+                                                onChange={e => setFormData({ ...formData, waterContaminationValue: e.target.value })}
+                                            />
+                                            <select
+                                                className="w-20 rounded-l-none bg-slate-50 border-l border-slate-200 appearance-none pr-8"
+                                                value={formData.waterContaminationType}
+                                                onChange={e => setFormData({ ...formData, waterContaminationType: e.target.value as any })}
+                                            >
+                                                <option value="height">mm</option>
+                                                <option value="percentage">%</option>
+                                            </select>
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <FiChevronDown size={14} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Density / API Gravity</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0.832"
+                                            value={formData.density}
+                                            onChange={e => setFormData({ ...formData, density: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="text-emerald-700">Temperature Gradient</label>
+                                        <input
+                                            readOnly
+                                            placeholder="0.00"
+                                            value={tempGradient !== '0.00' ? `${tempGradient}°C` : ''}
+                                            className="bg-emerald-50/50 font-mono font-bold text-emerald-600 border-emerald-100"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            {/* Invoice Upload Section */}
+                            <div className="atm-section indigo mb-4">
+                                <div className="atm-section-header">
+                                    <div className="atm-section-icon bg-indigo-500 text-white"><FiFileText size={14} /></div>
+                                    <span className="atm-section-title text-indigo-700">Digital Documentation</span>
+                                </div>
+                                <div className="atm-section-body">
+                                    <div
+                                        className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${invoiceFile ? 'border-emerald-300 bg-emerald-50/30' : 'border-indigo-100 hover:border-indigo-400 bg-indigo-50/10'}`}
+                                        onClick={() => document.getElementById('invoice-upload')?.click()}
+                                    >
+                                        <input
+                                            id="invoice-upload"
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*"
+                                            onChange={e => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    if (file.size > 5 * 1024 * 1024) {
+                                                        alert('File size limit exceeded (Max 5MB)');
+                                                        return;
+                                                    }
+                                                    setInvoiceFile(file);
+                                                }
+                                            }}
+                                        />
+                                        <div className="flex flex-col items-center gap-2">
+                                            {invoiceFile ? (
+                                                <>
+                                                    <FiCheckCircle className="text-emerald-500" size={32} />
+                                                    <span className="text-sm font-bold text-emerald-700">{invoiceFile.name}</span>
+                                                    <button type="button" className="text-[10px] text-red-500 font-bold uppercase underline" onClick={(e) => { e.stopPropagation(); setInvoiceFile(null); }}>Remove</button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FiUploadCloud className="text-indigo-400" size={32} />
+                                                    <span className="text-sm font-bold text-indigo-700">Scan or Upload Invoice Image</span>
+                                                    <span className="text-[10px] text-indigo-400 uppercase font-black tracking-widest leading-none mt-1">Maximum 5MB</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="tm-verification-card">
+                                <FiCheckCircle size={18} />
+                                <p>
+                                    System will automatically verify the volume delta using ESP32 telemetry after confirmation.
+                                </p>
+                            </div>
+
+                            <div className="form-actions pt-4 pb-2">
+                                <button type="button" className="btn-danger" onClick={onClose}>Cancel</button>
+                                <button type="submit" className="btn-submit" disabled={uploadingInvoice || submitting}>
+                                    {submitting ? 'Authenticating...' : 'Confirm Delivery'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="variance-popup animate-in slide-in-from-bottom-4 duration-300">
+                            <div className="text-center mb-4">
+                                <h3 className="text-xl font-bold text-slate-800">Reconciliation Variance Check</h3>
+                                <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
+                                    Below is the analytical summary of the delivery metrics for final verification.
+                                </p>
+                            </div>
+
+                            <div className="tm-disclosure-grid">
+                                {/* Volume Variance */}
+                                <div className={`tm-disclosure-chip ${Math.abs(variance) > 50 ? 'critical' : Math.abs(variance) > 10 ? 'warning' : ''}`}>
+                                    <span className="tm-chip-label">Volume Discrepancy</span>
+                                    <span className="tm-chip-value">
+                                        {variance > 0 ? '+' : ''}{variance.toLocaleString()}L ({variance > 0 ? '+' : ''}{variancePcnt.toFixed(2)}%)
+                                    </span>
+                                    <div className={`tm-chip-status ${Math.abs(variance) <= 10 ? 'ok' : Math.abs(variance) > 50 ? 'critical' : 'issue'}`}>
+                                        {Math.abs(variance) <= 10 ? 'Status: OK' : Math.abs(variance) > 50 ? 'Status: Critical' : 'Status: Variance Detected'}
+                                    </div>
+                                </div>
+
+                                {/* Visual Check */}
+                                <div className={`tm-disclosure-chip ${formData.visualCheck !== 'Clear & Bright' && formData.visualCheck !== '' ? 'warning' : ''}`}>
+                                    <span className="tm-chip-label">Visual Check</span>
+                                    <span className="tm-chip-value">{formData.visualCheck || 'Not Recorded'}</span>
+                                    <div className={`tm-chip-status ${formData.visualCheck === 'Clear & Bright' ? 'ok' : 'issue'}`}>
+                                        {formData.visualCheck === 'Clear & Bright' ? 'Status: OK' : 'Status: Review Required'}
+                                    </div>
+                                </div>
+
+                                {/* Water & Contamination */}
+                                <div className={`tm-disclosure-chip ${(Number(formData.waterContaminationValue) > 0) ? 'critical' : ''}`}>
+                                    <span className="tm-chip-label">Water & Contamination</span>
+                                    <span className="tm-chip-value">
+                                        {Number(formData.waterContaminationValue) > 0 ? `${formData.waterContaminationValue}${formData.waterContaminationType === 'percentage' ? '%' : 'mm'}` : '0.00'}
+                                    </span>
+                                    <div className={`tm-chip-status ${Number(formData.waterContaminationValue) <= 0 ? 'ok' : 'critical'}`}>
+                                        {Number(formData.waterContaminationValue) <= 0 ? 'Status: OK' : 'Status: Contaminated'}
+                                    </div>
+                                </div>
+
+                                {/* Temp Gradient */}
+                                <div className={`tm-disclosure-chip ${Math.abs(Number(tempGradient)) > 5 ? 'warning' : ''}`}>
+                                    <span className="tm-chip-label">Temperature Gradient</span>
+                                    <span className="tm-chip-value">{tempGradient}°C</span>
+                                    <div className={`tm-chip-status ${Math.abs(Number(tempGradient)) <= 5 ? 'ok' : 'issue'}`}>
+                                        {Math.abs(Number(tempGradient)) <= 5 ? 'Status: OK' : 'Status: High Gradient'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-group max-w-md mx-auto mt-6">
+                                <label className="text-slate-700">Analytical Remarks / Reason for Variance</label>
+                                <textarea
+                                    className="w-full border-2 border-slate-200 rounded-lg p-3 text-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 placeholder:text-slate-400"
+                                    rows={3}
+                                    placeholder="Enter forensic remarks or reconciliation notes..."
+                                    value={formData.varianceReason}
+                                    onChange={e => setFormData({ ...formData, varianceReason: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="tm-verification-card" style={{ maxWidth: '448px', margin: '20px auto 10px' }}>
+                                <FiCheckCircle size={18} />
+                                <p>
+                                    System will automatically verify the volume delta using ESP32 telemetry after confirmation.
+                                </p>
+                            </div>
+
+                            <div className="form-actions pt-6 pb-2 justify-center border-t-0 bg-transparent">
+                                <button type="button" className="btn-danger" onClick={() => setStep(1)}>Go Back</button>
+                                <button type="submit" className="btn-submit" disabled={submitting}>
+                                    {submitting ? 'Saving...' : 'Confirm Delivery'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </form>
+            </div>
+        </div>,
+        document.body
+    );
+};

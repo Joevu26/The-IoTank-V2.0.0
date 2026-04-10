@@ -1,0 +1,2 @@
+-- supabase/seed.sql
+-- Seed data cleared at user request (2026-04-05)

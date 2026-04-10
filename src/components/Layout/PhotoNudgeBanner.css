@@ -1,0 +1,149 @@
+.photo-nudge-banner {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 16px 2.5rem 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+}
+
+.banner-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    background: #f1f5f9;
+    color: #7b6cf6;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.banner-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.banner-title {
+    font-weight: 800;
+    font-size: 1rem;
+    color: #1e293b;
+    margin: 0;
+}
+
+.banner-description {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 2px 0 0;
+}
+
+.banner-actions {
+    display: flex;
+    gap: 12px;
+    margin-left: 20px;
+}
+
+.btn-upload {
+    background: #7b6cf6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-upload:hover {
+    background: #6355d8;
+}
+
+.btn-later {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-later:hover {
+    background: #e2e8f0;
+}
+
+.banner-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.banner-close:hover {
+    color: #64748b;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-down {
+    animation: slideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@media (max-width: 1024px) {
+    .photo-nudge-banner {
+        margin: 12px 1.5rem 0;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .banner-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .banner-actions {
+        margin-left: 0;
+        width: 100%;
+        margin-top: 4px;
+    }
+
+    .btn-upload,
+    .btn-later {
+        flex: 1;
+        text-align: center;
+    }
+}

@@ -1,0 +1,86 @@
+mutation CreateSeedData @transaction @auth(level: NO_ACCESS) {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      displayName: "demouser1",
+      email: "demouser1@example.com",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      displayName: "demouser2",
+      email: "demouser2@example.com",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  dataSource_insertMany(data: [
+    {
+      id: "660e8400-e29b-41d4-a716-446655440002",
+      name: "datasource1",
+      collectionPath: "collection/path/1",
+      createdAt: "2024-01-01T00:00:00Z"
+    },
+    {
+      id: "660e8400-e29b-41d4-a716-446655440003",
+      name: "datasource2",
+      collectionPath: "collection/path/2",
+      createdAt: "2024-01-01T00:00:00Z"
+    }
+  ])
+  dashboard_insertMany(data: [
+    {
+      id: "770e8400-e29b-41d4-a716-446655440004",
+      name: "dashboard1",
+      ownerId: "550e8400-e29b-41d4-a716-446655440000",
+      createdAt: "2024-01-01T00:00:00Z",
+      isPublic: true
+    },
+    {
+      id: "770e8400-e29b-41d4-a716-446655440005",
+      name: "dashboard2",
+      ownerId: "550e8400-e29b-41d4-a716-446655440001",
+      createdAt: "2024-01-01T00:00:00Z",
+      isPublic: false
+    }
+  ])
+  widget_insertMany(data: [
+    {
+      id: "880e8400-e29b-41d4-a716-446655440006",
+      dashboardId: "770e8400-e29b-41d4-a716-446655440004",
+      dataSourceId: "660e8400-e29b-41d4-a716-446655440002",
+      position: "top-left",
+      title: "widget1",
+      type: "chart"
+    },
+    {
+      id: "880e8400-e29b-41d4-a716-446655440007",
+      dashboardId: "770e8400-e29b-41d4-a716-446655440005",
+      dataSourceId: "660e8400-e29b-41d4-a716-446655440003",
+      position: "bottom-right",
+      title: "widget2",
+      type: "table"
+    }
+  ])
+    alert_insertMany(data: [
+    {
+      id: "990e8400-e29b-41d4-a716-446655440008",
+      dataSourceId: "660e8400-e29b-41d4-a716-446655440002",
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      condition: "value > 10",
+      createdAt: "2024-01-01T00:00:00Z",
+      message: "Alert 1 triggered",
+      name: "alert1",
+      triggerType: "threshold"
+    },
+    {
+      id: "990e8400-e29b-41d4-a716-446655440009",
+      dataSourceId: "660e8400-e29b-41d4-a716-446655440003",
+      userId: "550e8400-e29b-41d4-a716-446655440001",
+      condition: "value < 5",
+      createdAt: "2024-01-01T00:00:00Z",
+      message: "Alert 2 triggered",
+      name: "alert2",
+      triggerType: "threshold"
+    }
+  ])
+}

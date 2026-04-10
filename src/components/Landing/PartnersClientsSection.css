@@ -1,0 +1,221 @@
+/* Common Headers & Pills */
+.pc-header {
+    text-align: center;
+    margin-bottom: 24px; /* Reduced from 60px */
+}
+
+
+
+.pc-pill {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    border-width: 1.5px;
+    border-style: solid;
+}
+
+.pc-pill.ecosystem {
+    background: rgba(0, 210, 190, 0.05);
+    border-color: rgba(0, 210, 190, 0.2);
+    color: #00D2BE;
+}
+
+.pc-pill.industries {
+    background: rgba(245, 158, 11, 0.05);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: #F59E0B;
+}
+
+.pc-title {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 900;
+    color: #111827;
+    margin: 0;
+    letter-spacing: -1.5px;
+}
+
+.pc-title .text-cyan {
+    background: linear-gradient(135deg, #06B6D4 0%, #10B981 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.pc-title .text-orange {
+    color: #F59E0B;
+}
+
+.pc-subtitle {
+    font-size: 17px;
+    color: #64748B;
+    margin-top: 16px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    font-weight: 500;
+}
+
+/* ================= PARTNERS MARQUEE ================= */
+.partners-marquee-container {
+    width: 100%;
+    overflow: hidden;
+    padding: 24px 0; /* Reduced from 60px */
+    position: relative;
+    margin-bottom: 32px; /* Reduced from 80px */
+    mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+
+@media (max-width: 768px) {
+    .partners-marquee-container {
+        padding: var(--section-padding-mobile, 40px) 0;
+        margin-bottom: 40px;
+    }
+}
+
+
+.partners-marquee-track {
+    display: flex;
+    width: fit-content;
+    animation: marquee 60s linear infinite;
+    gap: 24px;
+}
+
+.partner-card {
+    background: #FFFFFF;
+    border: 1px solid #F1F5F9;
+    border-radius: 16px;
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
+    height: 90px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+}
+
+.partner-logo {
+    max-height: 44px;
+    max-width: 140px;
+    object-fit: contain;
+}
+
+/* ================= TARGETED INDUSTRIES CARDS ================= */
+.clients-wrapper {
+    background: transparent;
+    padding: var(--section-padding-desktop, 60px) 0;
+}
+
+@media (max-width: 768px) {
+    .clients-wrapper {
+        padding: var(--section-padding-mobile, 32px) 0;
+    }
+}
+
+
+.industry-cards-grid {
+    display: flex; /* Single vertical row */
+    gap: 16px;
+    justify-content: center;
+    margin-top: 24px; /* Reduced from 40px */
+}
+
+.industry-card {
+    flex: 1;
+    min-width: 180px; /* Compressed card width */
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px 16px; /* Reduced from 40px */
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center for single row */
+    text-align: center;
+    border: 1px solid #F1F5F9;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+}
+
+.industry-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+
+.industry-card-icon-box {
+    width: 44px; /* Reduced from 56px */
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px; /* Reduced from 24px */
+    font-size: 20px; /* Reduced from 24px */
+}
+
+
+.industry-card-title {
+    font-size: 16px; 
+    font-weight: 800;
+    color: #111827;
+    margin-bottom: 6px;
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+}
+
+
+.industry-card-tagline {
+    font-size: 15px;
+    font-weight: 500;
+    color: #64748B;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Industry Specific Themes */
+.industry-card.cyan { border-color: rgba(6, 182, 212, 0.1); }
+.industry-card.cyan .industry-card-icon-box { background: rgba(6, 182, 212, 0.08); color: #0891B2; }
+
+.industry-card.orange { border-color: rgba(245, 158, 11, 0.1); }
+.industry-card.orange .industry-card-icon-box { background: rgba(245, 158, 11, 0.08); color: #D97706; }
+
+.industry-card.green { border-color: rgba(16, 185, 129, 0.1); }
+.industry-card.green .industry-card-icon-box { background: rgba(16, 185, 129, 0.08); color: #059669; }
+
+.industry-card.red { border-color: rgba(239, 68, 68, 0.1); }
+.industry-card.red .industry-card-icon-box { background: rgba(239, 68, 68, 0.08); color: #DC2626; }
+
+.industry-card.indigo { border-color: rgba(79, 70, 229, 0.1); }
+.industry-card.indigo .industry-card-icon-box { background: rgba(79, 70, 229, 0.08); color: #4F46E5; }
+
+.industry-card.blue { border-color: rgba(59, 130, 246, 0.1); }
+.industry-card.blue .industry-card-icon-box { background: rgba(59, 130, 246, 0.08); color: #2563EB; }
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .industry-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+@media (max-width: 700px) {
+    .industry-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .industry-card {
+        padding: 32px;
+    }
+    .pc-title {
+        font-size: 32px;
+    }
+}

@@ -1,0 +1,45 @@
+type User @table {
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  photoUrl: String
+  role: String
+}
+
+type DataSource @table {
+  name: String!
+  collectionPath: String!
+  createdAt: Timestamp!
+  description: String
+  lastSyncAt: Timestamp
+}
+
+type Dashboard @table {
+  owner: User!
+  name: String!
+  createdAt: Timestamp!
+  isPublic: Boolean!
+  description: String
+  lastAccessedAt: Timestamp
+}
+
+type Widget @table {
+  dashboard: Dashboard!
+  dataSource: DataSource!
+  type: String!
+  title: String!
+  position: String!
+  configuration: String
+  refreshInterval: Int
+}
+
+type Alert @table {
+  user: User!
+  dataSource: DataSource!
+  name: String!
+  condition: String!
+  triggerType: String!
+  createdAt: Timestamp!
+  message: String
+  lastTriggeredAt: Timestamp
+}

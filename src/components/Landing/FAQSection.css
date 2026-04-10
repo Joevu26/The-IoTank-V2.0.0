@@ -1,0 +1,276 @@
+/* FAQ Section Styles */
+
+.faq-section {
+    padding: var(--section-padding-desktop, 140px) 0;
+    background: #FFFFFF;
+    font-family: 'Inter', sans-serif;
+}
+
+@media (max-width: 768px) {
+    .faq-section {
+        padding: var(--section-padding-mobile, 60px) 0;
+    }
+}
+
+
+.faq-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 40px;
+    display: grid;
+    grid-template-columns: 360px 1fr; /* Narrower left column */
+    /* Split layout: Left Content | Right List */
+    gap: 48px; /* Reduced from 100px */
+    align-items: start;
+}
+
+
+
+/* ================= LEFT COLUMN ================= */
+.faq-left-col {
+    position: sticky;
+    top: 100px;
+    /* Sticky scroll for the contact box */
+}
+
+.faq-header {
+    text-align: left;
+    margin-bottom: 40px;
+}
+
+.faq-eyebrow {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #6B7280;
+    margin-bottom: 16px;
+    display: block;
+    background: #F3F4F6;
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+}
+
+.faq-title {
+    font-size: 42px;
+    font-weight: 800;
+    color: #111827;
+    line-height: 1.1;
+    margin: 0;
+    letter-spacing: -1px;
+}
+
+/* Contact/Query Card */
+.faq-contact-card {
+    background: #111827;
+    /* Dark background per image reference */
+    border-radius: 24px;
+    padding: 24px; /* Reduced from 32px */
+    color: #FFFFFF;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+
+.contact-card-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #FFFFFF;
+}
+
+.contact-card-text {
+    font-size: 14px;
+    color: #9CA3AF;
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+.contact-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.contact-textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px;
+    color: #FFFFFF;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    resize: none;
+    height: 100px;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.contact-textarea:focus {
+    border-color: #6366F1;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.contact-send-btn {
+    background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.contact-send-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+/* ================= RIGHT COLUMN (FAQ LIST) ================= */
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.faq-item {
+    border-radius: 16px;
+    background: #F9FAFB;
+    /* Very light gray default */
+    padding: 0;
+    /* Padding handled internally to separate header/content areas */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    /* The "ring/accent" on the left */
+    border-left: 4px solid transparent;
+}
+
+/* Hover state for closed items */
+.faq-item:not(.active):hover {
+    background: #EFF2F6;
+    border-left-color: #CBD5E1;
+    /* Subtle hint on hover */
+}
+
+/* Active Open State */
+.faq-item.active {
+    background: #FFFFFF;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    border-left-color: #6366F1;
+    /* Active Ring Color (Purple/Indigo) */
+}
+
+/* FAQ Header (Question strip) */
+.faq-question-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 20px 24px;
+    /* Reduced padding for smaller size */
+}
+
+.faq-question {
+    font-size: 16px;
+    /* Reduced from 18px */
+    font-weight: 600;
+    color: #1F2937;
+    margin: 0;
+    flex: 1;
+    padding-right: 16px;
+}
+
+.faq-toggle-btn {
+    width: 28px;
+    /* Smaller button */
+    height: 28px;
+    border-radius: 50%;
+    background: #E5E7EB;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4B5563;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.faq-item.active .faq-toggle-btn {
+    background: #6366F1;
+    color: white;
+    transform: rotate(45deg);
+    /* Cross via rotation */
+}
+
+/* Answer Content - DIFFERENT BACKGROUND */
+.faq-answer {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #F3F4F6;
+    /* Distinct darker gray background for answer */
+}
+
+.faq-item.active .faq-answer {
+    max-height: 500px;
+    opacity: 1;
+    border-top: 1px solid #E5E7EB;
+    /* Separator */
+}
+
+.faq-answer-content {
+    padding: 20px 24px;
+    /* Padding for the answer text */
+}
+
+.faq-answer p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #4B5563;
+    margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .faq-container {
+        grid-template-columns: 1fr;
+        gap: 40px; /* Reduced for density */
+    }
+
+    .faq-left-col {
+        position: relative;
+        top: 0;
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .faq-header {
+        text-align: center;
+        margin-bottom: 24px; /* Tighter */
+    }
+
+    .faq-contact-card {
+        text-align: left;
+    }
+}
+
+
+@media (max-width: 768px) {
+    .faq-title {
+        font-size: 32px;
+    }
+
+    .faq-item {
+        border-radius: 12px;
+    }
+}

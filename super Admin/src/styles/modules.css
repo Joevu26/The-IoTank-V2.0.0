@@ -1,0 +1,43 @@
+.bg-dark-command {
+    background: linear-gradient(135deg, #1a1b1e 0%, #2c2d33 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.matrix-placeholder {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.analytics-page h1,
+.inventory-page h1,
+.market-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+}
+
+.badge-online {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.analytics-grid,
+.market-layout {
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

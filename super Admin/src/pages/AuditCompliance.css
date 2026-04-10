@@ -1,0 +1,109 @@
+.audit-page {
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
+    padding: 32px;
+}
+
+/* Forensic Table - High density */
+.forensic-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.75rem;
+}
+
+.forensic-table th {
+    background: rgba(255, 255, 255, 0.02);
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+}
+
+.forensic-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+}
+
+.forensic-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* JSON Diff Styling */
+.json-diff-container {
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.diff-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+}
+
+.diff-before { color: #ef4444; text-decoration: line-through; }
+.diff-after { color: #10b981; }
+
+/* Compliance Badges */
+.comp-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.comp-compliant { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+.comp-warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.2); }
+.comp-expired { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+
+/* Accountability Risk Indicator */
+.risk-meter {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.risk-level {
+    height: 100%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.risk-low { background: #10b981; }
+.risk-med { background: #f59e0b; }
+.risk-high { background: #ef4444; }
+
+/* Security Center Layout */
+.security-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.incident-card {
+    background: rgba(255, 25, 25, 0.03);
+    border: 1px solid rgba(255, 25, 25, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 32px;
+}
+
+.incident-card.critical {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}

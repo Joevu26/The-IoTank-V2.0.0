@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://the-iotank-project.web.app/sitemap.xml

@@ -1,0 +1,196 @@
+/* Security / How It Works Section Styles */
+
+.security-section {
+    width: 100%;
+    /* Soft pink/peach gradient background from image/code */
+    background: linear-gradient(180deg, #F9F3F0 0%, #F5EDE8 100%);
+    padding: var(--section-padding-desktop, 140px) 0;
+    font-family: 'DM Sans', 'Inter', sans-serif;
+    color: #000000;
+}
+
+@media (max-width: 768px) {
+    .security-section {
+        padding: var(--section-padding-mobile, 60px) 0;
+    }
+}
+
+
+.security-container {
+    max-width: 1000px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* ================= HEADER ================= */
+.security-header {
+    text-align: center;
+    margin-bottom: 32px; /* Reduced from 60px */
+}
+
+
+
+.security-title {
+    font-family: 'DM Sans', serif;
+    /* Serif font for "How It Works" matches image vibe usually, but code says DM Sans */
+    font-size: 48px;
+    font-weight: 800;
+    color: #000000;
+    margin-bottom: 16px;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+}
+
+.security-subtitle {
+    font-size: 17px;
+    color: #3D3D3D;
+    line-height: 1.6;
+    max-width: 520px;
+    margin: 0 auto;
+    font-weight: 400;
+}
+
+/* ================= CARDS GRID ================= */
+.security-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+}
+
+/* ================= FEATURE CARD ================= */
+.security-card {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 32px; /* Reduced from 60px 40px */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+
+
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.security-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Icon Wrapper */
+.icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    flex-shrink: 0;
+    /* Soft shadows for icons */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Icon Colors */
+.icon-blue {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    color: #FFFFFF;
+}
+
+.icon-pink {
+    background: linear-gradient(135deg, #EC4899 0%, #DB2777 100%);
+    color: #FFFFFF;
+}
+
+.icon-green {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: #FFFFFF;
+}
+
+.card-icon {
+    width: 28px;
+    height: 28px;
+}
+
+/* Card Title */
+.security-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #000000;
+    margin-bottom: 16px;
+    line-height: 1.3;
+    letter-spacing: -0.2px;
+}
+
+/* Card Description */
+.security-description {
+    font-size: 15px;
+    color: #6B7280;
+    line-height: 1.7;
+    margin-bottom: 24px;
+    flex-grow: 1;
+}
+
+/* Read More Link */
+.read-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #DC2626;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    align-self: flex-start;
+    cursor: pointer;
+}
+
+.read-more:hover {
+    color: #B91C1C;
+    gap: 12px;
+}
+
+.read-more svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.25s ease;
+}
+
+.read-more:hover svg {
+    transform: translateX(4px);
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 1024px) {
+    .security-section {
+        padding: 80px 32px;
+    }
+
+    .security-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .security-card:last-child {
+        grid-column: 1 / -1;
+        max-width: 500px;
+        margin: 0 auto;
+        width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    .security-section {
+        padding: 60px 24px;
+    }
+
+    .security-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .security-card:last-child {
+        grid-column: auto;
+    }
+
+    .security-title {
+        font-size: 32px;
+    }
+}

@@ -1,0 +1,907 @@
+.login-page-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    gap: 4vw;
+    overflow: hidden;
+    background: #f1f5f9 url('../../assets/login-bg-v2.png') no-repeat center center;
+    background-size: cover;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    position: relative;
+    z-index: 1;
+}
+
+/* -----------------------------------------------------------------------------
+   Branding & Ad Section (Left)
+   ----------------------------------------------------------------------------- */
+.branding-section {
+    flex: 1.2;
+    /* Slightly more space for branding */
+    max-width: 800px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2.5rem;
+    color: #1e293b;
+    /* Darker primary color */
+}
+
+.branding-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Scale content down slightly if screen is short */
+    transform-origin: center;
+}
+
+@media (max-height: 800px) {
+    .branding-content {
+        transform: scale(0.9);
+    }
+}
+
+.branding-logo {
+    max-width: 360px;
+    width: 100%;
+    height: auto;
+    margin-bottom: 1.25rem;
+    filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.2));
+    animation: float 6s ease-in-out infinite;
+}
+
+.branding-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    /* Darker, professional gradient for visibility */
+    background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.03em;
+    filter: drop-shadow(0 4px 12px rgba(255, 255, 255, 0.5));
+}
+
+.branding-description {
+    font-size: 1rem;
+    color: #475569;
+    line-height: 1.4;
+    max-width: 600px;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+}
+
+/* Value Statements Grid */
+.value-statements {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.value-item {
+    grid-column: span 2;
+    position: relative;
+    width: 100%;
+    /* Glassmorphism Design */
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #0f172a;
+    min-height: 120px;
+    /* Clean "Floating" Shadow */
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Adjust grid targeting */
+.value-item:nth-child(4) {
+    grid-column: 2 / 4;
+}
+
+.value-item:nth-child(5) {
+    grid-column: 4 / 6;
+}
+
+.value-number {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Individual colors for numbers */
+.value-item.item-1 .value-number {
+    color: #ef4444;
+}
+
+/* Red */
+.value-item.item-2 .value-number {
+    color: #2563eb;
+}
+
+/* Blue */
+.value-item.item-3 .value-number {
+    color: #8b5cf6;
+}
+
+/* Violet */
+.value-item.item-4 .value-number {
+    color: #10b981;
+}
+
+/* Green */
+.value-item.item-5 .value-number {
+    color: #f59e0b;
+}
+
+/* Orange */
+
+.value-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #3b82f6;
+    /* Visible blue */
+}
+
+.value-item strong {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.value-item span {
+    font-size: 0.85rem;
+    color: #475569;
+    /* Visible slate color */
+    line-height: 1.5;
+    display: block;
+    margin-top: 0.5rem;
+    font-weight: 500;
+    opacity: 1;
+}
+
+.value-item::before {
+    display: none;
+    /* Removed numbers to save space/noise */
+}
+
+.value-item:hover {
+    transform: translateY(-5px);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* -----------------------------------------------------------------------------
+   Login Section (Right)
+   ----------------------------------------------------------------------------- */
+.form-section {
+    flex: 0 0 500px;
+    /* Fixed width for better consistency */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 410px; /* Reduced from 440px for a more focused layout, but larger than 380px */
+}
+
+.login-container.forgot-password-container {
+    max-width: 410px; /* Matched to main login width based on user feedback */
+}
+
+/* Base card width styling */
+.login-card {
+    width: 100%;
+    padding: 1.5rem 2rem;
+    /* Reduced padding */
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(30px) saturate(150%);
+    -webkit-backdrop-filter: blur(30px) saturate(150%);
+    border-radius: 28px;
+    box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.15),
+        0 1px 2px rgba(255, 255, 255, 0.5) inset;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 2;
+    transition: transform 0.3s ease;
+}
+
+.login-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Compact form elements */
+.login-header {
+    margin-bottom: 0.75rem;
+    text-align: center;
+}
+
+.login-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.15rem;
+}
+
+.login-subtitle {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+/* Error Alerts */
+.alert-danger {
+    background-color: #FEF2F2;
+    /* Soft red bg */
+    border: 1px solid #FCA5A5;
+    color: #EF4444;
+    /* Prominent red text */
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.4;
+    display: flex;
+    align-items: start;
+    gap: 0.5rem;
+    animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes shake {
+
+    10%,
+    90% {
+        transform: translate3d(-1px, 0, 0);
+    }
+
+    20%,
+    80% {
+        transform: translate3d(2px, 0, 0);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translate3d(-4px, 0, 0);
+    }
+
+    40%,
+    60% {
+        transform: translate3d(4px, 0, 0);
+    }
+}
+
+.form-group {
+    margin-bottom: 0.5rem;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+    display: block;
+    color: #334155;
+    font-weight: 500;
+}
+
+.form-group input,
+.password-input-container input {
+    height: 46px;
+    /* Reduced height */
+    width: 100%;
+    padding: 0 1rem;
+    border: 1px solid rgba(203, 213, 225, 0.5);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(5px);
+    color: #1e293b;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.password-input-container input:focus {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.btn {
+    padding: 0.5rem;
+    height: 44px;
+    /* Slightly smaller buttons */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0.5rem auto 0;
+    width: 100%;
+    max-width: 280px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+/* Divider removed */
+.divider {
+    display: none;
+}
+
+.login-page-footer {
+    margin-top: 0.75rem;
+    text-align: center;
+    color: #1e293b;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* Animation */
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+/* Mobile / Tablet View */
+@media (max-width: 1100px) {
+    .login-page-wrapper {
+        flex-direction: column;
+        padding: 0.5rem 1rem 2rem 1rem;
+        /* Reduced top padding to move logo up */
+        gap: 1rem;
+        /* Compact gap */
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto !important;
+        justify-content: flex-start;
+    }
+
+    .branding-section {
+        flex: none;
+        width: 100%;
+        height: auto;
+        padding: 1rem 0;
+        display: flex;
+        /* Restore visibility */
+    }
+
+    .branding-logo {
+        max-width: 240px;
+        /* Further reduced */
+    }
+
+    .branding-title {
+        font-size: 1.5rem;
+    }
+
+    .branding-description {
+        font-size: 0.8rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .value-statements {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.35rem;
+        /* Ultra tight */
+        margin-top: 0;
+        width: 100%;
+    }
+
+    .value-item {
+        grid-column: auto !important;
+        min-height: auto;
+        padding: 0.35rem;
+        /* Minimum padding */
+    }
+
+    .value-item:nth-child(5) {
+        grid-column: span 2 !important;
+        /* Center the last one */
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 50%;
+        /* Match column width */
+    }
+
+    .value-number {
+        font-size: 0.85rem !important;
+        margin-bottom: 0.15rem !important;
+    }
+
+    .value-icon {
+        font-size: 1rem !important;
+        margin-bottom: 0.15rem !important;
+    }
+
+    .value-item strong {
+        font-size: 0.6rem !important;
+    }
+
+    .value-item span {
+        font-size: 0.68rem !important;
+        margin-top: 0.15rem !important;
+        line-height: 1.2 !important;
+    }
+
+    .form-section {
+        flex: none;
+        width: 100%;
+        max-width: 440px;
+        padding: 1rem 0 4rem 0;
+        display: flex;
+        justify-content: center;
+        /* Center form */
+        align-items: center;
+    }
+
+    .login-container {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .form-group {
+        width: 100%;
+        max-width: 320px;
+        /* Make inputs tighter and centered */
+        margin-bottom: 0.4rem;
+    }
+
+    .form-group input,
+    .password-input-container input {
+        height: 36px !important;
+        /* Credentials compaction */
+        font-size: 0.88rem !important;
+        padding: 0 0.7rem !important;
+        width: 100%;
+    }
+
+    /* Enforce screen margins and handle reCAPTCHA expansion */
+    .login-card {
+        padding: 1.25rem !important;
+        background: rgba(255, 255, 255, 0.85);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: calc(100% - 32px) !important;
+        /* Enforce 16px total side margin */
+        max-width: 400px !important;
+        margin: 0.5rem auto !important;
+        box-sizing: border-box;
+    }
+
+    /* Scale hCaptcha for very small screens to prevent card expansion */
+    .h-captcha {
+        transform: scale(0.85);
+        transform-origin: center;
+        margin: 0 -24px !important;
+        /* Compensate for scaling whitespace */
+    }
+
+    @media (max-width: 380px) {
+        .h-captcha {
+            transform: scale(0.75);
+        }
+
+        .login-card {
+            padding: 1rem !important;
+        }
+    }
+
+    .login-header {
+        margin-bottom: 0.75rem;
+    }
+
+    .login-title {
+        font-size: 1.25rem;
+    }
+
+    /* Specific fitting for login and google buttons */
+    .btn {
+        height: 44px;
+        /* Reverted to original height */
+        font-size: 0.95rem;
+        width: 100% !important;
+        max-width: 220px !important;
+        /* 'Fitting' not too long */
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding: 0 1.25rem;
+    }
+
+    .form-group label {
+        text-align: left;
+        width: 100%;
+        max-width: 320px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Password Match Feedback */
+.password-match-feedback {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 0.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.password-match-feedback.success {
+    color: #10b981;
+}
+
+.password-match-feedback.error {
+    color: #ef4444;
+}
+
+/* Scroll context for card if needed */
+.login-body {
+    max-height: 65vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-right: 4px;
+}
+
+.login-body::-webkit-scrollbar {
+    display: none;
+}
+
+/* -----------------------------------------------------------------------------
+   Registration Promo Card
+   ----------------------------------------------------------------------------- */
+.registration-promo-card {
+    margin-top: 1.25rem;
+    padding: 1rem 1.25rem;
+    background: rgba(15, 23, 42, 0.04);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    position: relative;
+    z-index: 2;
+}
+
+.registration-promo-card.hidden {
+    display: none;
+}
+
+.registration-promo-card:hover {
+    background: rgba(15, 23, 42, 0.06);
+    transform: translateY(-2px);
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+.promo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.promo-body {
+    flex: 1;
+}
+
+.promo-body h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+    text-transform: lowercase;
+}
+
+.promo-body p {
+    font-size: 0.7rem;
+    margin: 2px 0 0 0;
+    color: #64748b;
+    line-height: 1.3;
+}
+
+.promo-action-btn {
+    padding: 0.5rem 0.85rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    color: #1e293b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.promo-action-btn:hover {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+@media (max-width: 1100px) {
+    .registration-promo-card {
+        width: 100%;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Success Delivery Card (ForgotPasswordForm)
+   ----------------------------------------------------------------------------- */
+.success-delivery-card {
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 20px;
+    padding: 1rem;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.delivery-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    background: #6366f1;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.delivery-icon {
+    position: relative;
+    z-index: 2;
+    animation: paperPlaneFloat 3s ease-in-out infinite;
+}
+
+.delivery-ping {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
+    background: rgba(99, 102, 241, 0.4);
+    animation: iconPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.delivery-content {
+    flex: 1;
+}
+
+.delivery-content h3 {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.delivery-content p {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 2px 0 0 0;
+    line-height: 1.4;
+}
+
+.highlight-email {
+    color: #4f46e5;
+    font-weight: 700;
+}
+
+.delivery-instructions {
+    border-top: 1px solid rgba(99, 102, 241, 0.1);
+    padding-top: 0.75rem;
+}
+
+.primary-instruction {
+    font-size: 0.72rem !important;
+    font-weight: 700;
+    color: #475569 !important;
+    margin-bottom: 0.25rem !important;
+}
+
+.instruction-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.instruction-item .dot {
+    width: 6px;
+    height: 6px;
+    background: #6366f1;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+
+@keyframes paperPlaneFloat {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-3px) rotate(-5deg); }
+}
+
+@keyframes iconPing {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
+
+@media (max-width: 1100px) {
+    .success-delivery-card {
+        padding: 1rem;
+        gap: 0.75rem;
+    }
+    
+    .delivery-icon-wrapper {
+        width: 44px;
+        height: 44px;
+        font-size: 1.1rem;
+    }
+    
+    .delivery-content h3 {
+        font-size: 0.9rem;
+    }
+    
+    .delivery-content p {
+        font-size: 0.75rem;
+    }
+}
+
+.reset-security-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(15, 23, 42, 0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.05);
+}
+
+.reset-security-note .note-icon {
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.reset-security-note span {
+    font-size: 0.65rem !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    line-height: 1.2 !important;
+}
+
+.back-to-login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    height: 48px;
+    background: rgba(99, 102, 241, 0.03);
+    border: 1px solid rgba(99, 102, 241, 0.15);
+    border-radius: 16px;
+    color: #4f46e5;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);
+}
+
+.back-to-login-btn:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.1);
+}
+
+/* ── Primary Reset Button (Specialized) ── */
+.primary-reset-btn {
+    width: 100%;
+    height: 52px;
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    border: none;
+    border-radius: 16px;
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.primary-reset-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(79, 70, 229, 0.4);
+    filter: brightness(1.1);
+}
+
+.primary-reset-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #94a3b8;
+    box-shadow: none;
+}
+
+.primary-reset-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transition: 0.5s;
+}
+
+.primary-reset-btn:hover::before {
+    left: 100%;
+}

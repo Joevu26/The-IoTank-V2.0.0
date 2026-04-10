@@ -1,0 +1,166 @@
+.bg-dark-command {
+    background: linear-gradient(135deg, #1a1b1e 0%, #2c2d33 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.matrix-placeholder {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.analytics-page h1,
+.inventory-page h1,
+.market-page h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+}
+
+.badge-online {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.analytics-grid,
+.market-layout {
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+   SHARED COMPONENT MODULES (Cards & Tables)
+── ── ── ── ── ── ── ── ── ── ── ── ── ── */
+.tdv-section-card {
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.section-icon-box {
+    width: 32px;
+    height: 32px;
+    background: rgba(168, 85, 247, 0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0;
+}
+
+.btn-add-new {
+    background: none;
+    border: none;
+    color: #f97316;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.btn-add-new:hover {
+    background: rgba(249, 115, 22, 0.05);
+}
+
+.plus-icon {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid #f97316;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+.tdv-transaction-table {
+    width: 100%;
+    min-width: 900px; /* Slightly wider for complex logistics tables */
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.tdv-transaction-table th {
+    background: #f8fafc;
+    text-align: left;
+    padding: 14px 24px;
+    font-weight: 800;
+    color: #64748b;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #f1f5f9;
+    text-transform: uppercase;
+}
+
+.tdv-transaction-table td {
+    padding: 16px 24px;
+    color: #334155;
+    border-bottom: 1px solid #f8fafc;
+    white-space: nowrap;
+}
+
+.tdv-transaction-table tr:last-child td {
+    border-bottom: none;
+}
+
+.tdv-transaction-table tr.row-highlighted {
+    background-color: rgba(249, 115, 22, 0.04);
+    border-left: 4px solid #f97316;
+}
+
+.customer-name {
+    color: #f97316;
+    font-weight: 700;
+}
+
+.address-col {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #64748b;
+}
+
+.action-col {
+    color: #f97316;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: right;
+}
+
+.font-mono {
+    font-family: var(--font-family-mono);
+    letter-spacing: -0.02em;
+}

@@ -1,0 +1,211 @@
+/* super Admin/src/pages/ClientDetails.css */
+
+.client-details-container {
+    padding: var(--spacing-xl);
+    animation: fadeIn 0.4s ease-out;
+}
+
+.client-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xl);
+}
+
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.back-link:hover {
+    color: var(--color-accent-primary);
+    text-decoration: none;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-xl);
+}
+
+.profile-premium-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-xl);
+    padding: var(--spacing-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.profile-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: var(--spacing-xl);
+    border-bottom: 1px solid var(--color-divider);
+    margin-bottom: var(--spacing-xl);
+}
+
+.station-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.station-logo-large {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--border-radius-xl);
+    background: var(--color-bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 900;
+    color: var(--color-accent-primary);
+    border: 1px solid var(--color-divider);
+    box-shadow: var(--shadow-sm);
+}
+
+.station-info h1 {
+    font-size: var(--font-size-2xl);
+    font-weight: 900;
+    margin: 0;
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
+}
+
+.station-location-text {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.status-section {
+    text-align: right;
+}
+
+.status-badge-large {
+    padding: 0.5rem 1.25rem;
+    border-radius: var(--border-radius-full);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: none;
+    letter-spacing: 0.1em;
+}
+
+.info-stripe {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-xl);
+}
+
+.info-item label {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--color-text-disabled);
+    text-transform: none;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+}
+
+.info-item p {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0;
+}
+
+.financial-premium-section {
+    margin-top: var(--spacing-xl);
+    background: var(--color-bg-tertiary);
+    border-radius: var(--border-radius-xl);
+    padding: var(--spacing-xl);
+    border: 1px solid var(--color-divider);
+}
+
+.financial-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.stat-premium-card {
+    background: var(--color-bg-secondary);
+    padding: var(--spacing-lg);
+    border-radius: var(--border-radius-lg);
+    border: 1px solid var(--color-divider);
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s;
+}
+
+.stat-premium-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-accent-primary-light);
+}
+
+.stat-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--color-text-secondary);
+    text-transform: none;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    font-size: var(--font-size-xl);
+    font-weight: 900;
+    margin-top: 8px;
+}
+
+.value--danger { color: var(--color-danger); }
+.value--success { color: var(--color-success); }
+.value--info { color: var(--color-info); }
+
+.sidebar-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.health-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.health-item:last-child {
+    border-bottom: none;
+}
+
+.health-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
+.health-value {
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    color: var(--color-text-primary);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 1024px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}

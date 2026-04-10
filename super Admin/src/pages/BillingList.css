@@ -1,0 +1,442 @@
+.billing-page {
+    background: var(--bg-primary);
+    min-height: 100vh;
+    color: var(--text-primary);
+}
+
+/* Tab Styling - Neumorphic Pill */
+.neumorphic-pill {
+    display: inline-flex;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 100px;
+    backdrop-filter: blur(10px);
+}
+
+.tab-btn {
+    padding: 10px 24px;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.3);
+}
+
+/* Metrics Grid */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    border-radius: 24px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.glass-card:hover {
+    border-color: rgba(var(--primary-rgb), 0.4);
+    transform: translateY(-4px);
+}
+
+.metric-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.metric-icon-box {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.metric-info {
+    flex: 1;
+}
+
+.metric-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    opacity: 0.7;
+}
+
+.metric-value {
+    font-size: 1.75rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.7) 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Trend Indicators */
+.trend-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.trend-up { color: #10b981; }
+.trend-down { color: #ef4444; }
+
+/* Highlight Card Style */
+.highlight-card {
+    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(255,255,255,0.02) 100%);
+}
+
+.card-shine {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Dashboard Rows */
+.dashboard-row {
+    display: flex;
+    gap: 24px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.section-header h4 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.85rem;
+}
+
+/* Debt Aging Styling */
+.debt-total-box {
+    text-align: center;
+    padding: 24px;
+    background: rgba(239, 68, 68, 0.05);
+    border-radius: 20px;
+    margin-bottom: 24px;
+}
+
+.total-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #ef4444;
+}
+
+.total-value {
+    font-size: 2.25rem;
+    font-weight: 950;
+    margin-top: 4px;
+}
+
+.aging-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.aging-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.aging-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.aging-bar-bg {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.aging-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Color Tokens */
+.bg-cyan-soft { background: rgba(6, 182, 212, 0.1); }
+.icon-cyan { color: #06b6d4; }
+
+.bg-purple-soft { background: rgba(168, 85, 247, 0.1); }
+.icon-purple { color: #a855f7; }
+
+.bg-blue-soft { background: rgba(59, 130, 246, 0.1); }
+.icon-blue { color: #3b82f6; }
+
+.bg-amber-soft { background: rgba(245, 158, 11, 0.1); }
+.icon-amber { color: #f59e0b; }
+
+.bg-info { background: #3b82f6; }
+.bg-warning { background: #f59e0b; }
+.bg-orange { background: #f97316; }
+.bg-danger { background: #ef4444; }
+
+/* Custom Pie Elements */
+.method-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.method-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.bg-mpesa { background: #10b981; }
+.bg-bank { background: #6366f1; }
+.bg-card { background: #ec4899; }
+
+/* Generic Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.5s ease forwards;
+}
+
+/* Transaction Table Styling */
+.billing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.billing-table th {
+    text-align: left;
+    padding: 16px 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.billing-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    vertical-align: middle;
+}
+
+.billing-table tr:hover td {
+    background: rgba(255, 255, 255, 0.01);
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.bg-success-soft { background: rgba(16, 185, 129, 0.1); }
+.text-success { color: #10b981; }
+
+.bg-warning-soft { background: rgba(245, 158, 11, 0.1); }
+.text-warning { color: #f59e0b; }
+
+.bg-danger-soft { background: rgba(239, 68, 68, 0.1); }
+.text-danger { color: #ef4444; }
+
+.bg-secondary-soft { background: rgba(255, 255, 255, 0.05); }
+.text-secondary { color: var(--text-secondary); }
+
+/* Filter Bar */
+.filter-bar {
+    padding: 16px 24px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 16px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.billing-search-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 16px 10px 44px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.billing-search-input:focus {
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.billing-select {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 10px 16px;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+}
+
+.billing-select option {
+    background: #1a1a1a;
+    color: white;
+}
+
+/* Utility Buttons */
+.icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: scale(1.05);
+    color: white;
+}
+
+/* Gateway & Settings Styles */
+.gateway-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
+}
+
+.gateway-card {
+    padding: 30px;
+}
+
+.gateway-status {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.status-active { background: #10b981; color: white; }
+.status-disabled { background: #6b7280; color: white; }
+
+.config-field {
+    margin-top: 16px;
+}
+
+.config-field label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.config-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 10px;
+    color: white;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Reports Styles */
+.reports-dashboard {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.report-type-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.report-type-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--primary-color);
+}
+
+.report-icon {
+    font-size: 2rem;
+    opacity: 0.5;
+}

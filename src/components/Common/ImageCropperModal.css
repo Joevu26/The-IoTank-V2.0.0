@@ -1,0 +1,226 @@
+/* src/components/Common/ImageCropperModal.css */
+.cropper-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(16px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.cropper-modal-container {
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+    border-radius: 24px;
+    width: 100%;
+    max-width: 580px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.3);
+}
+
+.dark .cropper-modal-container {
+    background: #111827;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.cropper-modal-header {
+    padding: 1.75rem 2rem;
+    border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-secondary, #f8fafc);
+}
+
+.dark .cropper-modal-header {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.cropper-modal-header h3 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    margin: 0;
+    letter-spacing: -0.025em;
+}
+
+.cropper-modal-header p {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin: 0.25rem 0 0 0;
+    font-weight: 500;
+}
+
+.cropper-viewport-container {
+    height: 300px;
+    position: relative;
+    background: #0f172a;
+    border-radius: 0;
+    margin: 0;
+}
+
+.cropper-modal-controls {
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-text-secondary);
+    font-weight: 900;
+    opacity: 0.6;
+}
+
+.slider-container {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0 0.5rem;
+}
+
+.cropper-slider {
+    flex: 1;
+    height: 6px;
+    background: var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    appearance: none;
+    outline: none;
+}
+
+.dark .cropper-slider {
+    background: #374151;
+}
+
+.cropper-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #7b6cf6;
+    border-radius: 50%;
+    cursor: grab;
+    border: 4px solid #fff;
+    box-shadow: 0 4px 10px rgba(123, 108, 246, 0.4);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dark .cropper-slider::-webkit-slider-thumb {
+    border-color: #1f2937;
+}
+
+.cropper-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.2);
+}
+
+.mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg-secondary, #f1f5f9);
+    padding: 0.35rem;
+    border-radius: 14px;
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+    gap: 0.25rem;
+}
+
+.dark .mode-toggle {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-btn {
+    padding: 0.65rem;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    transition: all 0.2s;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.mode-btn.active {
+    background: #fff;
+    color: #7b6cf6;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.dark .mode-btn.active {
+    background: #374151;
+    color: #fff;
+}
+
+.cropper-modal-footer {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-color, rgba(0, 0, 0, 0.05));
+}
+
+.btn-cancel {
+    background: var(--bg-secondary, #f1f5f9);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--border-color, transparent);
+    padding: 0.875rem;
+    border-radius: 14px;
+    font-weight: 700;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.dark .btn-cancel {
+    background: #374151;
+    color: #d1d5db;
+}
+
+.btn-cancel:hover {
+    background: var(--border-color, #e2e8f0);
+}
+
+.btn-save {
+    background: linear-gradient(135deg, #7b6cf6, #6366f1);
+    color: white;
+    border: none;
+    padding: 0.875rem;
+    border-radius: 14px;
+    font-weight: 800;
+    box-shadow: 0 10px 20px rgba(123, 108, 246, 0.3);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(123, 108, 246, 0.4);
+}
+
+.btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Custom styles for the crop area mask to look "premium" */
+.react-easy-crop_Container {
+    color: rgba(15, 23, 42, 0.5) !important;
+}
+
+.react-easy-crop_CropArea {
+    border: 3px solid #fff !important;
+    box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.75) !important;
+}

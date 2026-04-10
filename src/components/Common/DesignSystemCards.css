@@ -1,0 +1,311 @@
+/* Base Variables based on User Spec */
+:root {
+    --ds-font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+    --ds-color-title: #242424;
+    --ds-color-body: #424242;
+    --ds-color-accent: #0078D4;
+    /* Microsoft Blue */
+    --ds-color-bg-light: #F3F9FF;
+    /* Tint for Process Cards */
+    --ds-color-frame-bg: #F2F2F2;
+    /* Frame for Promo Cards */
+    --ds-radius-soft: 8px;
+    --ds-radius-large: 24px;
+    --ds-shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --ds-shadow-hover: 0 8px 16px rgba(0, 0, 0, 0.08);
+    /* Lift effect */
+    --ds-spacing-card: 24px;
+}
+
+/* Base Card Reset */
+.ds-card {
+    font-family: var(--ds-font-family);
+    box-sizing: border-box;
+    transition: all 0.2s ease-in-out;
+    cursor: default;
+}
+
+/* Generic Content Panel (for Dashboard/Inventory) */
+/* Generic Content Panel (Fluent / Material Surface) */
+.ds-card-panel {
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--color-divider);
+    padding: var(--ds-spacing-card);
+    transition: all var(--transition-base);
+}
+
+.ds-card-panel:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(-4px);
+    border-color: var(--color-accent-primary);
+}
+
+/* ---------------------------------------------------------
+   Type 1: Feature Card (Stay Informed Style)
+   Vertical Stack, Image Top, White Bg, Soft Radius
+--------------------------------------------------------- */
+/* Type 1: Feature Card */
+.ds-card-feature {
+    background: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.ds-card-feature:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+    border-color: rgba(0, 0, 0, 0.05);
+}
+
+.ds-card-visual {
+    width: 100%;
+    height: 85px;
+    /* Fixed height for perfect row alignment */
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    /* For overlays if needed */
+}
+
+.ds-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.ds-card-icon-placeholder {
+    font-size: 48px;
+    color: var(--ds-color-accent);
+}
+
+.ds-card-content {
+    padding: var(--ds-spacing-card);
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.ds-card-title {
+    font-size: 20px;
+    font-weight: 600;
+    /* Semi-bold */
+    color: var(--ds-color-title);
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+}
+
+.ds-card-body {
+    font-size: 15px;
+    color: var(--ds-color-body);
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+    flex-grow: 1;
+}
+
+.ds-card-cta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ds-color-accent);
+    font-weight: 500;
+    font-size: 15px;
+    cursor: pointer;
+    margin-top: auto;
+}
+
+.ds-card-cta:hover {
+    text-decoration: underline;
+}
+
+/* ---------------------------------------------------------
+   Type 2: Service Card (Icon + Text)
+   Horizontal, No Box (Separated by lines usually, or just clean grid)
+--------------------------------------------------------- */
+.ds-card-service {
+    display: flex;
+    align-items: flex-start;
+    /* Top align icon */
+    gap: 16px;
+    padding: 16px 0;
+    /* Optional: Add bottom border if list style is desired externally */
+}
+
+.ds-service-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+}
+
+.ds-service-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.ds-service-title {
+    font-size: 18px;
+    font-weight: 700;
+    /* Bold */
+    color: var(--ds-color-title);
+    margin: 0 0 4px 0;
+}
+
+.ds-service-body {
+    font-size: 15px;
+    color: var(--ds-color-body);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ---------------------------------------------------------
+   Type 3: Process Card (Numbered Steps)
+   Horizontal, Tinted Bg, Large Radius
+--------------------------------------------------------- */
+.ds-card-process {
+    background: var(--ds-color-bg-light);
+    border-radius: var(--ds-radius-large);
+    padding: 32px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    height: 100%;
+}
+
+.ds-process-number {
+    font-size: 64px;
+    font-weight: 300;
+    /* Light/Thin for huge numbers */
+    color: var(--ds-color-accent);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.ds-process-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.ds-process-title {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--ds-color-title);
+    margin: 8px 0 12px 0;
+}
+
+.ds-process-body {
+    font-size: 16px;
+    color: var(--ds-color-body);
+    line-height: 1.6;
+    margin: 0 0 16px 0;
+}
+
+.ds-process-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--ds-color-accent);
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    font-size: 16px;
+    text-decoration: underline;
+}
+
+/* ---------------------------------------------------------
+   Type 4: Promo Card (Card-in-Card / 3D Layout)
+   Vertical, Top Frame, Bottom Text
+--------------------------------------------------------- */
+.ds-card-promo {
+    display: flex;
+    flex-direction: column;
+    /* Often used in a grid with vertical dividers, so we keep the card itself clean */
+    height: 100%;
+    padding: 16px;
+}
+
+/* The frame for the icon/graphic */
+.ds-promo-frame {
+    background: var(--ds-color-frame-bg);
+    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    transition: transform 0.2s ease;
+}
+
+.ds-card-promo:hover .ds-promo-frame {
+    transform: scale(1.02);
+    /* Subtle zoom of the graphic frame */
+}
+
+.ds-promo-icon-3d {
+    font-size: 32px;
+    /* Reduced from 64px */
+    /* Add a drop shadow to the icon to simulate 3D */
+    filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.15));
+}
+
+.ds-promo-content {
+    text-align: left;
+    /* Keep left aligned as per Windows style */
+}
+
+.ds-promo-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ds-color-title);
+    margin: 0 0 8px 0;
+}
+
+.ds-promo-body {
+    font-size: 15px;
+    color: var(--ds-color-body);
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+}
+
+.ds-promo-cta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ds-color-accent);
+    font-weight: 500;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+
+/* Toast Animations */
+@keyframes slide-in-bottom {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.z-toast {
+    z-index: 2000;
+}

@@ -1,0 +1,283 @@
+/* =============================================================================
+   IoTank Fuel Intelligence Hub - Design System
+   Industrial-themed CSS custom properties for light/dark modes
+   ============================================================================= */
+
+:root {
+  /* ==================== COLOR SYSTEM - LIGHT MODE ==================== */
+  /* Base Backgrounds - Soft Lavender/Blue-Grey tint */
+  --color-bg-primary: #F4F5FF;
+  --color-bg-secondary: #FFFFFF;
+  /* Main Card Background */
+  --color-bg-secondary-glass: rgba(255, 255, 255, 0.7);
+  /* Frosted effect */
+  --color-bg-tertiary: #FAFAFF;
+  --color-bg-elevated: #FFFFFF;
+
+  /* Sidebar Gradient - Blush/Lavender/Milky White */
+  --sidebar-bg: linear-gradient(180deg, rgba(246, 234, 242, 0.95) 0%, rgba(238, 211, 232, 0.95) 45%, rgba(230, 219, 245, 0.95) 100%);
+
+  /* Navbar Gradient - Horizontal Atmospheric (Intensified for Visibility) */
+  --navbar-bg-gradient: linear-gradient(100deg, #F3E4ED 0%, #c8b0ed 50%, #b2b8c8 100%);
+
+  /* Text Colors - Softened contrasts */
+  --color-text-primary: #323264;
+  --color-text-secondary: #7A7A95;
+  --color-text-disabled: #B6B6CC;
+  --color-text-inverse: #FFFFFF;
+
+  /* Accents - Premium Travel Palette (Synced with Electric Cyan Branding) */
+  --color-accent-primary: #00D4FF;
+  /* Electric Cyan */
+  --color-accent-primary-hover: #00B8E6;
+  --color-accent-primary-light: rgba(0, 212, 255, 0.1);
+
+  --color-accent-pink: #FF4FCB;
+  /* Brand Pink */
+  --color-accent-peach: #FFD6B3;
+  /* Warm Glow */
+
+  /* Ambient Glow Colors */
+  --color-glow-pink: #FF9BCF;
+  --color-glow-purple: #C7B7FF;
+  --color-glow-peach: #FFD6B3;
+
+  /* Status Colors - Pastel/Softened */
+  --color-success: #10B981;
+  --color-success-bg: #E0F2F1;
+  --color-success-border: #A7F3D0;
+
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FCD34D;
+
+  --color-danger: #EF4444;
+  --color-danger-bg: #FEF2F2;
+  --color-danger-border: #FCA5A5;
+
+  --color-info: #00D4FF;
+  /* Using primary accent for info */
+  --color-info-bg: rgba(0, 212, 255, 0.1);
+  --color-info-border: #C7D2FE;
+
+  /* Borders & Dividers */
+  --color-border: #E8E9F5;
+  --color-border-light: #F4F5FF;
+  --color-divider: rgba(122, 122, 149, 0.1);
+
+  /* Shadows - Soft & Colored */
+  --color-shadow: rgba(180, 140, 255, 0.08);
+  --color-shadow-medium: rgba(180, 140, 255, 0.15);
+  --color-shadow-strong: rgba(43, 43, 58, 0.1);
+
+  /* Chart colors - Pastel harmony */
+  --chart-fuel-level: #00D4FF;
+  --chart-temperature: #FFD6B3;
+  --chart-volume: #10B981;
+  --chart-market: #FF4FCB;
+  --chart-fill-opacity: 0.25;
+
+  /* Icon colors */
+  --icon-default: #7A7A95;
+  --icon-hover: var(--color-accent-primary);
+}
+
+/* ==================== DARK MODE OVERRIDES ==================== */
+:root[data-theme='dark'] {
+  --color-bg-primary: #121212;
+  --color-bg-secondary: #1E1E1E;
+  --color-bg-secondary-glass: rgba(30, 30, 30, 0.85);
+  --color-bg-tertiary: #212121;
+  --color-bg-elevated: #2C2C2C;
+
+  --color-text-primary: #E0E0E0;
+  --color-text-secondary: #9E9E9E;
+  --color-text-disabled: #616161;
+  --color-text-inverse: #121212;
+
+  --color-accent-primary: #00E5FF;
+  --color-accent-primary-hover: #00D4FF;
+  --color-accent-primary-light: rgba(0, 229, 255, 0.15);
+
+  --color-success: #81C784;
+  --color-success-bg: rgba(129, 199, 132, 0.15);
+  --color-success-border: #66BB6A;
+
+  --color-warning: #FFD54F;
+  --color-warning-bg: rgba(255, 213, 79, 0.15);
+  --color-warning-border: #FFCA28;
+
+  --color-danger: #E57373;
+  --color-danger-bg: rgba(229, 115, 115, 0.15);
+  --color-danger-border: #EF5350;
+
+  --color-info: #00E5FF;
+  --color-info-bg: rgba(100, 181, 246, 0.15);
+  --color-info-border: #42A5F5;
+
+  --color-border: #424242;
+  --color-border-light: #333333;
+  --color-divider: rgba(255, 255, 255, 0.12);
+
+  --color-shadow: rgba(0, 0, 0, 0.3);
+  --color-shadow-medium: rgba(0, 0, 0, 0.4);
+  --color-shadow-strong: rgba(0, 0, 0, 0.6);
+
+  /* Chart colors - lighter for dark mode */
+  --chart-fuel-level: #00E5FF;
+  --chart-temperature: #FFB74D;
+  --chart-volume: #AED581;
+  --chart-market: #CE93D8;
+  --chart-fill-opacity: 0.3;
+
+  --icon-default: #BDBDBD;
+}
+
+/* ==================== TYPOGRAPHY SYSTEM ==================== */
+:root {
+  /* Microsoft Aptos Font Stack (Modern Office/Windows Style) */
+  --font-family-display: "Aptos", "Inter", "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+  --font-family-primary: "Aptos", "Inter", "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+  --font-family-mono: "Cascadia Code", "Segoe UI Mono", "Consolas", "Courier New", monospace;
+
+  /* Font sizes - fluid responsive scale */
+  --font-size-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.8125rem);
+  --font-size-sm: clamp(0.8125rem, 0.75rem + 0.3vw, 0.9375rem);
+  --font-size-base: clamp(0.9375rem, 0.875rem + 0.3vw, 1.0625rem);
+  --font-size-lg: clamp(1.0625rem, 1rem + 0.4vw, 1.25rem);
+  --font-size-xl: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
+  --font-size-2xl: clamp(1.5rem, 1.4rem + 1vw, 2rem);
+  --font-size-3xl: clamp(2rem, 1.6rem + 1.25vw, 2.75rem);
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 900;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ==================== SPACING SYSTEM ==================== */
+  --spacing-xs: 0.25rem;
+  /* 4px */
+  --spacing-sm: 0.5rem;
+  /* 8px */
+  --spacing-md: 0.75rem;
+  /* 12px */
+  --spacing-base: 1rem;
+  /* 16px */
+  --spacing-lg: 1.5rem;
+  /* 24px */
+  --spacing-xl: 2rem;
+  /* 32px */
+  --spacing-2xl: 3rem;
+  /* 48px */
+  --spacing-3xl: 4rem;
+  /* 64px */
+
+  /* ==================== LAYOUT ==================== */
+  --container-max-width: 1680px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --navbar-height: 72px;
+
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 4px;
+
+  /* ==================== SHADOWS ==================== */
+  --shadow-sm: 0 1px 2px 0 var(--color-shadow);
+  --shadow-md: 0 4px 6px -1px var(--color-shadow),
+    0 2px 4px -1px var(--color-shadow);
+  --shadow-lg: 0 10px 15px -3px var(--color-shadow-medium),
+    0 4px 6px -2px var(--color-shadow);
+  --shadow-xl: 0 20px 25px -5px var(--color-shadow-strong),
+    0 10px 10px -5px var(--color-shadow);
+  --shadow-inner: inset 0 2px 4px 0 var(--color-shadow);
+
+  /* ==================== TRANSITIONS ==================== */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 300ms ease-in-out;
+  --transition-slow: 500ms ease-in-out;
+
+  /* ==================== Z-INDEX LAYERS ==================== */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+
+  /* ==================== BREAKPOINTS (for JS) ==================== */
+  --breakpoint-mobile: 480px;
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1024px;
+  --breakpoint-wide: 1440px;
+}
+
+/* =============================================================================
+   THEME TRANSITION
+   ============================================================================= */
+* {
+  transition: background-color var(--transition-base),
+    color var(--transition-base),
+    border-color var(--transition-base);
+}
+
+/* Prevent transition on initial page load */
+.preload * {
+  transition: none !important;
+}
+
+/* =============================================================================
+   ACCESSIBILITY - HIGH CONTRAST MODE
+   ============================================================================= */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: #000000;
+    --color-text-secondary: #424242;
+  }
+
+  :root[data-theme='dark'] {
+    --color-border: #FFFFFF;
+    --color-text-secondary: #BDBDBD;
+  }
+}
+
+/* =============================================================================
+   REDUCED MOTION
+   ============================================================================= */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =============================================================================
+   COLOR-BLIND SAFE MODE (Deuteranopia - Red-Green)
+   ============================================================================= */
+:root[data-colorblind='deuteranopia'] {
+  --color-success: #0077BB;
+  /* Blue instead of green */
+  --color-success-bg: #E3F2FD;
+  --color-danger: #EE7733;
+  /* Orange instead of red */
+  --color-danger-bg: #FFF3E0;
+  --color-warning: #CCBB44;
+  /* Yellow-brown */
+  --chart-volume: #0077BB;
+}

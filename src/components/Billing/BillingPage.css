@@ -1,0 +1,425 @@
+/* =============================================================================
+   BillingPage — Premium Financial Hub
+   Aligned with Amethyst Design System (Glassmorphism + High Density)
+   ============================================================================= */
+
+.billing-page {
+    padding: 2.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: var(--font-family-primary);
+    color: var(--color-text-primary);
+}
+
+/* ── Header Area ────────────────────────────────────────────────────────────── */
+.billing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2.5rem;
+    gap: 2rem;
+}
+
+.billing-header-info h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5rem;
+    background: linear-gradient(135deg, var(--color-text-primary) 0%, #7b6cf6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.billing-header-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    margin: 0;
+}
+
+.billing-period-selector {
+    background: var(--color-bg-secondary-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 0.5rem 0.75rem;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+}
+
+.billing-period-selector:hover {
+    border-color: var(--color-accent-primary);
+    box-shadow: var(--shadow-md);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────── */
+.billing-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    background: rgba(0, 0, 0, 0.03);
+    padding: 0.4rem;
+    border-radius: 14px;
+    width: max-content;
+}
+
+.billing-tab-btn {
+    padding: 0.6rem 1.25rem;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.billing-tab-btn:hover {
+    color: var(--color-text-primary);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.billing-tab-btn.active {
+    background: #fff;
+    color: var(--color-accent-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Bento Grid Overview ────────────────────────────────────────────────────── */
+.billing-bento-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 0.8fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+@media (max-width: 1024px) {
+    .billing-bento-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.billing-glass-card {
+    background: var(--color-bg-secondary-glass);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 1.75rem;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.billing-glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+}
+
+/* Balance Card Specifics */
+.balance-card.overdue {
+    background: linear-gradient(135deg, rgba(254, 242, 242, 0.8) 0%, rgba(255, 255, 255, 0.8) 100%);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.balance-card.overdue .balance-amount {
+    color: var(--color-danger);
+    text-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+}
+
+.balance-card.healthy {
+    background: linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, rgba(255, 255, 255, 0.8) 100%);
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.balance-card.healthy .balance-amount {
+    color: #10b981;
+}
+
+.balance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.balance-status-tag {
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--border-radius-full);
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.balance-amount {
+    font-size: 3rem;
+    font-weight: 900;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.04em;
+}
+
+.balance-footer {
+    display: flex;
+    gap: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+/* Plan Card Specifics */
+.plan-card {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    color: #fff;
+}
+
+.plan-card .billing-header-subtitle {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.plan-badge {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+}
+
+.plan-feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.plan-feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── Usage Analytics ────────────────────────────────────────────────────────── */
+.usage-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.usage-mini-card {
+    padding: 1.5rem;
+}
+
+.usage-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.usage-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    margin-bottom: 0.75rem;
+}
+
+.usage-progress-bar {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.usage-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ── Transactions Table ─────────────────────────────────────────────────────── */
+.billing-table-container {
+    background: #fff;
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.billing-table-header {
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.billing-table-header h2 {
+    font-size: 1.125rem;
+    font-weight: 800;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.billing-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.billing-table th {
+    background: var(--color-bg-tertiary);
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.billing-table td {
+    padding: 1.25rem 1.5rem;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--color-divider);
+    color: var(--color-text-primary);
+}
+
+.billing-table tr:hover td {
+    background: rgba(var(--color-primary-rgb), 0.01);
+}
+
+.payment-status-chip {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.tx-type-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+}
+
+/* ── Record Payment Form ────────────────────────────────────────────────────── */
+.payment-form-card {
+    margin-top: 2.5rem;
+}
+
+.payment-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 1.25rem;
+    align-items: flex-end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    color: var(--color-text-primary);
+}
+
+.form-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 8px 24px rgba(123, 108, 246, 0.1);
+}
+
+.payment-submit-btn {
+    padding: 0.85rem 2rem;
+    background: var(--color-accent-primary);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.payment-submit-btn:hover:not(:disabled) {
+    background: var(--color-accent-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.payment-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease forwards;
+}
+
+[data-theme='dark'] .billing-glass-card {
+    background: rgba(30, 41, 59, 0.7);
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme='dark'] .billing-table-container {
+    background: var(--color-bg-secondary);
+}
+
+[data-theme='dark'] .form-input {
+    background: var(--color-bg-tertiary);
+    color: #fff;
+}
