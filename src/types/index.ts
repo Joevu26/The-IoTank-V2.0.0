@@ -81,6 +81,7 @@ export interface Tank {
     createdAt: number;
     updatedAt: number;
     isActive: boolean;
+    metadata?: any;
     lastMaintenanceDate?: number;
     lastCalibrationDate?: number;
     lastConfigUpdate?: number;
@@ -239,7 +240,7 @@ export interface GeminiInsight {
 }
 
 export interface UserPreferences {
-    userId: string;
+    authUserId: string;
     theme: 'light' | 'dark' | 'auto';
     colorblindMode: 'none' | 'deuteranopia' | 'protanopia' | 'tritanopia';
     language: 'en' | 'es' | 'fr' | 'de' | 'sw';
@@ -272,11 +273,15 @@ export interface User {
     displayName?: string;
     photoURL?: string;
     /**
-     * Level 5: admin         = Station Admin (full control of their station) - PREFERRED
-     * Level 6: supervisor    = Station Supervisor (operational tasks, no billing/users)
+     * Level 8: viewer        = Read-only analyst/auditor (Minimum Portal Level)
      * Level 7: operator      = Station Operator (monitor-only, assigned tanks)
-     * Level 8: viewer        = Read-only analyst/auditor
-     * @deprecated 'owner' is legacy; use 'admin' for station owners.
+     * Level 6: supervisor    = Station Supervisor (operational tasks, no billing/users)
+     * Level 5: admin         = Station Admin (full control of their station)
+     * 
+     * Level 4: Global Auditor = Governance read-only compliance
+     * Level 3: Global Support = Governance incident response / troubleshooting
+     * Level 2: Global Ops     = Governance deployment / infrastructure control
+     * Level 1: Global Apex    = Governance full system sovereignty
      */
     role: 'admin' | 'owner' | 'supervisor' | 'operator' | 'viewer';
     authLevel: number;
@@ -397,11 +402,12 @@ export type ThemeMode = 'light' | 'dark';
 export type ColorBlindMode = 'none' | 'deuteranopia' | 'protanopia' | 'tritanopia';
 /**
  * Client-layer role hierarchy:
- * admin         = Level 5: Station Admin (Preferred)
- * owner         = Level 5: Station Owner (Legacy)
- * supervisor    = Level 6: Station Supervisor
- * operator      = Level 7: Station Operator
- * viewer        = Level 8: Read-only access
+ * Level 5: admin         = Station Admin
+ * Level 6: supervisor    = Station Supervisor
+ * Level 7: operator      = Station Operator
+ * Level 8: viewer        = Read-only access (Minimum)
+ * 
+ * Governance-layer hierarchy: 1 (Apex) to 4 (Auditor)
  */
 export type UserRole = 'admin' | 'owner' | 'supervisor' | 'operator' | 'viewer';
 export type AlertSeverity = 'info' | 'warning' | 'critical';
@@ -437,15 +443,19 @@ export interface ShiftDocument {
     volumeSoldLiters: number;
 
     expected: { cash: number; mpesa: number; pos: number; total: number };
-    received: { cash: number; mpesa: number; pos: number; total: number };
+    received: { cash: number; mpesa: number; pos: number; total: number; spending: number };
     variance: { amount: number; pct: number };
 
     status: 'BALANCED' | 'SHORT' | 'OVER' | 'NEEDS_REVIEW';
     reviewState: 'OPEN' | 'CLOSED' | 'APPROVED';
 
-    closedBy: { userId: string; display: string };
+    openedBy: { authUserId: string; display: string };
+    closedBy: { authUserId: string; display: string };
+    closingVolume: number; // Tank volume at closure
+    notes: string;
     createdAt: string; // ISO String
 }
+
 
 // --- Delivery Types (New Schema) ---
 
@@ -475,7 +485,7 @@ export interface DeliveryDocument {
     status: 'VERIFIED' | 'NEEDS_REVIEW' | 'DISPUTED';
     verified: boolean;
 
-    createdBy: { kind: 'user' | 'system'; userId: string; display: string };
+    createdBy: { kind: 'user' | 'system'; authUserId: string; display: string };
     createdAt: string; // ISO String
     notes?: string;
 }
@@ -516,7 +526,7 @@ export interface SupportMessage {
 export interface SupportTicket {
     id: string;
     stationId: string;
-    userId: string;
+    authUserId: string;
     ts: string;
     category: SupportCategory;
     severity: SupportSeverity;

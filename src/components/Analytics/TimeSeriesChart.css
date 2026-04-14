@@ -1,3 +1,12 @@
+/* Theme Registry */
+.fuel-diesel { --chart-color: var(--color-accent-amber); }
+.fuel-petrol { --chart-color: var(--color-accent-emerald); }
+.fuel-kerosene { --chart-color: var(--color-accent-blue); }
+.fuel-other { --chart-color: var(--color-accent-primary); }
+.theme-temperature { --chart-color: #ef4444; }
+.theme-volume { --chart-color: #3b82f6; }
+.theme-default { --chart-color: var(--chart-fuel-level, #10b981); }
+
 .time-series-chart-container {
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-base);
@@ -29,6 +38,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--border-radius-md);
     box-shadow: var(--shadow-lg);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -43,6 +53,7 @@
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-bold);
     margin: 0;
+    color: var(--chart-color);
 }
 
 /* Customize Recharts Brush */
@@ -66,4 +77,8 @@
 .legend-dot {
     display: inline-block;
     vertical-align: middle;
-}
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--chart-color);
+}

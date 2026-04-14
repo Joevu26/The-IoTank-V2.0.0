@@ -1,0 +1,17 @@
+/* src/styles/recaptcha.css */
+
+/* Google reCAPTCHA v3 Badge Controls */
+.grecaptcha-badge {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(20px) !important;
+  transition: opacity 0.6s ease, transform 0.6s ease, visibility 0.6s ease !important;
+  bottom: 24px !important;
+}
+
+/* When body has this class, smoothly reveal the badge */
+body.show-recaptcha .grecaptcha-badge {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateY(0) !important;
+}

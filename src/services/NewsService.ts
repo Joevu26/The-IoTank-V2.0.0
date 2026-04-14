@@ -33,6 +33,33 @@ export class NewsService {
     }
 
     /**
+     * Fetch the most recent news from the database for initial hydration.
+     */
+    static async fetchRecentNews(limit: number = 10): Promise<MarketSignal[]> {
+        const { data, error } = await supabase
+            .from('market_news')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('Failed to fetch historical news:', error);
+            return [];
+        }
+
+        return (data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            summary: item.summary,
+            sourceType: item.source_type || 'system',
+            attribution: item.attribution || 'IoTank Core',
+            priority: item.priority || 3,
+            timestamp: new Date(item.created_at).getTime(),
+            metadata: item.metadata || {}
+        }));
+    }
+
+    /**
      * Stop listening.
      */
     static stopListening() {
@@ -43,7 +70,7 @@ export class NewsService {
     }
 
     /**
-     * Dispatches a custom event that the NewsToast component listens for.
+     * Dispatches a custom event that hooks/UI components listen for.
      */
     private static dispatchNews(data: any) {
         const signal: MarketSignal = {

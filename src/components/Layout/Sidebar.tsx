@@ -15,7 +15,7 @@ import {
     MdCreditCard,
 } from 'react-icons/md';
 
-import { FiHome, FiTruck } from 'react-icons/fi';
+import { FiHome, FiTruck, FiShield } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
 import { enableGovernanceConsole } from '@/config/supabase';
 import './Sidebar.css';
@@ -55,6 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'Event Log', path: '/event-log', icon: <MdOutlineEventNote />, level: 6 },
         { name: t('market'), path: '/market', icon: <MdTrendingUp />, level: 7 },
         { name: t('alerts'), path: '/alerts', icon: <MdWarning />, level: 7 },
+        { name: 'Forensic Security', path: '/security', icon: <FiShield />, level: 6 },
+        { name: 'Doc Intelligence', path: '/analysis', icon: <MdAssessment />, level: 6 },
         { name: t('reporting'), path: '/reporting', icon: <MdAssessment />, level: 6 },
 
         { name: 'Administration', isSection: true, path: 'sec-admin', level: 6 },
@@ -81,7 +83,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`operator-identity-module ${collapsed ? 'collapsed' : ''}`}
                 onClick={() => navigate('/settings?tab=company')}
                 title="Manage Organization Identity"
-                style={{ cursor: 'pointer' }}
             >
                 <div className="avatar-container">
                     <div className="operator-photo-placeholder neumorphic-rim overflow-hidden flex items-center justify-center">
@@ -104,16 +105,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <nav className="sidebar-nav">
                 <ul>
-                    {menuItems.map((item) => {
+                    {menuItems.map((item, index) => {
                         if (item.isSection) {
+                            // Only show section if there is at least one non-section item following it 
+                            // before the next section begins
+                            const nextItems = menuItems.slice(index + 1);
+                            const hasVisibleItemsInSection = nextItems.length > 0 && 
+                                (nextItems.findIndex(ni => ni.isSection) === -1 || nextItems.findIndex(ni => ni.isSection) > 0);
+                            
+                            if (!hasVisibleItemsInSection) return null;
+
                             return (
                                 <li key={item.path} className={`nav-section ${(collapsed && !mobileOpen) ? 'hidden' : ''}`}>
                                     <span className="nav-section-label">{item.name}</span>
                                 </li>
                             );
                         }
-
-
 
                         return (
                             <li key={item.path}>

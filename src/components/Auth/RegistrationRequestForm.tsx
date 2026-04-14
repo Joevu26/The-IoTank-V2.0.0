@@ -82,24 +82,22 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
         // Continue without token - registration can still proceed
       }
 
-      // Insert registration record with reCAPTCHA token
-      const { error: dbError } = await supabase
-        .from('pending_registrations')
-        .insert([{
+      // 2. SUBMIT: Routing via hardened Edge Function (enforces server-side reCAPTCHA & sanitization)
+      const { data: functionData, error: functionError } = await supabase.functions.invoke('submit-registration-request', {
+        body: {
           full_name: sanitizeText(formData.full_name, 120),
           email: formData.email.toLowerCase().trim(),
           phone: sanitizeText(formData.phone, 40),
           station_name: sanitizeText(formData.station_name, 160),
           county: sanitizeText(formData.county, 80),
-          notes: sanitizeText(formData.notes, 100),
-          tanks: [],
-          status: 'pending',
-          email_verified: false,
-          verification_token_expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          recaptcha_token: recaptchaToken || null, // Store token for backend verification
-        }]);
+          notes: sanitizeText(formData.notes, 500),
+          recaptcha_token: recaptchaToken || null,
+        }
+      });
 
-      if (dbError) throw dbError;
+      if (functionError) throw functionError;
+      if (functionData && !functionData.success) throw new Error(functionData.error || 'Registration failed');
+
       
       // Hide reCAPTCHA badge
       document.body.classList.remove('show-recaptcha');
@@ -250,7 +248,7 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
                 <div className="atm-section-body">
                   <div className="form-group">
                     <label>County / Region Headquarters</label>
-                    <select name="county" value={formData.county} onChange={handleChange}>
+                    <select name="county" value={formData.county} onChange={handleChange} title="Select County">
                       <option value="">Select County</option>
                       {counties.map(c => (
                         <option key={c} value={c}>{c}</option>

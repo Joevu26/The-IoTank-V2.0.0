@@ -8,7 +8,7 @@ import {
     PDFAnalysisCategory
 } from '@/types';
 
-export function useFileAnalysis(orgId: string, userId: string) {
+export function useFileAnalysis(stationId: string, authUserId: string) {
     const [isUploading, setIsUploading] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
@@ -31,8 +31,8 @@ export function useFileAnalysis(orgId: string, userId: string) {
         try {
             const result = await fileAnalysisService.uploadFile(
                 file,
-                orgId,
-                userId,
+                stationId,
+                authUserId,
                 (progress) => setUploadProgress(progress)
             );
             setUploadedFile(result);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTanks, useLatestReading } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
+import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
 import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUploadCloud, FiChevronDown } from 'react-icons/fi';
 import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
@@ -14,8 +15,8 @@ interface DeliveryModalProps {
 
 export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || '';
-    const { tanks } = useTanks(orgId);
+    const stationId = currentUser?.stationId || '';
+    const { tanks } = useTanks(stationId);
 
     const [isHibernating, setIsHibernating] = useState(false);
     const [formData, setFormData] = useState({
@@ -40,7 +41,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
     const [submitting, setSubmitting] = useState(false);
     const [step, setStep] = useState<1 | 2>(1);
 
-    const { reading: latestReading } = useLatestReading(orgId, formData.tankId);
+    const { reading: latestReading } = useLatestReading(stationId, formData.tankId);
 
     useEffect(() => {
         if (isOpen) {
@@ -82,7 +83,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                 setUploadingInvoice(true);
                 const fileExt = invoiceFile.name.split('.').pop();
                 const fileName = `${Math.random()}.${fileExt}`;
-                const filePath = `deliveries/invoices/${orgId}/${fileName}`;
+                const filePath = `deliveries/invoices/${stationId}/${fileName}`;
 
                 const { error: uploadError } = await supabase.storage
                     .from('uploads')
@@ -152,12 +153,21 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                         timestamp: new Date().toISOString(),
                         operator: currentUser.displayName
                     },
-                    generated_by: currentUser.authUserId
                 };
-
-                const { error: reportError } = await supabase.from('reports').insert([reportPayload]);
-                if (reportError) console.error("Forensic report storage failed:", reportError);
+                
+                // Insert report into database
+                await supabase.from('reports').insert([reportPayload]);
             }
+
+            // 🟢 Forensic Log
+            await AuditService.log(
+                'DELIVERY',
+                'DELIVERY_RECORDED',
+                stationId,
+                `Delivery recorded from ${formData.supplier}: ${formData.expectedVolume}L to ${selectedTank?.name}. Variance: ${variance}L.`,
+                Math.abs(variance) > 50 ? 'WARNING' : 'INFO',
+                { deliveryId: deliveryData?.id, tankId: formData.tankId, variance }
+            );
 
             alert('Delivery logged successfully and stored as a forensic report.');
             onClose();
@@ -213,7 +223,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                             <span className="modal-badge amethyst">INCOMING</span>
                         </div>
                     </div>
-                    <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose}><FiX size={18} /></button>
+                    <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose} title="Close Modal" aria-label="Close Modal"><FiX size={18} /></button>
                 </div>
 
                 <form onSubmit={step === 1 ? handleNextStep : executeSubmission} className="add-tank-form">
@@ -228,7 +238,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                 <div className="atm-section-body atm-grid atm-grid-2">
                                     <div className="form-group atm-col-2">
                                         <label>Target Tank</label>
-                                        <select required value={formData.tankId} onChange={e => {
+                                        <select required title="Target Tank" aria-label="Target Tank" value={formData.tankId} onChange={e => {
                                             const newTankId = e.target.value;
                                             const tank = tanks.find(t => t.id === newTankId);
                                             setFormData({
@@ -291,7 +301,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
 
                                     <div className="form-group">
                                         <label>Delivery Timestamp</label>
-                                        <input type="datetime-local" value={formData.timestamp} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} />
+                                        <input type="datetime-local" title="Delivery Timestamp" aria-label="Delivery Timestamp" placeholder="Delivery Timestamp" value={formData.timestamp} onChange={e => setFormData({ ...formData, timestamp: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -310,6 +320,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                             <FiInfo className="text-emerald-400 cursor-help" size={12} title="Pour sample into clean glass container and inspect against light source." />
                                         </label>
                                         <select
+                                            title="Visual Check" aria-label="Visual Check"
                                             value={formData.visualCheck}
                                             onChange={e => setFormData({ ...formData, visualCheck: e.target.value })}
                                             className="w-full border-emerald-100 focus:border-emerald-500 focus:ring-emerald-50"
@@ -333,6 +344,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                                 onChange={e => setFormData({ ...formData, waterContaminationValue: e.target.value })}
                                             />
                                             <select
+                                                title="Water Contamination Type" aria-label="Water Contamination Type"
                                                 className="w-20 rounded-l-none bg-slate-50 border-l border-slate-200 appearance-none pr-8"
                                                 value={formData.waterContaminationType}
                                                 onChange={e => setFormData({ ...formData, waterContaminationType: e.target.value as any })}
@@ -382,6 +394,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                     >
                                         <input
                                             id="invoice-upload"
+                                            title="Upload Invoice" aria-label="Upload Invoice" placeholder="Upload Invoice"
                                             type="file"
                                             className="hidden"
                                             accept="image/*"
@@ -491,7 +504,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                 />
                             </div>
 
-                            <div className="tm-verification-card" style={{ maxWidth: '448px', margin: '20px auto 10px' }}>
+                            <div className="tm-verification-card max-w-[448px] mx-auto my-[10px] mt-[20px]">
                                 <FiCheckCircle size={18} />
                                 <p>
                                     System will automatically verify the volume delta using ESP32 telemetry after confirmation.

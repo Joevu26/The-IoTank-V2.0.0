@@ -5,8 +5,8 @@ import { NotificationService } from '@/services/NotificationService';
 /**
  * Hook to automatically trigger browser notifications for new alerts
  */
-export function useBrowserNotifications(orgId: string) {
-    const { alerts } = useAlerts(orgId, false);
+export function useBrowserNotifications(stationId: string) {
+    const { alerts } = useAlerts(stationId, false);
     const prevAlertIds = useRef<Set<string>>(new Set());
     const isFirstRun = useRef(true);
 

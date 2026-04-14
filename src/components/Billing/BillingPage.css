@@ -1,7 +1,90 @@
-/* =============================================================================
-   BillingPage — Premium Financial Hub
-   Aligned with Amethyst Design System (Glassmorphism + High Density)
+/* Aligned with Amethyst Design System (Glassmorphism + High Density)
    ============================================================================= */
+
+/* ── Simulation Banners ───────────────────────────────────────────────────── */
+.simulation-insight-banner {
+    background: var(--color-warning-bg);
+    border: 1px solid var(--color-warning-border);
+    border-radius: 12px;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.85rem;
+}
+
+.simulation-insight-text {
+    flex: 1;
+}
+
+.simulation-insight-btn {
+    padding: 0.25rem 0.75rem !important;
+    font-size: 0.75rem !important;
+}
+
+/* ── Typography & Label Helpers ────────────────────────────────────────────── */
+.billing-label-bold {
+    font-weight: 700;
+}
+
+.usage-value-hero {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+}
+
+.usage-label-sub {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+}
+
+.usage-stats-divider {
+    border-top: 1px solid rgba(0,0,0,0.05);
+    padding-top: 0.75rem;
+}
+
+.usage-quota-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--color-text-secondary);
+}
+
+.usage-quota-value {
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+/* ── Status Banners ────────────────────────────────────────────────────────── */
+.billing-feedback-banner {
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.billing-feedback-banner--success {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border-color: var(--color-success-border);
+}
+
+.billing-feedback-banner--danger {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border-color: var(--color-danger-border);
+}
+
+/* ── Intelligence Card Overrides ───────────────────────────────────────────── */
+.intelligence-card-premium {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+    border: 1px solid rgba(0,0,0,0.05) !important;
+}
+
 
 .billing-page {
     padding: 2.5rem;
@@ -39,6 +122,7 @@
 
 .billing-period-selector {
     background: var(--color-bg-secondary-glass);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border: 1px solid var(--color-border);
     border-radius: 12px;
@@ -106,6 +190,7 @@
 
 .billing-glass-card {
     background: var(--color-bg-secondary-glass);
+    -webkit-backdrop-filter: blur(20px);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 24px;
@@ -195,6 +280,7 @@
     font-size: 0.7rem;
     font-weight: 800;
     text-transform: uppercase;
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -258,6 +344,8 @@
     left: 0;
     top: 0;
     bottom: 0;
+    width: var(--fill-width, 0%);
+    background: var(--fill-bg, var(--color-accent-primary));
     border-radius: 4px;
     transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -316,12 +404,103 @@
     background: rgba(var(--color-primary-rgb), 0.01);
 }
 
+.tx-date-cell {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.tx-type-cell {
+    vertical-align: middle;
+}
+
+.tx-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.tx-type-badge.payment, .tx-type-badge.credit { color: var(--color-success); }
+.tx-type-badge.charge, .tx-type-badge.fee { color: var(--color-warning); }
+
+.tx-desc-cell {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tx-method-cell {
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--color-text-secondary);
+}
+
+.tx-amount-cell {
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tx-amount-cell[data-type="payment"], .tx-amount-cell[data-type="credit"] { color: var(--color-success); }
+.tx-amount-cell[data-type="charge"], .tx-amount-cell[data-type="fee"] { color: var(--color-warning); }
+
+.tx-status-cell {
+    text-align: right;
+}
+
 .payment-status-chip {
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: capitalize;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+}
+
+.payment-status-chip.completed {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
+}
+
+.payment-status-chip.pending {
+    background: var(--color-warning-bg);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning-border);
+}
+
+.payment-status-chip.failed {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger-border);
+}
+
+.restricted-shield-icon {
+    color: var(--color-danger);
+}
+
+.empty-ledger-state {
+    padding: 4rem;
+    text-align: center;
+    color: var(--color-text-disabled);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-ledger-icon {
+    opacity: 0.15;
+    margin-bottom: 1.5rem;
+    font-size: 3rem;
 }
 
 .tx-type-group {
@@ -360,6 +539,7 @@
     width: 100%;
     padding: 0.85rem 1rem;
     background: rgba(255, 255, 255, 0.4);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 12px;
@@ -423,3 +603,81 @@
     background: var(--color-bg-tertiary);
     color: #fff;
 }
+
+/* ── Billing Utilities ─────────────────────────────────────────────────────── */
+.billing-status-tag-custom {
+    background: var(--status-bg);
+    color: var(--status-color);
+    border: 1px solid var(--status-border);
+}
+
+.bill-text-large {
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.bill-text-small {
+    font-size: 0.75rem;
+}
+
+.bill-text-tiny {
+    font-size: 0.7rem;
+}
+
+.bill-text-mono {
+    font-family: var(--font-family-mono, monospace);
+    font-size: 0.8rem;
+}
+
+.bill-flex-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.bill-margin-reset {
+    margin: 0;
+}
+
+.bill-font-bold {
+    font-weight: 800;
+}
+
+.bill-font-medium {
+    font-weight: 700;
+}
+
+.bill-text-secondary {
+    color: var(--color-text-secondary);
+}
+
+.bill-mg-top-tiny {
+    margin-top: 0.5rem;
+}
+
+/* ── Status Tag Variants ─────────────────────────────────────────────────── */
+.status-tag--overdue {
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid var(--color-danger-border);
+}
+
+.status-tag--healthy {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-tag--live-sync {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+    border: 1px solid var(--color-success-border);
+}
+
+/* ── Mockup Width Utilities (to avoid inline style) ──────────────────────── */
+.w-42p { width: 42%; background: var(--color-accent-primary); }
+.w-78p { width: 78%; background: var(--color-accent-primary); }
+.w-45p { width: 45%; background: var(--color-accent-pink); }
+.w-99p { width: 99%; background: var(--color-success); }
+

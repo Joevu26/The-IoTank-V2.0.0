@@ -27,7 +27,10 @@ import { ReportModal } from '../QuickActions/ReportModal';
 import { Toast } from '../Common/Toast';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { ViewOnlyNoticeModal } from '../Common/ViewOnlyNoticeModal';
-import { FiEye, FiLock } from 'react-icons/fi';
+import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo } from 'react-icons/fi';
+import { NotificationService } from '@/services/NotificationService';
+import { DeviceCommandService } from '@/services/DeviceCommandService';
+import { FiActivity } from 'react-icons/fi';
 
 interface NavbarProps {
     onToggleSidebar: () => void;
@@ -35,15 +38,14 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     const { currentUser, signOut } = useAuth();
-    const orgId = currentUser?.stationId || '';
+    const stationId = currentUser?.stationId || '';
+    const navigate = useNavigate();
 
-    // Theme toggle removed
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
     const [showQuickActions, setShowQuickActions] = useState(false);
     
-    // Shift Status Logic
-    const { status: shiftStatus, isViewOnly } = useShiftStatus();
+    const { isViewOnly } = useShiftStatus();
     const [showNoticeModal, setShowNoticeModal] = useState(false);
 
     const [toast, setToast] = useState<{ 
@@ -54,6 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     } | null>(null);
     
     const { activeModal, openModal, closeModal } = useModals();
+    const { status: shiftStatus } = useShiftStatus();
     
     // Derived states for local UI
     const isDeliveryModalOpen = activeModal === 'delivery';
@@ -61,21 +64,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     const isShiftOpenModalOpen = activeModal === 'shift-open';
     const isReportModalOpen = activeModal === 'report';
 
-    const navigate = useNavigate();
-
-    // Fetch real alerts for the notification tray
-    const { alerts } = useAlerts(orgId, false);
+    // Fetch alerts for the notification tray
+    const { alerts } = useAlerts(stationId, false);
     const unreadAlerts = alerts.filter(a => !a.resolved);
-
-    const handleResolve = async (e: React.MouseEvent, alertId: string) => {
-        e.stopPropagation(); // Don't navigate to /alerts
-        try {
-            if (!currentUser) return;
-            await resolveAlert(alertId, currentUser.authUserId);
-        } catch (err) {
-            console.error('Error resolving alert from navbar:', err);
-        }
-    };
 
     // Use click outside hooks
     const profileMenuRef = useClickOutside(() => setShowProfileMenu(false));
@@ -84,28 +75,123 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isOnline, setIsOnline] = useState(true);
+    const [pendingCommandCount, setPendingCommandCount] = useState(0);
+
+    const handleResolve = async (e: React.MouseEvent, alertId: string) => {
+        e.stopPropagation();
+        try {
+            if (!currentUser) return;
+            await resolveAlert(alertId, currentUser.authUserId);
+        } catch (err) {
+            console.error('Error resolving alert from navbar:', err);
+        }
+    };
+
+    const handleResolveEvent = async (e: React.MouseEvent, eventId: string) => {
+        e.stopPropagation();
+        try {
+            await supabase
+                .from('unified_events')
+                .update({ is_resolved: true })
+                .eq('id', eventId);
+            setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
+        } catch (err) {
+            console.error('Error resolving event:', err);
+        }
+    };
+
+    // Monitor for pending hardware instructions
+    useEffect(() => {
+        const updatePending = () => {
+            const pending = DeviceCommandService.getLocalPendingIds();
+            setPendingCommandCount(pending.length);
+        };
+        updatePending();
+
+        const pCount = DeviceCommandService.getLocalPendingIds().length;
+        if (pCount > 0) {
+            setToast({
+                message: `Session Recovery: ${pCount} hardware command(s) are still pending.`,
+                type: 'warning',
+                actionLabel: 'View Queue',
+                onAction: () => navigate('/settings?tab=devices')
+            });
+        }
+
+        const interval = setInterval(updatePending, 2000);
+        return () => clearInterval(interval);
+    }, [navigate]);
 
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date());
         }, 60000);
 
-        // Check if we should show the View-Only notice
         const hasSeenNotice = sessionStorage.getItem('iotank_view_only_notice_shown');
         if (isViewOnly && !hasSeenNotice) {
             setShowNoticeModal(true);
             sessionStorage.setItem('iotank_view_only_notice_shown', 'true');
         }
 
-        return () => {
-            clearInterval(timer);
-        };
+        return () => clearInterval(timer);
     }, [isViewOnly]);
+
+    const [unifiedEvents, setUnifiedEvents] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchUnifiedEvents = async () => {
+            if (!stationId) return;
+            const { data } = await supabase
+                .from('unified_events')
+                .select('*')
+                .eq('station_id', stationId)
+                .eq('is_resolved', false)
+                .order('created_at', { ascending: false })
+                .limit(15);
+            
+            if (data) setUnifiedEvents(data);
+        };
+
+        fetchUnifiedEvents();
+        if (!stationId) return;
+
+        const channel = supabase
+            .channel(`public:unified_events:navbar:${stationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'unified_events',
+                    filter: `station_id=eq.${stationId}`
+                },
+                (payload) => {
+                    setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
+                    const cat = payload.new.event_category || 'SYSTEM';
+                    const isCritical = payload.new.severity === 'CRITICAL';
+                    setToast({
+                        message: payload.new.description || 'New audit event recorded.',
+                        type: isCritical ? 'error' : cat === 'SECURITY' ? 'warning' : 'success',
+                    });
+
+                    if (NotificationService.isEnabled()) {
+                        NotificationService.show(payload.new.description || 'System Audit Event', {
+                            body: `Category: ${payload.new.event_category}`,
+                            tag: `audit-${payload.new.id}`
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [stationId]);
 
     useEffect(() => {
         const checkConnection = async () => {
             try {
-                // Check a valid table to verify connectivity (market_prices was deleted/renamed)
                 const { error } = await supabase.from('market_signals').select('id').limit(1);
                 setIsOnline(!error);
             } catch {
@@ -133,29 +219,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 </div>
             </div>
 
-            <div className="navbar-center flex items-center justify-center">
+        <div className="navbar-center flex items-center justify-center">
                 {isViewOnly && (
-                    <div className="view-only-badge animate-pulse" 
-                         onClick={() => setShowNoticeModal(true)}
-                         title="Operational State: Limited Visibility Only"
-                         style={{
-                             background: 'rgba(239, 68, 68, 0.08)',
-                             border: '1px solid rgba(239, 68, 68, 0.2)',
-                             color: '#ef4444',
-                             padding: '6px 14px',
-                             borderRadius: '99px',
-                             display: 'flex',
-                             alignItems: 'center',
-                             gap: '8px',
-                             cursor: 'pointer',
-                             fontSize: '11px',
-                             fontWeight: 900,
-                             letterSpacing: '0.05em',
-                             textTransform: 'uppercase'
-                         }}>
+                    <div 
+                        className="view-only-badge animate-pulse" 
+                        onClick={() => setShowNoticeModal(true)}
+                        title="Operational State: Limited Visibility Only"
+                    >
                         <FiEye size={14} />
                         <span>View Only Mode</span>
-                        <FiLock size={10} style={{ opacity: 0.6 }} />
+                        <FiLock size={10} className="view-only-lock-icon" />
                     </div>
                 )}
             </div>
@@ -170,6 +243,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                     <div className={`health-badge ${!isOnline ? 'offline' : ''}`}>
                         <MdCircle className={isOnline ? "pulse-green-small" : "text-red-500"} />
                         <span className="health-text">{isOnline ? 'System Online' : 'System Offline'}</span>
+                        {pendingCommandCount > 0 && (
+                            <div 
+                                className="pending-badge ml-2 flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Clear pending command queue? This only stops client tracking, it does not cancel the command on the server.')) {
+                                        localStorage.removeItem('iotank_pending_commands');
+                                        setPendingCommandCount(0);
+                                    }
+                                }}
+                                title="Click to clear local action queue"
+                            >
+                                <FiActivity className="animate-pulse" />
+                                {pendingCommandCount} PENDING
+                            </div>
+                        )}
                         <span className="sync-text">{formattedTime}</span>
                     </div>
                 </div>
@@ -294,53 +383,102 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
                     {showNotifications && (
                         <div className="dropdown-menu modern-dropdown notifications-dropdown">
-                            <div className="dropdown-header" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div className="dropdown-header notif-header">
                                 <h3>Notifications</h3>
-                                {unreadAlerts.length > 0 && <span className="pro-badge" style={{ margin: 0 }}>{unreadAlerts.length} New</span>}
+                                {unreadAlerts.length > 0 && <span className="pro-badge notif-badge-inline">{unreadAlerts.length} New</span>}
                             </div>
-                            <div className="dropdown-content overflow-y-auto max-h-[400px]">
-                                {unreadAlerts.length > 0 ? (
-                                    unreadAlerts.slice(0, 5).map((alert: Alert) => (
-                                        <div
-                                            key={alert.id}
-                                            className={`notification-item ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'}`}
-                                            onClick={() => {
-                                                navigate('/alerts');
-                                                setShowNotifications(false);
-                                            }}
-                                        >
-                                            <div className="notification-title">
-                                                <span className="flex items-center gap-2">
-                                                    <span className="text-lg">
-                                                        {alert.message.includes('Started') ? '🏁' :
-                                                         alert.message.includes('Closed') || alert.message.includes('Closure') ? '🚩' :
-                                                         alert.message.includes('THEFT') ? '🚨' :
-                                                         alert.message.includes('LEAK') ? '💧' :
-                                                         alert.message.includes('COLLUSION') ? '🤝' :
-                                                         alert.type === 'low-level' ? '📉' :
-                                                         alert.type === 'anomaly' ? '⚠️' : '🔔'}
+                            <div className="dropdown-content custom-scrollbar overflow-y-auto max-h-[380px]">
+                                {unreadAlerts.length > 0 || unifiedEvents.length > 0 ? (
+                                    <>
+                                        {/* Security Alerts Section */}
+                                        {unreadAlerts.length > 0 && (
+                                            <div className="section-label px-4 py-2 text-[10px] font-black text-rose-500 uppercase tracking-widest border-b border-slate-100 bg-rose-50/30 sticky top-0 z-10">
+                                                Active Risk Vectors
+                                            </div>
+                                        )}
+                                        {unreadAlerts.map((alert: Alert) => (
+                                            <div
+                                                key={alert.id}
+                                                className={`notification-item ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'}`}
+                                                onClick={() => {
+                                                    navigate('/alerts');
+                                                    setShowNotifications(false);
+                                                }}
+                                            >
+                                                <div className="notification-title">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="text-lg">
+                                                            {alert.message.includes('Started') ? '🏁' :
+                                                             alert.message.includes('Closed') || alert.message.includes('Closure') ? '🚩' :
+                                                             alert.message.includes('THEFT') ? '🚨' :
+                                                             alert.message.includes('LEAK') ? '💧' :
+                                                             alert.message.includes('COLLUSION') ? '🤝' :
+                                                             alert.type === 'low-level' ? '📉' :
+                                                             alert.type === 'anomaly' ? '⚠️' : '🔔'}
+                                                        </span>
+                                                        {alert.message.split('.')[0]}
                                                     </span>
-                                                    {alert.message.split('.')[0]}
-                                                </span>
-                                                <button
-                                                    className="btn-mark-read hover:bg-emerald-50 hover:text-emerald-600 transition-colors bg-slate-100 rounded-full p-1.5"
-                                                    onClick={(e) => handleResolve(e, alert.id)}
-                                                    title="Mark as acknowledge"
-                                                >
-                                                    <MdCheck size={18} className="text-emerald-500 font-bold" />
-                                                </button>
+                                                    <button
+                                                        className="btn-mark-read hover:bg-emerald-50 hover:text-emerald-600 transition-colors bg-slate-100 rounded-full p-1.5"
+                                                        onClick={(e) => handleResolve(e, alert.id)}
+                                                        title="Mark as acknowledge"
+                                                    >
+                                                        <MdCheck size={18} className="text-emerald-500 font-bold" />
+                                                    </button>
+                                                </div>
+                                                <div className="notification-meta flex justify-between items-center mt-2 px-1">
+                                                    <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
+                                                        <MdCircle size={6} className={alert.severity === 'critical' ? 'text-red-500' : 'text-blue-500'} />
+                                                        {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 font-bold text-gray-500 border border-gray-200/50">
+                                                        {alert.detectionMethod === 'ai-assisted' ? '🤖 AI AGENT' : 'SYSTEM'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="notification-meta flex justify-between items-center mt-2 px-1">
-                                                <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
-                                                    <MdCircle size={6} className={alert.severity === 'critical' ? 'text-red-500' : 'text-blue-500'} />
-                                                    {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 font-bold text-gray-500 border border-gray-200/50">
-                                                    {alert.detectionMethod === 'ai-assisted' ? '🤖 AI AGENT' : 'SYSTEM'}
-                                                </span>
-                                            </div>
+                                        ))}
+
+                                        {/* Forensic Audit Section */}
+                                        <div className="px-4 py-2 text-[11px] font-bold text-[#1e1b4b] uppercase tracking-wider border-b border-t border-slate-100 bg-[#f8fafc] sticky top-0 z-10">
+                                            Forensic Action Logs
                                         </div>
-                                    ))
+                                        {unifiedEvents.slice(0, 15).map((event: any) => {
+                                            const toRelative = (iso: string) => {
+                                                const ms = Date.now() - new Date(iso).getTime();
+                                                const mins = Math.max(Math.floor(ms / 60000), 1);
+                                                return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
+                                            };
+                                            return (
+                                                <div key={event.id} className="mx-3 my-2 bg-white rounded-xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-100 p-3">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2 text-slate-500">
+                                                            {event.event_category === 'SHIFT' ? <FiClock size={14} /> :
+                                                             event.event_category === 'DELIVERY' ? <FiTrendingDown size={14} /> :
+                                                             event.event_category === 'SECURITY' ? <FiShield size={14} /> :
+                                                             event.event_category === 'TEAM' ? <FiUserPlus size={14} /> : <FiInfo size={14} />}
+                                                            <span className="text-[13px] uppercase text-[#1e1b4b] font-medium">{event.event_category}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[13px] font-bold text-[#1e1b4b]">{toRelative(event.created_at)}</span>
+                                                            <button
+                                                                className="rounded-[4px] border border-slate-200 text-[#1e1b4b] hover:text-emerald-600 hover:border-emerald-200 transition-colors flex items-center justify-center w-[20px] h-[20px] bg-white"
+                                                                onClick={(e) => handleResolveEvent(e, event.id)}
+                                                                title="Mark as acknowledge"
+                                                            >
+                                                                <MdCheck size={12} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-[13px] text-[#1e1b4b] leading-relaxed mb-2 pl-[22px]">
+                                                        {event.description}
+                                                    </p>
+                                                    <div className="text-[13px] text-slate-600 pl-[22px]">
+                                                        By: {event.actor_name || (event.metadata as any)?.actor_name || event.actor_email?.split('@')[0] || 'system'}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-10 opacity-60">
                                         <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
@@ -357,7 +495,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                         navigate('/alerts');
                                         setShowNotifications(false);
                                     }}
-                                    className="px-8 py-3 bg-gradient-to-r from-[#855AFF] to-[#6C40FE] text-white font-black rounded-full shadow-[0_10px_20px_-5px_rgba(133,90,255,0.4)] hover:shadow-[0_12px_24px_-5px_rgba(133,90,255,0.6)] active:scale-[0.96] transition-all text-[12px] tracking-widest uppercase"
+                                    className="btn-open-alerts"
                                 >
                                     Open Alert Center
                                 </button>
@@ -378,7 +516,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                 <MdPerson />
                             )}
                         </div>
-                        <span className="hidden lg:inline-block text-sm font-bold ml-1 overflow-hidden transition-all duration-300" style={{ maxWidth: '80px', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="navbar-username hidden lg:inline-block">
                             {currentUser?.displayName?.split(' ')[0] || 'User'}
                         </span>
                     </button>

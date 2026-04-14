@@ -1,9 +1,10 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/config/supabase';
 import { TankReading, Tank, Alert, User, ShiftDocument, Site } from '@/types';
 import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
+import { AuditService } from '@/services/AuditService';
 
 /**
  * Helper to safely cast to number with a default
@@ -11,6 +12,40 @@ import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
 const safeNum = (val: any, fallback = 0) => {
     const num = Number(val);
     return isNaN(num) ? fallback : num;
+};
+
+/**
+ * CACHE AGENT: TTL-enabled localStorage persistence
+ */
+const STORAGE_PREFIX = 'iotank_telemetry_';
+const CACHE_TTL = 3600 * 1000; // 1 Hour
+
+const cacheHelper = {
+    set: (key: string, data: any) => {
+        try {
+            const payload = {
+                timestamp: Date.now(),
+                data
+            };
+            localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(payload));
+        } catch (e) {
+            console.warn('[StorageAgent] Cache write failed:', e);
+        }
+    },
+    get: (key: string) => {
+        try {
+            const raw = localStorage.getItem(STORAGE_PREFIX + key);
+            if (!raw) return null;
+            const payload = JSON.parse(raw);
+            if (Date.now() - payload.timestamp > CACHE_TTL) {
+                localStorage.removeItem(STORAGE_PREFIX + key);
+                return null;
+            }
+            return payload.data;
+        } catch (e) {
+            return null;
+        }
+    }
 };
 
 /**
@@ -38,7 +73,7 @@ const mapTank = (row: any): Tank => ({
     thermalCoefficient: safeNum(row.thermal_coefficient || 0.00084),
     density: safeNum(row.fuel_density || row.density || 0.832),
     sensorOffset: safeNum(row.sensor_offset || 0),
-    sensorHeight: safeNum(row.sensor_height || row.tank_height),
+    sensorHeight: safeNum(row.sensor_height),
     sensorEmptyDistance: row.sensor_empty_distance !== null ? safeNum(row.sensor_empty_distance) : undefined,
     sensorFullDistance: row.sensor_full_distance !== null ? safeNum(row.sensor_full_distance) : undefined,
     currentVolume: safeNum(row.current_volume || 0),
@@ -47,7 +82,8 @@ const mapTank = (row: any): Tank => ({
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
     sensorId: row.sensor_id,
-    sensorChannel: row.sensor_channel
+    sensorChannel: row.sensor_channel,
+    metadata: row.metadata || {}
 });
 
 const parseTimestamp = (ts: any) => {
@@ -200,32 +236,95 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
 
 /**
  * Professional Supabase-based Hook for multiple tank readings
+ * Optimized for "Live SaaS" requirements with 1s update frequency support
  */
 export function useAllLatestReadings(stationId: string | undefined, tankIds: string[], enabled: boolean = true) {
+    const queryClient = useQueryClient();
+    const cacheKey = `latest_readings_${stationId}`;
+
     const query = useQuery({
         queryKey: ['all_latest_readings', tankIds],
+        initialData: () => {
+            if (!stationId) return undefined;
+            return cacheHelper.get(cacheKey) || undefined;
+        },
         queryFn: async () => {
             if (tankIds.length === 0) return {};
-            const { data, error } = await supabase
-                .from('sensor_readings')
-                .select('*')
-                .in('tank_id', tankIds)
-                .order('timestamp', { ascending: false });
-
-            if (error) throw error;
             
-            // Map to latest per tank
+            // Optimized query using the latest_sensor_readings view
+            const { data, error } = await supabase
+                .from('latest_sensor_readings')
+                .select('*')
+                .in('tank_id', tankIds);
+
+            if (error) {
+                console.error('Core Query Fail (Optimized View):', error);
+                const { data: fallback, error: fallError } = await supabase
+                    .from('sensor_readings')
+                    .select('*')
+                    .in('tank_id', tankIds)
+                    .order('timestamp', { ascending: false })
+                    .limit(tankIds.length * 2); 
+                
+                if (fallError) throw fallError;
+                const results = (fallback || []).reduce((acc: any, r) => {
+                    if (!acc[r.tank_id]) acc[r.tank_id] = mapReading(r);
+                    return acc;
+                }, {});
+                if (stationId) cacheHelper.set(cacheKey, results);
+                return results;
+            }
+            
             const latest: Record<string, TankReading> = {};
             (data || []).forEach(r => {
-                if (!latest[r.tank_id]) {
-                    latest[r.tank_id] = mapReading(r);
-                }
+                latest[r.tank_id] = mapReading(r);
             });
+            if (stationId && Object.keys(latest).length > 0) cacheHelper.set(cacheKey, latest);
             return latest;
         },
         enabled: enabled && !!stationId && tankIds.length > 0,
-        staleTime: 30000,
+        staleTime: 10000, 
     });
+
+    // [ALG OPTIMIZATION]: Stabilize tankIds to prevent redundant re-subscriptions
+    const stabilizedTankIds = React.useMemo(() => JSON.stringify([...tankIds].sort()), [tankIds]);
+
+    // ✦ HIGH-FREQUENCY LIVE SUBSCRIPTION (1s Resolution)
+    // Ensures components re-render immediately when any tank in the station gets an update
+    useEffect(() => {
+        if (!stationId || !enabled || tankIds.length === 0) return;
+
+        const channel = supabase
+            .channel(`station-telemetry:${stationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'sensor_readings',
+                    filter: `station_id=eq.${stationId}`
+                },
+                (payload) => {
+                    const newReading = mapReading(payload.new);
+                    // Standardize inclusion check
+                    if (tankIds.includes(newReading.tankId)) {
+                        queryClient.setQueryData(['all_latest_readings', tankIds], (old: any) => {
+                            const updated = { ...old, [newReading.tankId]: newReading };
+                            if (stationId) cacheHelper.set(cacheKey, updated);
+                            return updated;
+                        });
+                        
+                        // Also update the individual reading hook's cache for consistency
+                        queryClient.setQueryData(['latest_reading', newReading.tankId], newReading);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [stationId, enabled, stabilizedTankIds, queryClient, cacheKey]);
 
     return { readings: query.data || {}, loading: query.isLoading, error: query.error as Error | null };
 }
@@ -387,14 +486,22 @@ export async function updateTank(tankId: string, updates: Partial<Tank>) {
                 if (updates.lowLevelThreshold !== undefined) dbUpdates.low_level_threshold = updates.lowLevelThreshold;
                 if (updates.sensorHeight !== undefined) {
                     if (updates.sensorHeight < 0) throw new Error("Sensor height cannot be negative");
-                    dbUpdates.tank_height = updates.sensorHeight;
+                    dbUpdates.sensor_height = updates.sensorHeight;
                 }
                 if (updates.sensorOffset !== undefined) dbUpdates.sensor_offset = updates.sensorOffset;
                 if ((updates as any).temperatureAlertThreshold !== undefined) dbUpdates.high_temperature_threshold = (updates as any).temperatureAlertThreshold;
-                if (updates.esp32Address !== undefined) dbUpdates.sensor_id = updates.esp32Address;
+                if ((updates as any).esp32Address !== undefined) dbUpdates.sensor_id = (updates as any).esp32Address;
                 if (updates.sensorId !== undefined) dbUpdates.sensor_id = updates.sensorId;
                 if (updates.sensorChannel !== undefined) dbUpdates.sensor_channel = updates.sensorChannel;
                 if ((updates as any).metadata !== undefined) dbUpdates.metadata = (updates as any).metadata;
+                
+                if (updates.height !== undefined) dbUpdates.tank_height = updates.height;
+                if (updates.diameter !== undefined) dbUpdates.tank_radius = updates.diameter / 2;
+                if (updates.length !== undefined) dbUpdates.tank_length = updates.length;
+                if (updates.capacity !== undefined) dbUpdates.tank_capacity = updates.capacity;
+                if (updates.shape !== undefined) {
+                    dbUpdates.tank_shape = updates.shape === 'cylinder' ? 'vertical_cylinder' : (updates.shape === 'capsule' ? 'capsule' : 'rectangular');
+                }
                 
                 dbUpdates.updated_at = new Date().toISOString();
 
@@ -405,8 +512,19 @@ export async function updateTank(tankId: string, updates: Partial<Tank>) {
                     .select();
 
                 if (error) throw error;
+
+                // 🟢 Forensic Intelligence Log
+                await AuditService.log(
+                    'CALIBRATION',
+                    'SETTINGS_CHANGED',
+                    (updates as any).stationId || '',
+                    `Hardware profile updated for ${updates.name || 'tank'}. Fields modified: ${Object.keys(dbUpdates).join(', ')}`,
+                    'INFO',
+                    { tankId, changes: dbUpdates }
+                ).catch((err: any) => console.warn("[AUDIT_FAILURE]", err));
+
                 resolve(data);
-            } catch (err) {
+            } catch (err: any) {
                 reject(err);
             }
         }, 300); // 300ms debounce
@@ -458,13 +576,13 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
 /**
  * Hook for User Profile
  */
-export function useProfile(uid: string | undefined) {
+export function useProfile(authUserId: string | undefined) {
     const [profile, setProfile] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        if (!uid) {
+        if (!authUserId) {
             setLoading(false);
             return;
         }
@@ -477,7 +595,7 @@ export function useProfile(uid: string | undefined) {
                 const { data, error } = await supabase
                     .from('profiles')
                     .select('*')
-                    .eq('auth_user_id', uid)
+                    .eq('auth_user_id', authUserId)
                     .single();
 
                 if (!isMounted) return;
@@ -512,10 +630,10 @@ export function useProfile(uid: string | undefined) {
         fetchProfile();
 
         const channel = supabase
-            .channel(`profile:${uid}`)
+            .channel(`profile:${authUserId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'profiles', filter: `auth_user_id=eq.${uid}` },
+                { event: '*', schema: 'public', table: 'profiles', filter: `auth_user_id=eq.${authUserId}` },
                 () => fetchProfile()
             )
             .subscribe();
@@ -524,7 +642,7 @@ export function useProfile(uid: string | undefined) {
             isMounted = false;
             supabase.removeChannel(channel);
         };
-    }, [uid]);
+    }, [authUserId]);
 
     return { profile, loading, error };
 }
@@ -588,13 +706,10 @@ export function useShifts(stationId: string | undefined, tankId?: string) {
 /**
  * Create Shift Record
  */
-export async function createShift(shiftData: Omit<ShiftDocument, 'id'>) {
+export async function createShift(stationId: string, shiftData: Omit<ShiftDocument, 'id'>) {
     // Map ShiftDocument to snake_case table columns
     const dbShift = {
-        station_id: shiftData.tankId, // Actually, we need to resolve station_id. 
-                                     // For now, assume shiftData.tankId is a UUID or use a helper
-                                     // In useSupabase, we usually map station_id to stationId
-                                     // We'll use a safer approach in the component
+        station_id: stationId, 
         site_id: shiftData.siteId,
         tank_id: shiftData.tankId,
         opened_at: shiftData.openedAt,
@@ -603,16 +718,24 @@ export async function createShift(shiftData: Omit<ShiftDocument, 'id'>) {
         pump_readings: shiftData.pumpReadings,
         volume_sold_liters: shiftData.volumeSoldLiters,
         expected_collections: shiftData.expected,
-        received_collections: shiftData.received,
+        received_collections: {
+            ...shiftData.received,
+            // [FORENSIC MAPPING]: Injecting operator identity and terminal volume into collections
+            // until a top-level schema migration is approved.
+            opened_by: shiftData.openedBy,
+            closing_volume: shiftData.closingVolume
+        },
         variance_data: shiftData.variance,
         status: shiftData.status,
         review_state: shiftData.reviewState,
-        closed_by_uid: shiftData.closedBy.userId,
+        closed_by_uid: shiftData.closedBy.authUserId, // Aligned with DB schema column name
+        supervisor_notes: shiftData.notes
     };
 
     const { data, error } = await supabase
         .from('shift_closures')
         .insert(dbShift)
+
         .select();
 
     if (error) throw error;
@@ -621,19 +744,42 @@ export async function createShift(shiftData: Omit<ShiftDocument, 'id'>) {
 
 /**
  * Create/Update Profile
+ * [FORENSIC HARDENING]: Enforces identity immutability for station_id once established
  */
 export async function upsertProfile(profile: Partial<User> & { authUserId: string }) {
-    const dbProfile = {
+    // 1. Audit Check: If this is an update, verify we aren't changing the station_id
+    const { data: existing } = await supabase
+        .from('profiles')
+        .select('station_id')
+        .eq('auth_user_id', profile.authUserId)
+        .single();
+    
+    const dbProfile: any = {
         auth_user_id: profile.authUserId,
         email: profile.email,
         display_name: profile.displayName,
         role: profile.role,
-        station_id: profile.stationId,
         site_ids: profile.siteIds,
         mfa_enabled: profile.mfaEnabled,
         last_login_at: profile.lastLoginAt ? new Date(profile.lastLoginAt).toISOString() : new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
+
+    // Only allow setting station_id if it's currently null/empty in DB
+    if (!existing?.station_id && profile.stationId) {
+        dbProfile.station_id = profile.stationId;
+    } else if (existing?.station_id && profile.stationId && existing.station_id !== profile.stationId) {
+        console.warn(`[SECURITY] Prevented unauthorized station migration for user ${profile.authUserId}`);
+        // Forensic log of the attempt
+        AuditService.log(
+            'SECURITY',
+            'IDENTITY_MUTATION_ATTEMPT',
+            existing.station_id,
+            `User tried to change station_id from ${existing.station_id} to ${profile.stationId}`,
+            'CRITICAL',
+            { authUserId: profile.authUserId }
+        ).catch(() => {});
+    }
 
     const { data, error } = await supabase
         .from('profiles')
@@ -662,6 +808,7 @@ export async function resolveAlert(alertId: string, resolvedBy: string) {
 }
 /**
  * Hook to monitor 'refuelling' state (sudden volume increase)
+ * @deprecated Use AlertDetectionEngine refill sensing for centralized forensic logic
  */
 export function useRefuelMonitor(stationId: string, tankId: string) {
     const [isRefuelling, setIsRefuelling] = useState(false);

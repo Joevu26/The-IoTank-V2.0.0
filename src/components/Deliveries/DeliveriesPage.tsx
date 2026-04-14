@@ -19,7 +19,7 @@ import './DeliveriesPage.css';
 
 export const DeliveriesPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || '';
+    const stationId = currentUser?.stationId || '';
     const orgName = currentUser?.companyName || 'Fuel Station Admin';
     const userName = currentUser?.displayName || currentUser?.email || 'Unknown';
     
@@ -42,8 +42,8 @@ export const DeliveriesPage: React.FC = () => {
     const [selectedDelivery, setSelectedDelivery] = useState<DeliveryDocument | null>(null);
 
     // Data Hooks
-    const { deliveries, loading, error } = useDeliveries(orgId);
-    const { tanks } = useTanks(orgId);
+    const { deliveries, loading, error } = useDeliveries(stationId);
+    const { tanks } = useTanks(stationId);
     const { status: shiftStatus } = useShiftStatus();
     const { openModal } = useModals();
     const [toast, setToast] = useState<{ 
@@ -245,6 +245,7 @@ export const DeliveriesPage: React.FC = () => {
                                             <td>
                                                 <button 
                                                     className="dp-action-btn"
+                                                    title="Download Delivery PDF Report"
                                                     onClick={(e) => { e.stopPropagation(); handleExportPDF(d); }}
                                                 >
                                                     <FiFileText size={16} />

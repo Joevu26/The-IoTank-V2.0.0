@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Tank } from '@/types';
 import { useHistoricalReadings } from '@/hooks/useSupabase';
 import { useConsumptionAnalytics } from '@/hooks/useConsumptionAnalytics';
-import { TankViewer } from '../3D/TankViewer';
+import { TankVisual2D } from '../Common/TankVisual2D';
 import { FiActivity, FiDownload, FiShare2, FiRefreshCw, FiInfo, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { formatVolume } from '@/utils/formatUtils';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Area } from 'recharts';
@@ -163,11 +163,9 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                 <div className="visual-tab">
                         <div className="visual-grid">
                             <div className="visual-main">
-                                <TankViewer
+                                <TankVisual2D
                                     fuelLevel={latestReading?.fuelLevel || 0}
                                     fuelType={tank.fuelType}
-                                    capacity={tank.capacity}
-                                    tankName={tank.name}
                                     shape={tank.shape as any}
                                     height={tank.height}
                                     diameter={tank.diameter}
@@ -204,8 +202,8 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                         </span>
                                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                             <div 
-                                                className={`h-full transition-all duration-1000 ${!isGhost && (tank.leakProbability || 0) > 20 ? 'bg-red-500' : 'bg-emerald-500'}`} 
-                                                style={{ width: `${isGhost ? 0 : (tank.leakProbability || 0)}%` }}
+                                                className={`progress-bar-fill-dynamic ${!isGhost && (tank.leakProbability || 0) > 20 ? 'bg-red-500' : 'bg-emerald-500'}`} 
+                                                ref={(el) => { if (el) el.style.width = `${isGhost ? 0 : (tank.leakProbability || 0)}%`; }}
                                             ></div>
                                         </div>
                                     </div>
@@ -298,7 +296,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                             {/* Intelligence Content Area */}
                             <div className="intelligence-content-area min-h-[400px]">
                                 {intelligenceType === 'Historical Level Intelligence' && (
-                                    <div className="live-trends-chart" style={{ height: '350px', width: '100%' }}>
+                                    <div className="live-trends-chart-container">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <LineChart
                                                 data={readings}
@@ -370,7 +368,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                         <WetstockReconciliation 
                                             tanks={tanks} 
                                             transactions={transactions} 
-                                            currency="KES" 
+                                            currency="Ksh" 
                                         />
                                         <div className="h-px bg-slate-100 my-8" />
                                         <ShrinkageHeatmap />
@@ -415,8 +413,8 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                                 <div 
-                                                                    className={`h-full ${reading.fuelLevel < 20 ? 'bg-red-500' : 'bg-primary'}`} 
-                                                                    style={{ width: `${reading.fuelLevel}%` }}
+                                                                    className={`progress-bar-fill-dynamic ${reading.fuelLevel < 20 ? 'bg-red-500' : 'bg-primary'}`} 
+                                                                    ref={(el) => { if (el) el.style.width = `${reading.fuelLevel}%`; }}
                                                                 ></div>
                                                             </div>
                                                             {reading.fuelLevel.toFixed(1)}%

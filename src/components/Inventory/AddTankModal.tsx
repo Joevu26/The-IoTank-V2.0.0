@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FiX, FiPlus, FiAlertCircle, FiLock, FiChevronRight, FiInfo } from 'react-icons/fi';
 import { useSites, createTank } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
+import { AuditService } from '@/services/AuditService';
 import { Tank, Site } from '@/types';
 import './AddTankModal.css';
 
@@ -97,6 +98,17 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
             });
 
             if (onSuccess) onSuccess(newTank);
+
+            // 🟢 Forensic Log
+            await AuditService.log(
+                'DELIVERY',
+                'CREATE_TANK',
+                stationId,
+                `Provisioned new tank: ${formData.name} (${formData.fuelType}) with hardware ${formData.espId}`,
+                'INFO',
+                { tankId: newTank.id, siteId: formData.siteId }
+            );
+
             onClose();
         } catch (err: any) {
             setError(err.message || 'Failed to create tank');
@@ -117,7 +129,7 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                             <span className="modal-badge violet">SECURE</span>
                         </div>
                     </div>
-                    <button className="close-btn" onClick={onClose}>
+                    <button className="close-btn" onClick={onClose} title="Dismiss Provisioning Modal">
                         <FiX size={18} />
                     </button>
                 </div>
@@ -188,32 +200,48 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>Physical Station (Site) {sitesLoading && <span className="text-indigo-500 ml-2 animate-pulse">(Loading...)</span>}</label>
-                                    <select name="siteId" value={formData.siteId} onChange={handleChange} required>
+                                    <label htmlFor="site-selector">Physical Station (Site) {sitesLoading && <span className="loading-spinner-inline">(Loading...)</span>}</label>
+                                    <select 
+                                        id="site-selector"
+                                        name="siteId" 
+                                        value={formData.siteId} 
+                                        onChange={handleChange} 
+                                        required
+                                        title="Physical Station Location"
+                                        aria-required="true"
+                                    >
                                         <option value="">{sitesLoading ? 'Loading locations…' : (sites.length ? 'Select a location...' : 'No sites available')}</option>
                                         {sites.map((site: Site) => (
                                             <option key={site.id} value={site.id}>{site.siteName || site.address || site.id}</option>
                                         ))}
                                     </select>
                                     {!sitesLoading && sites.length === 0 && (
-                                        <div className="field-hint text-xs text-red-600 mt-1">
+                                        <div className="field-hint error-hint">
                                             No physical station site found for this station. Create a site in the location settings before adding a tank.
                                         </div>
                                     )}
                                 </div>
                                 <div className="form-group">
-                                    <label>ESP ID (Hardware Serial)</label>
+                                    <label htmlFor="esp-id-input">ESP ID (Hardware Serial)</label>
                                     <input
+                                        id="esp-id-input"
                                         type="text"
                                         name="espId"
                                         value={formData.espId}
                                         onChange={handleChange}
                                         placeholder="ESP-XXXX-XXXX"
+                                        aria-label="ESP32 Hardware Identity"
                                     />
                                 </div>
                                 <div className="form-group">
-                                    <label>ESP Channel (1-4)</label>
-                                    <select name="sensorChannel" value={formData.sensorChannel} onChange={handleChange}>
+                                    <label htmlFor="esp-channel-selector">ESP Channel (1-4)</label>
+                                    <select 
+                                        id="esp-channel-selector"
+                                        name="sensorChannel" 
+                                        value={formData.sensorChannel} 
+                                        onChange={handleChange}
+                                        title="ESP32 Hardware Channel"
+                                    >
                                         <option value={1}>Channel 1 (Primary)</option>
                                         <option value={2}>Channel 2</option>
                                         <option value={3}>Channel 3</option>
@@ -221,8 +249,14 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Fuel Product Type</label>
-                                    <select name="fuelType" value={formData.fuelType} onChange={handleChange}>
+                                    <label htmlFor="fuel-type-selector">Fuel Product Type</label>
+                                    <select 
+                                        id="fuel-type-selector"
+                                        name="fuelType" 
+                                        value={formData.fuelType} 
+                                        onChange={handleChange}
+                                        title="Product Grade Selection"
+                                    >
                                         <option value="Diesel">Automotive Diesel (AGO)</option>
                                         <option value="Petrol">Premium Petrol (PMS)</option>
                                         <option value="Kerosene">Kerosene (IK)</option>
@@ -247,7 +281,12 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                             <div className="atm-section-body atm-grid atm-grid-2">
                                 <div className="form-group">
                                     <label>Geometry</label>
-                                    <select name="shape" value={formData.shape} onChange={handleChange}>
+                                    <select 
+                                        name="shape" 
+                                        value={formData.shape} 
+                                        onChange={handleChange}
+                                        title="Tank Geometric Profile"
+                                    >
                                         <option value="capsule">Horizontal Cylindrical</option>
                                         <option value="spherical">Spherical (Ball-Shaped)</option>
                                         <option value="rectangular">Rectangular / Flat-Sided (Custom)</option>
@@ -256,13 +295,16 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Total Capacity (Liters)</label>
+                                    <label htmlFor="capacity-input">Total Capacity (Liters)</label>
                                     <input
+                                        id="capacity-input"
                                         type="number"
                                         name="capacity"
                                         value={formData.capacity}
                                         onChange={handleChange}
                                         min="0"
+                                        title="Total Volumetric Capacity"
+                                        aria-required="true"
                                     />
                                 </div>
 
@@ -270,40 +312,40 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                                 {formData.shape === 'capsule' && (
                                     <>
                                         <div className="form-group">
-                                            <label>Diameter / Height (cm)</label>
-                                            <input type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required />
+                                            <label htmlFor="capsule-height">Diameter / Height (cm)</label>
+                                            <input id="capsule-height" type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required title="Tank Height / Vertical Diameter" aria-required="true" />
                                         </div>
                                         <div className="form-group">
-                                            <label>Length (cm)</label>
-                                            <input type="number" name="length" value={formData.length} onChange={handleChange} min="0" required />
+                                            <label htmlFor="capsule-length">Length (cm)</label>
+                                            <input id="capsule-length" type="number" name="length" value={formData.length} onChange={handleChange} min="0" required title="Horizontal Dimension (cm)" aria-required="true" />
                                         </div>
                                     </>
                                 )}
 
                                 {formData.shape === 'spherical' && (
                                     <div className="form-group atm-col-2">
-                                        <label>Sphere Diameter (cm)</label>
-                                        <input type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required />
+                                        <label htmlFor="sphere-diameter">Sphere Diameter (cm)</label>
+                                        <input id="sphere-diameter" type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required title="Spherical Diameter" aria-required="true" />
                                     </div>
                                 )}
 
                                 {formData.shape === 'rectangular' && (
                                     <>
                                         <div className="form-group">
-                                            <label>Height / Depth (cm)</label>
-                                            <input type="number" name="height" value={formData.height} onChange={handleChange} min="0" required />
+                                            <label htmlFor="rect-height">Height / Depth (cm)</label>
+                                            <input id="rect-height" type="number" name="height" value={formData.height} onChange={handleChange} min="0" required title="Rectangular Height" aria-required="true" />
                                         </div>
                                         <div className="form-group">
-                                            <label>Length (cm)</label>
-                                            <input type="number" name="length" value={formData.length} onChange={handleChange} min="0" required />
+                                            <label htmlFor="rect-length">Length (cm)</label>
+                                            <input id="rect-length" type="number" name="length" value={formData.length} onChange={handleChange} min="0" required title="Horizontal Dimension (cm)" aria-required="true" />
                                         </div>
                                     </>
                                 )}
 
                                 {formData.shape === 'compartmentalized' && (
                                     <div className="form-group atm-col-2">
-                                        <label>Max Height (cm)</label>
-                                        <input type="number" name="height" value={formData.height} onChange={handleChange} min="0" required />
+                                        <label htmlFor="comp-height">Max Height (cm)</label>
+                                        <input id="comp-height" type="number" name="height" value={formData.height} onChange={handleChange} min="0" required title="Maximum Compartment Height" aria-required="true" />
                                     </div>
                                 )}
                             </div>
@@ -323,29 +365,29 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                                         Sensor to tank bottom
                                     </div>
                                     <div className="atm-sensor-input-wrap">
-                                        <input type="number" name="sensorHeight" value={formData.sensorHeight} onChange={handleChange} min="0" required />
+                                        <input id="sensor-h-input" type="number" name="sensorHeight" value={formData.sensorHeight} onChange={handleChange} min="0" required title="Total Mounting Height" aria-required="true" />
                                         <span className="atm-unit">cm</span>
                                     </div>
                                 </div>
 
                                 <div className="atm-sensor-row empty">
-                                    <div className="atm-sensor-label">
+                                    <div className="atm-sensor-label" id="empty-read-label">
                                         <span className="tag-empty">EMPTY</span>
                                         Sensor read when empty
                                     </div>
                                     <div className="atm-sensor-input-wrap">
-                                        <input type="number" name="sensorEmptyDistance" value={formData.sensorEmptyDistance} onChange={handleChange} min="0" required />
+                                        <input id="sensor-empty-input" type="number" name="sensorEmptyDistance" value={formData.sensorEmptyDistance} onChange={handleChange} min="0" required title="Digital Empty Reading (cm)" aria-labelledby="empty-read-label" aria-required="true" />
                                         <span className="atm-unit">cm</span>
                                     </div>
                                 </div>
 
                                 <div className="atm-sensor-row full">
-                                    <div className="atm-sensor-label">
+                                    <div className="atm-sensor-label" id="full-read-label">
                                         <span className="tag-full">FULL</span>
                                         Sensor read when full
                                     </div>
                                     <div className="atm-sensor-input-wrap">
-                                        <input type="number" name="sensorFullDistance" value={formData.sensorFullDistance} onChange={handleChange} min="0" required />
+                                        <input id="sensor-full-input" type="number" name="sensorFullDistance" value={formData.sensorFullDistance} onChange={handleChange} min="0" required title="Digital Full Reading (cm)" aria-labelledby="full-read-label" aria-required="true" />
                                         <span className="atm-unit">cm</span>
                                     </div>
                                 </div>

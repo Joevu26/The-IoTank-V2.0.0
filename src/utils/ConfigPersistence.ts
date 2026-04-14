@@ -35,7 +35,7 @@ export const ConfigPersistence = {
     /**
      * Synchronizes local configuration with Firestore
      */
-    syncToCloud: async (orgId: string, tankId: string, config: Partial<Tank>) => {
+    syncToCloud: async (stationId: string, tankId: string, config: Partial<Tank>) => {
         try {
             const { error } = await supabase
                 .from('tanks')
@@ -44,7 +44,7 @@ export const ConfigPersistence = {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', tankId)
-                .eq('station_id', orgId);
+                .eq('station_id', stationId);
 
             if (error) throw error;
             return true;
@@ -57,13 +57,13 @@ export const ConfigPersistence = {
     /**
      * Fetches from cloud and updates local cache
      */
-    refreshFromCloud: async (orgId: string, tankId: string) => {
+    refreshFromCloud: async (stationId: string, tankId: string) => {
         try {
             const { data, error } = await supabase
                 .from('tanks')
                 .select('*')
                 .eq('id', tankId)
-                .eq('station_id', orgId)
+                .eq('station_id', stationId)
                 .single();
 
             if (error || !data) throw error || new Error('Tank not found');

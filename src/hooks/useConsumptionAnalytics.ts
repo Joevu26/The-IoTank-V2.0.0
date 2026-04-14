@@ -19,7 +19,7 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
                 // Get last 7 shift closures for this tank
                 const { data, error } = await supabase
                     .from('shift_closures')
-                    .select('sales_volume, opening_reading, closing_reading, recorded_at, closed_at')
+                    .select('volume_sold_liters, opened_at, closed_at')
                     .eq('tank_id', tank.id)
                     .order('closed_at', { ascending: false })
                     .limit(7);
@@ -29,8 +29,8 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
                 if (data && data.length > 0) {
                     // Calculate individual daily rates (L/hr) and average them
                     const rates = data.map(shift => {
-                        const duration = Math.max(0.5, differenceInHours(new Date(shift.closed_at), new Date(shift.recorded_at)));
-                        return (shift.sales_volume || 0) / duration;
+                        const duration = Math.max(0.5, differenceInHours(new Date(shift.closed_at), new Date(shift.opened_at)));
+                        return (Number(shift.volume_sold_liters) || 0) / duration;
                     });
                     const avg = rates.reduce((acc, r) => acc + r, 0) / rates.length;
                     setAvgDailyRate(avg);

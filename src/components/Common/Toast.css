@@ -1,0 +1,183 @@
+/* Toast.css - Unified Design System Implementation */
+
+.toast-portal-root {
+    position: relative;
+    z-index: 10000;
+}
+
+.toast-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.7);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(180%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 24px;
+}
+
+.toast-modal-card {
+    max-width: 440px;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    backdrop-filter: blur(24px) saturate(200%);
+    border-radius: 40px;
+    box-shadow: 
+        0 48px 100px -24px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Premium Icon Container */
+.toast-icon-container {
+    position: relative;
+    margin-bottom: 32px;
+}
+
+.toast-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background: linear-gradient(135deg, var(--ds-color-accent, #6366f1), var(--ds-color-accent-dark, #4f46e5));
+    box-shadow: 0 15px 30px -10px rgba(99, 102, 241, 0.5);
+    position: relative;
+    z-index: 2;
+}
+
+.toast-icon-pulse {
+    position: absolute;
+    inset: -8px;
+    border-radius: 32px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    z-index: 1;
+}
+
+/* Typography */
+.toast-title {
+    font-size: 2.25rem;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+}
+
+.toast-message {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.6;
+    max-width: 320px;
+    margin-bottom: 40px;
+}
+
+/* Action Buttons */
+.toast-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+}
+
+.btn-toast-primary {
+    width: 100%;
+    max-width: 280px;
+    height: 56px;
+    border-radius: 16px;
+    background: #6366f1;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 12px 24px -6px rgba(99, 102, 241, 0.5);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-toast-primary:hover {
+    background: #4f46e5;
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px -6px rgba(99, 102, 241, 0.6);
+}
+
+.btn-toast-secondary {
+    width: 100%;
+    max-width: 280px;
+    height: 52px;
+    border-radius: 16px;
+    background: rgba(248, 250, 252, 0.8);
+    color: #475569;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.075em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #f1f5f9;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.btn-toast-secondary:hover {
+    background: #ffffff;
+    color: #0f172a;
+    border-color: #e2e8f0;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Success State Overrides */
+.toast-success .toast-icon-wrapper {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 15px 30px -10px rgba(16, 185, 129, 0.5);
+}
+
+.toast-success .btn-toast-primary {
+    background: #10b981;
+    box-shadow: 0 12px 24px -6px rgba(16, 185, 129, 0.5);
+}
+
+/* Error State Overrides */
+.toast-error .toast-icon-wrapper {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    box-shadow: 0 15px 30px -10px rgba(239, 68, 68, 0.5);
+}
+
+.toast-error .btn-toast-primary {
+    background: #ef4444;
+    box-shadow: 0 12px 24px -6px rgba(239, 68, 68, 0.5);
+}
+
+/* Warning State Overrides */
+.toast-warning .toast-icon-wrapper {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    box-shadow: 0 15px 30px -10px rgba(245, 158, 11, 0.5);
+}
+
+.toast-warning .btn-toast-primary {
+    background: #f59e0b;
+    box-shadow: 0 12px 24px -6px rgba(245, 158, 11, 0.5);
+}

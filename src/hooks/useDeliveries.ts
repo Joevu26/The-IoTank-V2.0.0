@@ -9,20 +9,20 @@ interface UseDeliveriesOptions {
     status?: string;
 }
 
-export function useDeliveries(orgId: string, options: UseDeliveriesOptions = {}) {
+export function useDeliveries(stationId: string, options: UseDeliveriesOptions = {}) {
     const [deliveries, setDeliveries] = useState<DeliveryDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchDeliveries = useCallback(async () => {
-        if (!orgId) return;
+        if (!stationId) return;
 
         setLoading(true);
         try {
             let query = supabase
                 .from('deliveries')
                 .select('*')
-                .eq('station_id', orgId)
+                .eq('station_id', stationId)
                 .order('created_at', { ascending: false });
 
             if (options.startDate) {
@@ -74,17 +74,17 @@ export function useDeliveries(orgId: string, options: UseDeliveriesOptions = {})
         } finally {
             setLoading(false);
         }
-    }, [orgId, options.startDate, options.endDate, options.tankId, options.status]);
+    }, [stationId, options.startDate, options.endDate, options.tankId, options.status]);
 
     useEffect(() => {
         fetchDeliveries();
 
         // Real-time subscription
         const channel = supabase
-            .channel(`deliveries-all-${orgId}`)
+            .channel(`deliveries-all-${stationId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'deliveries', filter: `station_id=eq.${orgId}` },
+                { event: '*', schema: 'public', table: 'deliveries', filter: `station_id=eq.${stationId}` },
                 () => fetchDeliveries()
             )
             .subscribe();
@@ -92,7 +92,7 @@ export function useDeliveries(orgId: string, options: UseDeliveriesOptions = {})
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [fetchDeliveries, orgId]);
+    }, [fetchDeliveries, stationId]);
 
     return { deliveries, loading, error, refresh: fetchDeliveries };
 }

@@ -25,7 +25,8 @@
     align-items: center !important;
     gap: 12px !important;
     /* Reduced gap */
-    min-width: fit-content !important;
+    min-width: -webkit-fill-available !important;
+    min-width: max-content !important;
 }
 
 .navbar-right {
@@ -204,6 +205,34 @@
     font-weight: 800 !important;
     color: #15803d !important;
     text-transform: uppercase !important;
+}
+
+.health-badge {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+
+.health-badge.offline {
+    background: #fef2f2 !important;
+    border-color: #fee2e2 !important;
+}
+
+.pending-badge {
+    animation: pulse-glow-soft 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow-soft {
+    0%, 100% { 
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+    }
+    50% { 
+        box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.1);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
 }
 
 .sync-text {
@@ -396,12 +425,12 @@
     border-radius: 24px !important;
     padding: 0 0 16px 0 !important;
     box-shadow: 
-        0 20px 40px -10px rgba(133, 90, 255, 0.2),
-        0 0 0 1px rgba(255, 255, 255, 0.8) inset !important;
-    border: 1px solid rgba(133, 90, 255, 0.15) !important;
-    background: rgba(250, 248, 255, 0.85) !important; /* Soft frosted violet-white */
-    backdrop-filter: blur(24px) saturate(1.5) !important;
+        0 24px 50px -12px rgba(139, 92, 246, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.9) inset !important;
+    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    background: rgba(250, 248, 255, 0.95) !important; /* Soft frosted violet-white */
     -webkit-backdrop-filter: blur(24px) saturate(1.5) !important;
+    backdrop-filter: blur(24px) saturate(1.5) !important;
 }
 
 .modern-dropdown.notifications-dropdown {
@@ -451,6 +480,26 @@
 
 .modern-dropdown .dropdown-content {
     padding: 0 12px !important;
+}
+
+.notifications-list-container {
+    max-height: 380px !important;
+    overflow-y: auto !important;
+    padding-bottom: 12px !important;
+    overscroll-behavior: contain !important;
+}
+
+.dropdown-content.custom-scrollbar {
+    overscroll-behavior: contain !important;
+}
+
+.notifications-list-container::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.notifications-list-container::-webkit-scrollbar-thumb {
+    background: rgba(133, 90, 255, 0.2) !important;
+    border-radius: 10px !important;
 }
 
 .modern-dropdown ul {
@@ -546,23 +595,26 @@
 
 /* Notifications Specifics */
 .notifications-dropdown .notification-item {
-    padding: 16px 20px !important;
-    border-radius: 18px !important;
-    margin-bottom: 6px !important;
-    border: 1px solid transparent !important;
-    background: rgba(255,255,255,0.3) !important;
-    transition: all 0.2s ease !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    margin-bottom: 4px !important;
+    border: 1px solid rgba(133, 90, 255, 0.08) !important;
+    background: linear-gradient(145deg, rgba(255,255,255,0.85) 0%, rgba(250,248,255,0.95) 100%) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
 }
 
 .notifications-dropdown .notification-item:hover {
-    background: rgba(255,255,255,0.9) !important;
+    background: linear-gradient(145deg, #ffffff 0%, #fefbff 100%) !important;
     border-color: rgba(133, 90, 255, 0.2) !important;
-    box-shadow: 0 4px 12px rgba(133, 90, 255, 0.05) !important;
+    box-shadow: 0 4px 10px rgba(133, 90, 255, 0.06) !important;
+    transform: translateY(-1px);
 }
 
 .notifications-dropdown .notification-item.unread {
-    background: rgba(133, 90, 255, 0.05) !important; 
-    border-color: rgba(133, 90, 255, 0.15) !important;
+    background: linear-gradient(145deg, rgba(245, 243, 255, 0.95) 0%, rgba(23ede9, 237, 255, 0.95) 100%) !important; 
+    border-color: rgba(139, 92, 246, 0.25) !important;
+    box-shadow: inset 2px 0 0 #8b5cf6 !important;
 }
 
 .notifications-dropdown .notification-title {
@@ -602,21 +654,21 @@
 
 
 .notification-item {
-    padding: 10px 12px !important;
-    border-radius: 12px !important;
+    padding: 8px 10px !important;
+    border-radius: 10px !important;
     margin: 2px 0 !important;
     cursor: pointer !important;
-    transition: background-color 0.2s ease !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     border-bottom: none !important;
     background: transparent !important;
 }
 
 .notification-item:hover {
-    background-color: rgba(255,255,255,0.7) !important;
+    background-color: rgba(255,255,255,0.85) !important;
 }
 
 .notification-item.unread {
-    background-color: rgba(133, 90, 255, 0.05) !important;
+    background-color: rgba(139, 92, 246, 0.05) !important;
 }
 
 .notification-item.severity-critical {
@@ -646,9 +698,9 @@
 }
 
 .btn-mark-read {
-    background: rgba(255,255,255,0.5) !important;
-    border: 1px solid rgba(133,90,255,0.1) !important;
-    padding: 4px !important;
+    background: rgba(255,255,255,0.8) !important;
+    border: 1px solid rgba(133,90,255,0.15) !important;
+    padding: 2px !important;
     border-radius: 6px !important;
     color: #8b5cf6 !important;
     cursor: pointer !important;
@@ -656,18 +708,47 @@
     align-items: center !important;
     justify-content: center !important;
     transition: all 0.2s !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
 }
 
 .btn-mark-read:hover {
     color: #4c1d95 !important;
-    background: rgba(139, 92, 246, 0.15) !important;
-    border-color: rgba(139, 92, 246, 0.3) !important;
+    background: #f5f3ff !important;
+    border-color: rgba(139, 92, 246, 0.35) !important;
+    transform: scale(1.05);
 }
 
 .notification-time {
     font-size: var(--font-size-xs) !important;
     color: var(--color-text-secondary) !important;
     margin-top: 2px !important;
+}
+
+.btn-open-alerts {
+    background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%) !important;
+    color: white !important;
+    font-weight: 900 !important;
+    border-radius: 99px !important;
+    padding: 12px 32px !important;
+    box-shadow: 0 10px 20px -5px rgba(139, 92, 246, 0.4) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    font-size: 11px !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    border: none !important;
+}
+
+.btn-open-alerts:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 14px 24px -5px rgba(139, 92, 246, 0.6) !important;
+}
+
+.btn-open-alerts:active {
+    transform: scale(0.96) !important;
 }
 
 /* Responsive */
@@ -730,7 +811,51 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     background: linear-gradient(to right, var(--color-accent-primary), var(--color-accent-pink));
-    background-clip: text;
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
+
+/* View-only mode badge */
+.view-only-badge {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+    padding: 6px 14px !important;
+    border-radius: 99px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+}
+
+.view-only-lock-icon {
+    opacity: 0.6 !important;
+}
+
+/* Notification header row layout */
+.notif-header {
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+.notif-badge-inline {
+    margin: 0 !important;
+}
+
+/* Navbar username truncation */
+.navbar-username {
+    font-size: 0.875rem !important;
+    font-weight: 700 !important;
+    margin-left: 4px !important;
+    max-width: 80px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    transition: all 0.3s !important;
+}

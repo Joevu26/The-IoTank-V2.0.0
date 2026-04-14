@@ -12,17 +12,16 @@ import { FiAlertCircle } from 'react-icons/fi';
 import { ActionQueue } from './ActionQueue';
 import { TelemetryErrorBoundary } from '../Common/TelemetryErrorBoundary';
 import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
-import { RecentEvents } from './RecentEvents';
-import { LossRadar } from './LossRadar';
-import { DeliveryVerification } from './DeliveryVerification';
 import { SystemIntegrityCard } from './SystemIntegrityCard';
-import { CashView } from './CashView';
+
 import { ExecutiveOverview } from './ExecutiveOverview';
 import { PageHeader } from '../Common/PageHeader';
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { SkeletonDashboard } from '../Common/SkeletonLoader';
 import '../Common/DesignSystemCards.css';
 import './Dashboard.css';
+
+import { useShiftStatus } from '@/hooks/useShiftStatus';
 
 export const Dashboard: React.FC = () => {
     const { currentUser } = useAuth();
@@ -31,6 +30,7 @@ export const Dashboard: React.FC = () => {
     const stationId = currentUser?.stationId || '';
 
     const { tanks, loading: tanksLoading, error: tanksError } = useTanks(stationId);
+    const { status: shiftStatus } = useShiftStatus();
     
     // Fetch latest readings for all tanks to get RSSI
     const { readings } = useAllLatestReadings(stationId, (tanks || []).map(t => t.id));
@@ -39,7 +39,6 @@ export const Dashboard: React.FC = () => {
     const { error: summaryError, refetch: refetchSummary } = useDashboardData();
 
     const { alerts } = useAlerts(stationId, false);
-    const [currency, setCurrency] = useState<'USD' | 'Ksh'>('Ksh');
     const [showAddModal, setShowAddModal] = useState(false);
     const hasPushedError = React.useRef(false);
 
@@ -61,12 +60,13 @@ export const Dashboard: React.FC = () => {
         }
     }, [tanksError, summaryError, pushEvent, refetchSummary]);
 
-    // Onboarding Gate: Trigger modal if 0 tanks exist
+    // Onboarding Gate: Trigger modal if 0 tanks exist (Only for Admins/Owners Level 5)
+    const { canSee } = useAuth();
     React.useEffect(() => {
-        if (!tanksLoading && tanks.length === 0) {
+        if (!tanksLoading && tanks.length === 0 && canSee(5)) {
             setShowAddModal(true);
         }
-    }, [tanks.length, tanksLoading]);
+    }, [tanks.length, tanksLoading, canSee]);
 
     // --- THEFT DETECTION LOGIC (SIMULATED) ---
     const prevVolumes = React.useRef<{ [key: string]: number }>({});
@@ -74,7 +74,8 @@ export const Dashboard: React.FC = () => {
     React.useEffect(() => {
         if (tanksLoading || tanks.length === 0) return;
 
-        const shiftStatus = localStorage.getItem('iotank_shift_status') || 'closed';
+        // Use the status from the hook (driven by DB)
+        const currentShiftStatus = shiftStatus?.toLowerCase() || localStorage.getItem('iotank_shift_status') || 'closed';
         
         tanks.forEach(tank => {
             if (!tank || !tank.id) return;
@@ -83,7 +84,7 @@ export const Dashboard: React.FC = () => {
             const lastVol = prevVolumes.current[tank.id];
 
             // If shift is closed and volume decreases by more than 5L (to avoid noise)
-            if (shiftStatus === 'closed' && lastVol !== undefined && currentVol < lastVol - 0.5) {
+            if (currentShiftStatus === 'closed' && lastVol !== undefined && currentVol < lastVol - 5.0) {
                 pushEvent({
                     type: 'system_error',
                     message: `CRITICAL: Unofficial Fuel Reduction in ${tank.name || 'Unknown Tank'}. Shift is CLOSED. Possible Theft!`,
@@ -95,7 +96,8 @@ export const Dashboard: React.FC = () => {
             // Update ref for next comparison
             prevVolumes.current[tank.id] = currentVol;
         });
-    }, [tanks, tanksLoading, pushEvent, navigate]);
+    }, [tanks, tanksLoading, pushEvent, navigate, shiftStatus]);
+
 
     const ghostTank: Tank = {
         id: 'ghost-tank',
@@ -142,7 +144,7 @@ export const Dashboard: React.FC = () => {
                 {/* Main HUD Area */}
                 <section className="tanks-section">
                     
-                    <ExecutiveOverview tanks={displayTanks} readings={readings} />
+                    <ExecutiveOverview tanks={displayTanks} readings={readings} stationId={stationId} />
                     
                     <div className={displayTanks.length === 1 ? 'single-tank-view mt-8' : 'mt-8'}>
                         <TelemetryErrorBoundary
@@ -168,21 +170,10 @@ export const Dashboard: React.FC = () => {
                                 tanks={displayTanks}
                                 stationId={stationId}
                                 alerts={alerts}
-                                currency={currency}
-                                onCurrencyToggle={() => setCurrency(prev => prev === 'USD' ? 'Ksh' : 'USD')}
                             />
                         </TelemetryErrorBoundary>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                        <div className="space-y-6">
-                            <LossRadar />
-                        </div>
-                        <div className="space-y-6">
-                            <DeliveryVerification />
-                            <CashView currency={currency} stationId={stationId} />
-                        </div>
-                    </div>
 
                     {showAddModal && (
                         <AddTankModal 
@@ -207,10 +198,6 @@ export const Dashboard: React.FC = () => {
 
                     <TelemetryErrorBoundary>
                         <MarketLens stationId={stationId} />
-                    </TelemetryErrorBoundary>
-
-                    <TelemetryErrorBoundary>
-                        <RecentEvents />
                     </TelemetryErrorBoundary>
 
                     <TelemetryErrorBoundary>

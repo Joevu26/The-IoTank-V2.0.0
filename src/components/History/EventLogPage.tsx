@@ -88,8 +88,8 @@ function SeverityBadge({ severity }: { severity: EventSeverity }) {
         critical: '■',
     };
     return (
-        <span className={`el-severity-badge el-severity-badge--${severity}`}>
-            <span style={{ fontSize: '0.6rem' }}>{dots[severity]}</span>
+        <span className={`el-severity-badge el-severity-badge--${severity}`} role="status">
+            <span className="el-severity-badge-icon" aria-hidden="true">{dots[severity]}</span>
             {severity.charAt(0).toUpperCase() + severity.slice(1)}
         </span>
     );
@@ -101,7 +101,7 @@ function SeverityBadge({ severity }: { severity: EventSeverity }) {
 
 export const EventLogPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || '';
+    const stationId = currentUser?.stationId || '';
 
     const {
         events,
@@ -115,7 +115,7 @@ export const EventLogPage: React.FC = () => {
         categoryCounts,
         tanks,
         exportCSV,
-    } = useEventLog(orgId);
+    } = useEventLog(stationId);
 
     const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
     const endIdx = Math.min(currentPage * PAGE_SIZE, total);
@@ -210,6 +210,7 @@ export const EventLogPage: React.FC = () => {
                                 className="el-filter-select"
                                 value={filters.severity}
                                 onChange={e => updateFilter('severity', e.target.value as EventSeverity | 'all')}
+                                title="Filter by Severity"
                             >
                                 <option value="all">All Severities</option>
                                 <option value="info">Info</option>
@@ -230,6 +231,7 @@ export const EventLogPage: React.FC = () => {
                                 className="el-filter-select"
                                 value={filters.tankId}
                                 onChange={e => updateFilter('tankId', e.target.value)}
+                                title="Filter by Tank"
                             >
                                 <option value="">All Tanks</option>
                                 {tanks.map(t => (
@@ -250,6 +252,7 @@ export const EventLogPage: React.FC = () => {
                                 className="el-filter-select"
                                 value={filters.triggeredBy}
                                 onChange={e => updateFilter('triggeredBy', e.target.value as 'all' | 'system' | 'user' | 'ai')}
+                                title="Filter by Event Source"
                             >
                                 <option value="all">All Sources</option>
                                 <option value="system">System</option>
@@ -343,18 +346,20 @@ export const EventLogPage: React.FC = () => {
                             className="el-page-btn"
                             onClick={() => setCurrentPage(p => p - 1)}
                             disabled={currentPage === 1}
-                            title="Previous page"
+                            aria-label="Previous page"
                         >
                             ‹
                         </button>
                         {pageButtons().map((p, i) =>
                             p === '…'
-                                ? <span key={`ell-${i}`} style={{ padding: '0 0.25rem', color: 'var(--color-text-secondary)' }}>…</span>
+                                ? <span key={`ell-${i}`} className="pagination-ellipsis" aria-hidden="true">…</span>
                                 : (
                                     <button
                                         key={p}
                                         className={`el-page-btn ${currentPage === p ? 'active' : ''}`}
                                         onClick={() => setCurrentPage(p as number)}
+                                        aria-label={`Go to page ${p}`}
+                                        aria-current={currentPage === p ? 'page' : undefined}
                                     >
                                         {p}
                                     </button>
@@ -372,31 +377,31 @@ export const EventLogPage: React.FC = () => {
                 </div>
             )}
 
-            <footer className="analytics-info-section" style={{ marginTop: '2rem', background: 'var(--color-bg-card)', padding: '2rem', borderRadius: '1rem', border: '1px solid var(--color-border)' }}>
-                <div className="info-header" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--color-text)' }}>
+            <footer className="el-info-footer">
+                <div className="el-info-header">
                     <FiFileText />
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: 0 }}>About Historical Data</h2>
+                    <h2>About Historical Data</h2>
                 </div>
-                <p className="text-secondary mb-6 text-sm" style={{ marginBottom: '1.5rem', color: 'var(--color-text-secondary)' }}>
+                <p className="el-info-description">
                     This page displays fuel volume trends over time. Use the time range selector to view different periods.
                     Events such as refills, alerts, and anomalies are highlighted on the timeline below the chart.
                 </p>
-                <div className="info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                    <div className="info-item" style={{ background: 'var(--color-bg-body)', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid var(--color-border)' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--color-text)' }}><FiTarget /> Interactive Chart</h3>
-                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>Hover over data points to see exact values and timestamps captured by the ESP32 sensors.</p>
+                <div className="el-info-grid">
+                    <div className="el-info-item">
+                        <h3><FiTarget /> Interactive Chart</h3>
+                        <p>Hover over data points to see exact values and timestamps captured by the ESP32 sensors.</p>
                     </div>
-                    <div className="info-item" style={{ background: 'var(--color-bg-body)', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid var(--color-border)' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--color-text)' }}><FiActivity /> Event Timeline</h3>
-                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>View refills, low-fuel alerts, and AI-detected anomalies in a sequential audit trail.</p>
+                    <div className="el-info-item">
+                        <h3><FiActivity /> Event Timeline</h3>
+                        <p>View refills, low-fuel alerts, and AI-detected anomalies in a sequential audit trail.</p>
                     </div>
-                    <div className="info-item" style={{ background: 'var(--color-bg-body)', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid var(--color-border)' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--color-text)' }}><FiDownload /> Export Options</h3>
-                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>Download historical data as CSV for spreadsheets or generate a professional PDF report.</p>
+                    <div className="el-info-item">
+                        <h3><FiDownload /> Export Options</h3>
+                        <p>Download historical data as CSV for spreadsheets or generate a professional PDF report.</p>
                     </div>
-                    <div className="info-item" style={{ background: 'var(--color-bg-body)', padding: '1.5rem', borderRadius: '0.75rem', border: '1px solid var(--color-border)' }}>
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 'bold', marginBottom: '0.75rem', color: 'var(--color-text)' }}><FiZap /> Zoom & Pan</h3>
-                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', margin: 0 }}>Click and drag on the chart to inspect high-frequency data windows (Planned).</p>
+                    <div className="el-info-item">
+                        <h3><FiZap /> Zoom & Pan</h3>
+                        <p>Click and drag on the chart to inspect high-frequency data windows (Planned).</p>
                     </div>
                 </div>
             </footer>

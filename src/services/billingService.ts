@@ -27,7 +27,9 @@ export const billingService = {
    */
   async getDashboardSummary(stationId: string): Promise<ClientBillingSummary | null> {
     try {
-      if (!stationId) return null;
+      if (!stationId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stationId)) {
+        return null;
+      }
       
       const { data, error } = await supabase.rpc('get_station_dashboard_summary', {
         p_station_id: stationId

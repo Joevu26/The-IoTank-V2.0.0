@@ -22,7 +22,14 @@ interface TelemetryQueueContextType {
 const TelemetryQueueContext = createContext<TelemetryQueueContextType | undefined>(undefined);
 
 export const TelemetryQueueProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [events, setEvents] = useState<TelemetryEvent[]>([]);
+    const [events, setEvents] = useState<TelemetryEvent[]>(() => {
+        const saved = localStorage.getItem('iotank_telemetry_queue');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    React.useEffect(() => {
+        localStorage.setItem('iotank_telemetry_queue', JSON.stringify(events));
+    }, [events]);
 
     const pushEvent = useCallback((event: Omit<TelemetryEvent, 'id' | 'timestamp'>) => {
         const newEvent: TelemetryEvent = {

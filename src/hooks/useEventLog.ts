@@ -53,7 +53,7 @@ const DEFAULT_FILTERS: EventLogFilters = {
 
 export const PAGE_SIZE = 25;
 
-export function useEventLog(orgId: string) {
+export function useEventLog(stationId: string) {
     const [events, setEvents] = useState<EventLogEntry[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -63,14 +63,14 @@ export function useEventLog(orgId: string) {
 
     useEffect(() => {
         fetchTanks();
-    }, [orgId]);
+    }, [stationId]);
 
     useEffect(() => {
         fetchEvents();
-    }, [orgId, filters, currentPage]);
+    }, [stationId, filters, currentPage]);
 
     const fetchTanks = async () => {
-        const { data } = await supabase.from('tanks').select('id, tank_name').eq('station_id', orgId);
+        const { data } = await supabase.from('tanks').select('id, tank_name').eq('station_id', stationId);
         if (data) setTanks(data.map(t => ({ id: t.id, name: t.tank_name })));
     };
 
@@ -78,9 +78,9 @@ export function useEventLog(orgId: string) {
         setLoading(true);
         try {
             let query = supabase
-                .from('audit_logs')
+                .from('unified_events')
                 .select('*', { count: 'exact' })
-                .eq('station_id', orgId)
+                .eq('station_id', stationId)
                 .order('created_at', { ascending: false });
 
             // Apply time filters
@@ -90,17 +90,17 @@ export function useEventLog(orgId: string) {
                 query = query.gte('created_at', new Date(now.getTime() - ms).toISOString());
             }
 
-            // Apply Category (Map action types to categories)
+            // Apply Category filter
             if (filters.category !== 'all') {
-                // This logic depends on how actions are categorized. For now we use the type if it matches.
+                query = query.eq('event_category', filters.category.toUpperCase());
             }
 
             if (filters.severity !== 'all') {
-                query = query.eq('severity', filters.severity);
+                query = query.eq('severity', filters.severity.toUpperCase());
             }
 
             if (filters.search) {
-                query = query.or(`action.ilike.%${filters.search}%,details.ilike.%${filters.search}%,user_name.ilike.%${filters.search}%`);
+                query = query.or(`event_type.ilike.%${filters.search}%,description.ilike.%${filters.search}%,actor_email.ilike.%${filters.search}%`);
             }
 
             const { data, count, error } = await query
@@ -110,18 +110,18 @@ export function useEventLog(orgId: string) {
 
             const mapped: EventLogEntry[] = (data || []).map(log => ({
                 id: log.id,
-                category: 'operational', // Default for now
-                type: log.action,
-                title: log.action.replace(/_/g, ' '),
-                description: log.details,
+                category: log.event_category.toLowerCase() as EventCategory,
+                type: log.event_type,
+                title: log.event_type.replace(/_/g, ' '),
+                description: log.description,
                 timestamp: new Date(log.created_at).getTime(),
-                triggeredBy: 'user', // Audit logs are usually user or system
-                triggeredByName: log.user_name || 'System',
-                severity: log.severity as EventSeverity,
+                triggeredBy: (log.metadata?.actor_name || '').toLowerCase().includes('system') ? 'system' : 'user',
+                triggeredByName: log.metadata?.actor_name || log.actor_email || 'System',
+                severity: (log.severity || 'info').toLowerCase() as EventSeverity,
                 integrity: 'verified',
-                beforeValue: log.before_values ? JSON.stringify(log.before_values, null, 2) : undefined,
-                afterValue: log.after_values ? JSON.stringify(log.after_values, null, 2) : undefined,
-                rawPayload: log.changes_made || {}
+                beforeValue: log.metadata?.before ? JSON.stringify(log.metadata.before, null, 2) : undefined,
+                afterValue: log.metadata?.after ? JSON.stringify(log.metadata.after, null, 2) : undefined,
+                rawPayload: log.metadata || {}
             }));
 
             setEvents(mapped);

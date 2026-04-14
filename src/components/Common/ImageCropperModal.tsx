@@ -141,8 +141,12 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             <h3>{title}</h3>
                             <p>{subtitle}</p>
                         </div>
-                        <button className="p-2 transition-colors hover:bg-slate-100 dark:hover:bg-white/5 rounded-full" onClick={onCancel}>
-                            <FiX size={22} className="text-slate-400" />
+                        <button 
+                            className="btn-cropper-close" 
+                            onClick={onCancel}
+                            title="Close Cropper"
+                        >
+                            <FiX size={22} />
                         </button>
                     </div>
 
@@ -164,11 +168,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                     </div>
 
                     <div className="cropper-modal-controls">
-                        <div className="flex flex-col md:flex-row gap-8">
+                        <div className="cropper-controls-row">
                             <div className="control-group flex-1">
                                 <div className="flex justify-between items-center">
                                     <label className="control-label uppercase">Optical Zoom</label>
-                                    <span className="text-[11px] font-bold text-slate-400">{Math.round(zoom * 100)}%</span>
+                                    <span className="control-badge">{Math.round(zoom * 100)}%</span>
                                 </div>
                                 <div className="slider-container">
                                     <input
@@ -178,6 +182,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                         max={3}
                                         step={0.1}
                                         aria-labelledby="Zoom"
+                                        title="Adjust Zoom Level"
                                         className="cropper-slider"
                                         onChange={(e) => onZoomChange(Number(e.target.value))}
                                     />
@@ -187,7 +192,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             <div className="control-group flex-1">
                                 <div className="flex justify-between items-center">
                                     <label className="control-label uppercase">Orientation</label>
-                                    <span className="text-[11px] font-bold text-slate-400">{rotation}°</span>
+                                    <span className="control-badge">{rotation}°</span>
                                 </div>
                                 <div className="slider-container">
                                     <input
@@ -197,6 +202,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                         max={360}
                                         step={1}
                                         aria-labelledby="Rotation"
+                                        title="Adjust Rotation Angle"
                                         className="cropper-slider"
                                         onChange={(e) => onRotationChange(Number(e.target.value))}
                                     />

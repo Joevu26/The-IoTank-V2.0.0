@@ -22,7 +22,6 @@ html {
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     /* Hide scrollbar but allow scrolling */
-    scrollbar-width: none;
     /* Firefox */
     -ms-overflow-style: none;
     /* IE and Edge */
@@ -272,6 +271,7 @@ label {
     box-shadow: 0 4px 6px -1px var(--color-shadow), 0 2px 4px -1px var(--color-shadow);
     border: 1px solid var(--color-divider);
     transition: all var(--transition-base);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
 }
 
@@ -768,13 +768,36 @@ label {
 /* =============================================================================
    SCROLLBAR REMOVAL (Using Custom Handle Instead)
    ============================================================================= */
-* {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+/* =============================================================================
+   CUSTOM SCROLLBARS
+   ============================================================================= */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
 }
 
-*::-webkit-scrollbar {
-    display: none;
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.dark::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar {
+    @supports (scrollbar-width: auto) {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+    }
 }
 
 /* =============================================================================
@@ -828,4 +851,41 @@ img[src*="iotank-logo-v3"] {
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
+}
+
+/* =============================================================================
+   Initialization Diagnostics
+   ============================================================================= */
+.diagnostic-toggle {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    text-decoration: underline;
+    opacity: 0.6;
+    margin-top: 2rem;
+    transition: opacity 0.2s ease;
+    text-align: center;
+}
+
+.diagnostic-toggle:hover {
+    opacity: 1;
+}
+
+.diagnostic-panel {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--border-radius-md);
+    text-align: left;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.diagnostic-panel code {
+    background: transparent;
+    padding: 0;
 }

@@ -41,6 +41,16 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
             // Action type is handled by the parent or logged accordingly
         });
 
+        // Dispatch global success feedback
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Review Complete',
+                message: `Variance of ${varianceData.difference.toFixed(1)}L categorized as ${category}.`,
+                type: 'success',
+                attribution: 'LOSS RADAR'
+            }
+        }));
+
         setIsSubmitting(false);
         onClose();
     };
@@ -58,12 +68,17 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Variance Analysis</h2>
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Loss Radar Intelligence</p>
                     </div>
-                    <button className="close-btn p-2 hover:bg-slate-100 rounded-full transition-colors" type="button" onClick={onClose}>
+                    <button 
+                        className="close-btn p-2 hover:bg-slate-100 rounded-full transition-colors" 
+                        type="button" 
+                        onClick={onClose}
+                        title="Close Analysis Panel"
+                    >
                         <FiX size={20} className="text-slate-400" />
                     </button>
                 </div>
 
-                <div className="modal-body overflow-y-auto custom-scrollbar flex-1 pr-1" style={{ maxHeight: 'calc(90vh - 180px)' }}>
+                <div className="modal-body overflow-y-auto custom-scrollbar flex-1 pr-1 variance-panel-body">
                     <div className="space-y-8 p-1">
                         {/* Section 1: Auto Breakdown */}
                         <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100">
@@ -91,7 +106,7 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
                                     <div className="text-right">
                                         <span className="text-[10px] font-bold text-rose-400 uppercase block mb-1">Valuation</span>
                                         <span className="text-sm font-black text-rose-800 bg-white/50 px-3 py-1 rounded-full border border-rose-200">
-                                            KES {(varianceData.estimatedValueKes || 0).toLocaleString()}
+                                            Ksh {(varianceData.estimatedValueKes || 0).toLocaleString()}
                                         </span>
                                     </div>
                                 </div>
@@ -116,6 +131,7 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
                                         className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none cursor-pointer"
                                         value={category}
                                         onChange={(e) => setCategory(e.target.value as LossReview['selectedCause'])}
+                                        title="Select Suspected Root Cause"
                                     >
                                         <option value="" disabled>Select cause...</option>
                                         <option value="Delivery Adjustment">Delivery Adjustment</option>

@@ -172,8 +172,10 @@ const PendingRegistrations: React.FC = () => {
     setToast({ show: true, type: 'error', title: "Diagnostic in Progress", message: "Probing hub link...", step: 'DIAGNOSTIC' });
     try {
         const currentProjectUrl = import.meta.env.VITE_SUPABASE_URL;
-        const baseUrl = currentProjectUrl.replace('.supabase.co', '');
-        const pingUrl = `${baseUrl}.functions.supabase.co/functions/v1/approve-registration/ping`;
+        // FIX: Use the standard Supabase API URL format for Edge Functions.
+        // The .functions.supabase.co host does NOT use the /functions/v1/ prefix.
+        // The correct format is: {SUPABASE_URL}/functions/v1/{function-name}
+        const pingUrl = `${currentProjectUrl}/functions/v1/approve-registration/ping`;
         
         const start = Date.now();
         const { data: { session } } = await supabase.auth.getSession();

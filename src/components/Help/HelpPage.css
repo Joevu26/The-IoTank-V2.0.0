@@ -9,6 +9,7 @@
 
 .glass-panel {
     background: rgba(255, 255, 255, 0.75);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(0, 0, 0, 0.05);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
@@ -54,6 +55,10 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
+}
+
+.tools-grid-2col {
+    grid-template-columns: repeat(2, 1fr) !important;
 }
 
 .tool-card-legacy {

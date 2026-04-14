@@ -15,13 +15,13 @@ interface UseShiftsReturn {
     error: string | null;
 }
 
-export function useShifts(orgId: string, options: UseShiftsOptions = {}): UseShiftsReturn {
+export function useShifts(stationId: string, options: UseShiftsOptions = {}): UseShiftsReturn {
     const [shifts, setShifts] = useState<ShiftDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!orgId) {
+        if (!stationId) {
             setLoading(false);
             return;
         }
@@ -31,7 +31,7 @@ export function useShifts(orgId: string, options: UseShiftsOptions = {}): UseShi
                 let query = supabase
                     .from('shift_closures')
                     .select('*')
-                    .eq('station_id', orgId)
+                    .eq('station_id', stationId)
                     .order('closed_at', { ascending: false });
 
                 if (options.startDate) {
@@ -92,10 +92,10 @@ export function useShifts(orgId: string, options: UseShiftsOptions = {}): UseShi
 
         // Subscribe to changes
         const channel = supabase
-            .channel(`shifts:${orgId}`)
+            .channel(`shifts:${stationId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'shift_closures', filter: `station_id=eq.${orgId}` },
+                { event: '*', schema: 'public', table: 'shift_closures', filter: `station_id=eq.${stationId}` },
                 () => fetchShifts()
             )
             .subscribe();
@@ -103,7 +103,7 @@ export function useShifts(orgId: string, options: UseShiftsOptions = {}): UseShi
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [orgId, options.startDate, options.endDate, options.tankId, options.siteId]);
+    }, [stationId, options.startDate, options.endDate, options.tankId, options.siteId]);
 
     return { shifts, loading, error };
 }

@@ -5,8 +5,9 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/webp" href="/logo.webp" />
   <link rel="apple-touch-icon" href="/icons/icon-192x192.webp" />
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <!-- Dynamic Title Injection via src/main.tsx overrides this -->
+  <title>IoTank</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
   <!-- Speed & Connectivity Optimizations -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -32,65 +33,9 @@
 
   <!-- Force injection of the authentic Google reCAPTCHA v3 badge for our UI animation -->
   <script src="https://www.google.com/recaptcha/api.js?render=6LfgSHgsAAAAAHlWl9ZRVO1IvJGsEkyj8_lYVF2i"></script>
-
-  <style>
-    /* Google reCAPTCHA v3 Badge Controls */
-    .grecaptcha-badge {
-      opacity: 0 !important;
-      visibility: hidden !important;
-      transform: translateY(20px) !important;
-      transition: opacity 0.6s ease, transform 0.6s ease, visibility 0.6s ease !important;
-      bottom: 24px !important;
-      /* Lift it up slightly to match the UI style */
-    }
-
-    /* When body has this class, smoothly reveal the badge */
-    body.show-recaptcha .grecaptcha-badge {
-      opacity: 1 !important;
-      visibility: visible !important;
-      transform: translateY(0) !important;
-    }
-  </style>
+  <link rel="stylesheet" href="/src/styles/recaptcha.css" />
 
   <!-- Enhanced Security Headers -->
-
-  <!-- SEO Meta Tags Optimized for IoTank Kenya -->
-  <title>IoTank | AI Fuel Monitoring System & Petrol Station Analytics Kenya</title>
-  <meta name="description"
-    content="IoTank is Kenya's leading AI-powered fuel monitoring system for petrol stations and fleet depots. Features real-time underground tank monitoring, precision leak detection, EPRA-compliant reporting, and intelligent fuel procurement analytics to prevent theft and optimize fuel inventory.">
-  <meta name="keywords"
-    content="fuel monitoring system Kenya, fuel tank monitoring Kenya, EPRA compliance software, fuel theft detection Kenya, AI fuel procurement, petrol station inventory management, underground tank monitoring, fuel automation Kenya, wetstock management, remote fuel monitoring, fuel pump calibration check, digital dipping system, fuel station dashboard, fuel loss prevention, IoT fuel sensors, industrial IoT fuel tracking, Nairobi fuel technology, oil and gas monitoring Kenya">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://the-iotank-project.web.app/">
-
-  <!-- Geo-Location Authority -->
-  <meta name="geo.region" content="KE">
-  <meta name="geo.placename" content="Nairobi, Kenya">
-
-  <!-- Structured Data: SoftwareApplication -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "IoTank",
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Web",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "KES"
-    },
-    "description": "AI-powered fuel monitoring and procurement intelligence platform for petrol stations in Kenya.",
-    "provider": {
-      "@type": "Organization",
-      "name": "Joe Engineering Ltd",
-      "address": {
-        "@type": "PostalAddress",
-        "addressCountry": "KE"
-      }
-    }
-  }
-  </script>
 
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website" />
@@ -99,8 +44,7 @@
     content="Kenya's AI-powered fuel monitoring for petrol stations. Real-time tank monitoring & EPRA-compliant reporting." />
   <meta property="og:image" content="/logo.png" />
 
-  <!-- Theme Color -->
-  <meta name="theme-color" content="#00D4FF" />
+
 </head>
 
 <body class="preload">

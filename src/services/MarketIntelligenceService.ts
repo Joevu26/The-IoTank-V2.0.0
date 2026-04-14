@@ -140,16 +140,16 @@ export class MarketIntelligenceService {
         }];
     }
 
-    async syncAll(orgId: string): Promise<boolean> {
+    async syncAll(stationId: string): Promise<boolean> {
         let someFailure = false;
         let news: MarketSignal[] = [];
         const triggerAlert = async (type: 'market-news' | 'regulatory-update', message: string, severity: 'info' | 'warning' = 'info') => {
             try {
                 await supabase.from('alerts').insert({
-                    station_id: orgId,
+                    station_id: stationId,
                     alert_type: 'system_error', // Map generic alerts to system for now
                     severity,
-                    title: type === 'market-news' ? 'Market Update' : 'Regulatory Update',
+                    title: type === 'market-news' ? '💡 Price Review Trigger' : '📜 Regulatory Advisory',
                     message,
                     auth_user_id: 'system', // Indicates system-generated
                     alert_data: { detectionMethod: 'ai-assisted' },
@@ -166,7 +166,7 @@ export class MarketIntelligenceService {
             for (const signal of news) {
                 const { error } = await supabase.from('market_signals').upsert({
                     id: signal.id,
-                    station_id: orgId,
+                    station_id: stationId,
                     type: signal.type,
                     source: signal.source,
                     source_type: signal.sourceType,
@@ -189,7 +189,7 @@ export class MarketIntelligenceService {
             for (const notice of epra) {
                 const { error } = await supabase.from('regulatory_notices').upsert({
                     id: `reg-${notice.authority}-${notice.id}`,
-                    station_id: orgId,
+                    station_id: stationId,
                     authority: notice.authority,
                     notice_type: notice.noticeType,
                     title: notice.title,
@@ -210,7 +210,7 @@ export class MarketIntelligenceService {
                     if (!item || !item.period || !item.value) continue;
                     const { error } = await supabase.from('raw_market_data').upsert({
                         id: `eia-crude-${item.period}`,
-                        station_id: orgId,
+                        station_id: stationId,
                         fuel_type: 'crude-oil',
                         region: 'Global/EIA',
                         price_per_liter: parseFloat(item.value),
@@ -230,7 +230,7 @@ export class MarketIntelligenceService {
                 if (!b || !b.data || !b.data.value) continue;
                 const { error } = await supabase.from('raw_market_data').upsert({
                     id: `benchmark-${b.symbol}-${new Date().toISOString().split('T')[0]}`,
-                    station_id: orgId,
+                    station_id: stationId,
                     fuel_type: b.symbol,
                     region: 'Global',
                     price_per_liter: parseFloat(b.data.value),

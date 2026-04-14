@@ -8,6 +8,7 @@
     position: fixed;
     inset: 0;
     background: rgba(10, 15, 30, 0.65);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     display: flex;
     align-items: center;
@@ -33,6 +34,7 @@
     max-width: 740px;
     max-height: 92vh;
     background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
     backdrop-filter: blur(24px) saturate(160%);
     border-radius: 24px;
     border: 1px solid rgba(255, 255, 255, 0.6);
@@ -486,6 +488,22 @@
 .error-content p { color: #64748b; font-size: 0.78rem; margin: 0; line-height: 1.5; }
 .error-hint { margin-top: 4px; font-size: 0.72rem; color: #ef4444; font-style: italic; }
 
+.loading-spinner-inline {
+    display: inline-block;
+    color: #6366f1;
+    margin-left: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    animation: atm-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes atm-pulse {
+    0%, 100% { opacity: 0.4; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1.02); }
+}
+
 /* ---------- Security Gate ---------- */
 .add-tank-modal-content.auth-mode {
     max-width: 440px;
@@ -875,3 +893,122 @@
     color: #94a3b8;
 }
 
+
+/* ---------- Info Info Boxes ---------- */
+.field-info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 16px;
+    margin-top: 12px;
+    background: rgba(59, 130, 246, 0.05);
+    border-left: 4px solid #3b82f6; /* Blue edge */
+    border-radius: 8px;
+    animation: atm-fade 0.5s ease-out;
+}
+
+.field-info-box .info-icon {
+    color: #3b82f6;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.field-info-box p {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #475569;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Disclosure HUD */
+.tm-disclosure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+.tm-disclosure-chip { padding: 16px; border-radius: 12px; background: white; border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 4px; transition: all 0.2s; }
+.tm-disclosure-chip.critical { background: #fff1f2; border-color: #fecdd3; }
+.tm-disclosure-chip.ok { background: #f0fdf4; border-color: #dcfce7; }
+.tm-chip-label { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
+.tm-chip-value { font-size: 1.125rem; font-weight: 900; }
+.tm-chip-status { font-size: 9px; font-weight: 800; text-transform: uppercase; opacity: 0.8; }
+.tm-chip-status.ok { color: #10b981; }
+.tm-chip-status.critical { color: #ef4444; }
+
+/* Storage Analysis Unit (Premium Forensic Unit) */
+.storage-analysis-unit {
+    padding: 24px;
+    border-radius: 12px;
+    background: #fcfcfd;
+    border: 1px solid #f0f2f5;
+    box-shadow: 0 4px 12px -4px rgba(30,27,75,0.03);
+    transition: all 0.2s;
+}
+.storage-analysis-unit:hover {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    box-shadow: 0 12px 28px -8px rgba(30,27,75,0.08);
+}
+.unit-indicator-glow {
+    width: 6px; height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #10b981;
+}
+.unit-status-pill {
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f0fdf4;
+    color: #10b981;
+    border: 1px solid #dcfce7;
+    letter-spacing: 0.05em;
+}
+.tm-disclosure-chip.forensic {
+    border: 2px solid #f1f5f9;
+    background: #ffffff;
+    border-radius: 12px;
+}
+.tm-disclosure-chip.forensic.accent {
+    background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+    border-color: #dcfce7;
+    color: #064e3b;
+}
+.unit-suffix {
+    font-size: 10px;
+    font-weight: 500;
+    margin-left: 2px;
+    opacity: 0.5;
+}
+
+/* Pricing Placeholders */
+.price-placeholder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin-top: 8px;
+}
+.price-card-placeholder {
+    background: #ffffff;
+    border: 2px dashed #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.2s;
+}
+.price-card-placeholder:hover {
+    border-color: #cbd5e1;
+}
+.price-card-label {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 0.05em;
+}
+.price-card-value {
+    font-size: 16px;
+    font-weight: 900;
+    color: #1e293b;
+}

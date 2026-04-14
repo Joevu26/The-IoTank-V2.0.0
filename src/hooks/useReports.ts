@@ -42,7 +42,7 @@ export interface UseReportsReturn {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useReports(
-    clientId: string,
+    stationId: string,
     filter: ReportsFilter = {}
 ): UseReportsReturn {
     const [reports, setReports] = useState<Report[]>([]);
@@ -51,7 +51,7 @@ export function useReports(
     const [totalCount, setTotalCount] = useState(0);
 
     const fetchReports = useCallback(async () => {
-        if (!clientId) {
+        if (!stationId) {
             setReports([]);
             setLoading(false);
             return;
@@ -82,7 +82,7 @@ export function useReports(
                         verification_status
                     )
                 `, { count: 'exact' })
-                .eq('station_id', clientId)
+                .eq('station_id', stationId)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
@@ -114,7 +114,7 @@ export function useReports(
         } finally {
             setLoading(false);
         }
-    }, [clientId, filter.report_type, filter.dateFrom, filter.dateTo]);
+    }, [stationId, filter.report_type, filter.dateFrom, filter.dateTo]);
 
     useEffect(() => {
         fetchReports();

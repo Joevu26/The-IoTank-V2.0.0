@@ -17,9 +17,9 @@ import './HelpPage.css';
 export const HelpPage: React.FC = () => {
     const { currentUser } = useAuth();
     const { openModal } = useModals();
-    const orgId = currentUser?.stationId || '';
-    const { tanks } = useTanks(orgId);
-    const { sites } = useSites(orgId);
+    const stationId = currentUser?.stationId || '';
+    const { tanks } = useTanks(stationId);
+    const { sites } = useSites(stationId);
     const { status: newsStatus } = useMarketNews();
 
     // State
@@ -39,7 +39,7 @@ export const HelpPage: React.FC = () => {
 
     const handleTicketSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentUser || !orgId) return;
+        if (!currentUser || !stationId) return;
 
         setIsSubmitting(true);
         setShowSuccess(false);
@@ -47,7 +47,7 @@ export const HelpPage: React.FC = () => {
             const { error } = await supabase
                 .from('support_tickets')
                 .insert({
-                    station_id: orgId,
+                    station_id: stationId,
                     subject: `Escalation: ${ticketForm.category.replace(/_/g, ' ')}`,
                     description: ticketForm.description,
                     status: 'open',
@@ -76,7 +76,7 @@ export const HelpPage: React.FC = () => {
                 <div className="support-success-toast animate-in">
                     <FiCheck />
                     <span>Support Ticket Created. Our team is investigating.</span>
-                    <button onClick={() => setShowSuccess(false)}><FiX size={14}/></button>
+                    <button onClick={() => setShowSuccess(false)} title="Dismiss Success Message"><FiX size={14}/></button>
                 </div>
             )}
 
@@ -88,6 +88,7 @@ export const HelpPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <select
                                 className="form-input-cc"
+                                title="Support Category"
                                 value={ticketForm.category}
                                 onChange={e => setTicketForm({ ...ticketForm, category: e.target.value as SupportCategory })}
                             >
@@ -101,6 +102,7 @@ export const HelpPage: React.FC = () => {
                             </select>
                             <select
                                 className="form-input-cc"
+                                title="Issue Complexity / Severity"
                                 value={ticketForm.severity}
                                 onChange={e => setTicketForm({ ...ticketForm, severity: e.target.value as SupportSeverity })}
                             >
@@ -113,6 +115,7 @@ export const HelpPage: React.FC = () => {
                         <div className="grid grid-cols-2 gap-4">
                             <select
                                 className="form-input-cc"
+                                title="Select Operational Site"
                                 value={ticketForm.siteId}
                                 onChange={e => setTicketForm({ ...ticketForm, siteId: e.target.value })}
                             >
@@ -121,6 +124,7 @@ export const HelpPage: React.FC = () => {
                             </select>
                             <select
                                 className="form-input-cc"
+                                title="Select Specific Tank"
                                 value={ticketForm.tankId}
                                 onChange={e => setTicketForm({ ...ticketForm, tankId: e.target.value })}
                             >
@@ -222,7 +226,7 @@ export const HelpPage: React.FC = () => {
 
                 <div className="glass-panel quick-tools-panel">
                     <span className="uppercase-label mb-6">Quick Actions</span>
-                    <div className="tools-grid-legacy" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                    <div className="tools-grid-legacy tools-grid-2col">
                         <div className="tool-card-legacy" onClick={() => openModal('support-setup')}>
                             <FiLayers className="text-accent" size={24} />
                             <div>

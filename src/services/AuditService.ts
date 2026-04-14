@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
 
-export type AuditAction =
+export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'AUTH' | 'SYSTEM' | 'CALIBRATION' | 'SECURITY';
+
+export type EventType =
     | 'LOGIN'
     | 'LOGOUT'
     | 'CREATE_TANK'
@@ -22,28 +24,35 @@ export type AuditAction =
     | 'SHIFT_STARTED'
     | 'SECURITY_COLLUSION_ALERT'
     | 'UPLOAD_LOGO'
-    | 'UPLOAD_AVATAR';
+    | 'UPLOAD_AVATAR'
+    | 'MFA_DISABLED'
+    | 'DELIVERY_RECORDED'
+    | 'SETTINGS_CHANGED'
+    | 'ALERT_RESOLVED'
+    | 'THRESHOLD_UPDATED'
+    | 'IDENTITY_MUTATION_ATTEMPT'
+    | 'DEVICE_COMMAND';
 
-export interface AuditLog {
-    action: AuditAction;
-    userId: string;
-    userName?: string;
+export interface UnifiedEvent {
+    category: EventCategory;
+    type: EventType;
     stationId: string;
-    details: string;
-    timestamp: any;
-    severity: 'info' | 'warning' | 'critical';
-    changes_made?: any;
-    before_values?: any;
-    after_values?: any;
+    description: string;
+    severity?: 'INFO' | 'WARNING' | 'CRITICAL';
+    metadata?: any;
 }
 
 export class AuditService {
+    /**
+     * Records a high-fidelity event to the Unified Event Timeline.
+     */
     static async log(
-        action: AuditAction,
+        category: EventCategory,
+        type: EventType,
         stationId: string,
-        details: string,
-        severity: AuditLog['severity'] = 'info',
-        payload?: { before?: any; after?: any; changes?: any }
+        description: string,
+        severity: 'INFO' | 'WARNING' | 'CRITICAL' = 'INFO',
+        metadata: any = {}
     ) {
         const { data: { session } } = await supabase.auth.getSession();
         const user = session?.user;
@@ -51,21 +60,40 @@ export class AuditService {
         if (!user) return;
 
         try {
-            await supabase.from('audit_logs').insert({
-                action,
-                user_id: user.id,
-                user_name: user.user_metadata?.full_name || user.email,
-                user_email: user.email,
-                station_id: stationId,
-                details,
+            await supabase.from('unified_events').insert({
+                station_id: stationId || null,
+                actor_id: user.id,
+                actor_email: user.email,
+                event_category: category,
+                event_type: type,
+                description,
                 severity,
-                before_values: payload?.before,
-                after_values: payload?.after,
-                changes_made: payload?.changes,
+                metadata: {
+                    ...metadata,
+                    actor_name: user.user_metadata?.full_name || user.email
+                },
                 created_at: new Date().toISOString()
             });
         } catch (error) {
-            console.error('Failed to write audit log:', error);
+            console.error('Failed to write unified event log:', error);
+        }
+    }
+
+    /**
+     * Deletes a specific event (Station Admin only - enforced by RLS)
+     */
+    static async deleteEvent(eventId: string) {
+        try {
+            const { error } = await supabase
+                .from('unified_events')
+                .delete()
+                .eq('id', eventId);
+            
+            if (error) throw error;
+            return true;
+        } catch (err) {
+            console.error('Failed to delete event:', err);
+            return false;
         }
     }
 }

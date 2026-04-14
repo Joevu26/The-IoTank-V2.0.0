@@ -26,6 +26,25 @@ interface TimeSeriesChartProps {
     minThreshold?: number;
 }
 
+const CustomTooltip = ({ active, payload, label, timeDomain, unit }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="chart-tooltip">
+                <p className="tooltip-label">
+                    {timeDomain === 'day'
+                        ? format(new Date(label), 'HH:mm')
+                        : format(new Date(label), 'MMM d, HH:mm')
+                    }
+                </p>
+                <p className="tooltip-value">
+                    {payload[0].value} {unit}
+                </p>
+            </div>
+        );
+    }
+    return null;
+};
+
 export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
     data,
     title,
@@ -42,44 +61,34 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
         return format(date, 'MMM d');
     };
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="chart-tooltip">
-                    <p className="tooltip-label">
-                        {timeDomain === 'day'
-                            ? format(new Date(label), 'HH:mm')
-                            : format(new Date(label), 'MMM d, HH:mm')
-                        }
-                    </p>
-                    <p className="tooltip-value" style={{ color }}>
-                        {payload[0].value} {unit}
-                    </p>
-                </div>
-            );
-        }
-        return null;
-    };
+    // [HARDENING]: Derive theme classes from unit or title to avoid inline styles
+    let themeClass = 'theme-default';
+    const lowerTitle = title.toLowerCase();
+    
+    if (unit === '°C') themeClass = 'theme-temperature';
+    else if (unit === 'L' && !lowerTitle.includes('level')) themeClass = 'theme-volume';
+    else if (lowerTitle.includes('diesel')) themeClass = 'fuel-diesel';
+    else if (lowerTitle.includes('petrol')) themeClass = 'fuel-petrol';
+    else if (lowerTitle.includes('kerosene')) themeClass = 'fuel-kerosene';
 
-    return (
-        <div className="time-series-chart-container card">
+    return <div className={`time-series-chart-container card ${themeClass}`}>
             <div className="chart-header flex flex-col items-center mb-4">
                 <h4 className="chart-title mb-4">{title}</h4>
                 <div className="chart-legend flex gap-4 text-xs">
                     <div className="legend-item flex items-center gap-2">
-                        <span className="legend-dot border-2" style={{ borderColor: color, backgroundColor: 'transparent', borderRadius: '50%', width: '12px', height: '12px' }}></span>
+                        <span className="legend-dot"></span>
                         <span className="text-secondary">Fuel Volume (L)</span>
                     </div>
                     <div className="legend-item flex items-center gap-2">
-                        <span className="legend-dot border-2" style={{ borderColor: 'var(--color-danger)', backgroundColor: 'transparent', borderRadius: '50%', width: '12px', height: '12px' }}></span>
+                        <span className="legend-dot legend-dot-critical"></span>
                         <span className="text-secondary">Critical Level (20%)</span>
                     </div>
                     <div className="legend-item flex items-center gap-2">
-                        <span className="legend-dot border-2" style={{ borderColor: 'var(--color-warning)', backgroundColor: 'transparent', borderRadius: '50%', width: '12px', height: '12px' }}></span>
+                        <span className="legend-dot legend-dot-low"></span>
                         <span className="text-secondary">Low Level (50%)</span>
                     </div>
                     <div className="legend-item flex items-center gap-2">
-                        <span className="legend-dot" style={{ backgroundColor: '#22c55e', borderRadius: '50%', width: '10px', height: '10px' }}></span>
+                        <span className="legend-dot legend-dot-refill"></span>
                         <span className="text-secondary font-bold">Refill Event</span>
                     </div>
                 </div>
@@ -118,7 +127,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                             axisLine={false}
                             unit={unit}
                         />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip timeDomain={timeDomain} color={color} unit={unit} />} />
                         <Area
                             type="stepAfter"
                             dataKey={dataKey}
@@ -154,6 +163,5 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
                     </AreaChart>
                 </ResponsiveContainer>
             </div>
-        </div>
-    );
+        </div>;
 };

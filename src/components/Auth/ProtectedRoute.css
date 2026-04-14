@@ -1,0 +1,96 @@
+/* src/components/Auth/ProtectedRoute.css */
+
+.clearance-overlay {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-primary, #f8fafc);
+    background-image: radial-gradient(circle at center, rgba(168, 85, 247, 0.05) 0%, transparent 70%);
+    position: relative;
+    z-index: 9999;
+}
+
+.clearance-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+}
+
+.clearance-status {
+    text-align: center;
+    margin-top: 8px;
+}
+
+.clearance-title {
+    color: var(--color-text-primary, #1e1b4b);
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.clearance-subtitle {
+    color: var(--color-text-secondary, #6366f1);
+    font-size: 0.875rem;
+}
+
+.clearance-video-wrap {
+    width: 360px;
+    height: 240px;
+    overflow: hidden;
+    position: relative;
+    border-radius: 24px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    border: 8px solid rgba(255,255,255,0.8);
+}
+
+.clearance-video {
+    width: 400px;
+    height: auto;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+.clearance-timeout-card {
+    margin-top: 32px;
+    text-align: center;
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
+    max-width: 320px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.clearance-timeout-msg {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 16px;
+}
+
+.denied-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

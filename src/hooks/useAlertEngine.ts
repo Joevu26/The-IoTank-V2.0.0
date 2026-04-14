@@ -71,10 +71,10 @@ function computeRiskIndex(activeAlerts: Alert[]): RiskIndex {
 }
 
 export function useAlertEngine(
-    orgId: string,
+    stationId: string,
     thresholds: AlertEngineThresholds = DEFAULT_THRESHOLDS
 ) {
-    const { tanks } = useTanks(orgId);
+    const { tanks } = useTanks(stationId);
     const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
     const [riskIndex, setRiskIndex] = useState<RiskIndex>({
         fuel: { score: 0, label: 'LOW' },
@@ -88,7 +88,7 @@ export function useAlertEngine(
 
     // ── Subscribe to active alerts from Supabase ────────────────────────────
     useEffect(() => {
-        if (!orgId) return;
+        if (!stationId) return;
 
         const fetchAlerts = async () => {
             try {
@@ -124,7 +124,7 @@ export function useAlertEngine(
         fetchAlerts();
 
         const channel = supabase
-            .channel(`engine-alerts:${orgId}`)
+            .channel(`engine-alerts:${stationId}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'alerts', filter: `is_resolved=eq.false` },
@@ -135,7 +135,7 @@ export function useAlertEngine(
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [orgId]);
+    }, [stationId]);
 
     const { pushEvent } = useTelemetryQueue();
 
@@ -162,7 +162,7 @@ export function useAlertEngine(
 
             if (uniqueDrafts.length > 0) {
                 const dbAlerts = uniqueDrafts.map(draft => ({
-                    station_id: orgId,
+                    station_id: stationId,
                     tank_id: draft.tankId,
                     alert_type: draft.type,
                     severity: draft.severity,
@@ -221,7 +221,7 @@ export function useAlertEngine(
         } finally {
             setIsScanning(false);
         }
-    }, [tanks, activeAlerts, orgId, thresholds, isScanning, shiftStatus, pushEvent]);
+    }, [tanks, activeAlerts, stationId, thresholds, isScanning, shiftStatus, pushEvent]);
 
     // ── On-load + 60s polling ────────────────────────────────────────────────
     useEffect(() => {
@@ -231,7 +231,7 @@ export function useAlertEngine(
         const interval = setInterval(runScan, SCAN_INTERVAL_MS);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tanks.length, orgId]);
+    }, [tanks.length, stationId]);
 
     // ── Expose reading cache setter so parent can update it ──────────────────
     const updateReading = useCallback((tankId: string, reading: TankReading | null) => {

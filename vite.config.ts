@@ -83,14 +83,13 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react')) return 'vendor-react';
+            if (id.includes('react-dom') || id.includes('react-router-dom') || id.includes('react')) return 'vendor-core';
             if (id.includes('firebase')) return 'vendor-firebase';
             if (id.includes('supabase')) return 'vendor-supabase';
             if (id.includes('recharts') || id.includes('chart.js')) return 'vendor-charts';
             if (id.includes('three') || id.includes('@react-three')) return 'vendor-three';
             if (id.includes('jspdf') || id.includes('xlsx')) return 'vendor-docs';
             if (id.includes('lodash')) return 'vendor-lodash';
-            return 'vendor-others';
           }
         },
       },

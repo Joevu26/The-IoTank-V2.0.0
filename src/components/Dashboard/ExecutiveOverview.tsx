@@ -4,13 +4,15 @@ import {
     FiBarChart2, FiWifi
 } from 'react-icons/fi';
 import { Tank, TankReading } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ExecutiveOverviewProps {
     tanks: Tank[];
     readings: Record<string, TankReading>;
+    stationId: string;
 }
 
-export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, readings }) => {
+export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, readings, stationId }) => {
     // Dynamically Calculate Metrics from Props
     const activeTanks = tanks.filter(t => t.isActive);
 
@@ -46,25 +48,39 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
     const avgSignal = Math.round(activeTanks.length > 0 ? (totalSignal / activeTanks.length) : 0);
     const telemetryValue = activeTanks.length > 0 ? `${avgSignal}%` : 'N/A';
     const telemetryStatus = activeTanks.length === 0 ? 'No Data' : (avgSignal >= 80 ? 'Optimal' : avgSignal >= 50 ? 'Fair' : 'Critical');
-    const telemetryColor = activeTanks.length === 0 ? '#7a7a95' : (avgSignal >= 80 ? '#00d4ff' : avgSignal >= 50 ? '#f59e0b' : '#ef4444');
 
     // 2. Safety Relay Status
     const relayValue = activeTanks.length === 0 ? 'N/A' : (anySafetyTriggered ? 'TRIGGERED' : 'ACTIVE');
     const relayStatus = activeTanks.length === 0 ? 'Unknown' : (anySafetyTriggered ? 'Critical Alert' : 'Secure');
-    const relayColor = activeTanks.length === 0 ? '#7a7a95' : (anySafetyTriggered ? '#ef4444' : '#10b981');
 
     // 3. Sensor Health (% of nodes online)
     const sensorHealthValue = activeTanks.length > 0 ? `${Math.round((activeNodes / activeTanks.length) * 100)}%` : 'N/A';
     const sensorStatus = activeTanks.length === 0 ? 'No Data' : (anyStale ? 'Attention Needed' : 'Excellent');
-    const sensorColor = activeTanks.length === 0 ? '#7a7a95' : (anyStale ? '#f59e0b' : '#00d4ff');
 
+    const isLoading = activeTanks.length === 0 && stationId !== '';
+
+    const getMetricsState = (val: number | string, isLoader: boolean) => {
+        if (isLoader || val === '...') return 'loading';
+        if (typeof val === 'string' && (val.includes('N/A') || val === 'No Data')) return 'unknown';
+        const num = typeof val === 'string' ? parseInt(val) : val;
+        if (num >= 80) return 'optimal';
+        if (num >= 50) return 'fair';
+        return 'critical';
+    };
+
+    const { canSee } = useAuth();
+    
     const metrics = [
-        { label: 'Telemetry Integrity', value: telemetryValue, status: telemetryStatus, icon: <FiCloud />, color: telemetryColor },
-        { label: 'Safety Relay Status', value: relayValue, status: relayStatus, icon: <FiZap />, color: relayColor },
-        { label: 'Delivery Recon', value: 'N/A', status: 'Unavailable', icon: <FiCheckCircle />, color: '#7a7a95' },
-        { label: 'Compliance', value: 'N/A', status: 'Unavailable', icon: <FiActivity />, color: '#7a7a95' },
-        { label: 'Sensor Health', value: sensorHealthValue, status: sensorStatus, icon: <FiCpu />, color: sensorColor },
-        { label: 'Market Risk', value: 'N/A', status: 'Unavailable', icon: <FiBarChart2 />, color: '#7a7a95' },
+        { label: 'Telemetry Integrity', value: isLoading ? '...' : telemetryValue, status: isLoading ? 'Linking...' : telemetryStatus, icon: <FiCloud />, state: getMetricsState(avgSignal, isLoading) },
+        { label: 'Safety Relay Status', value: isLoading ? '...' : relayValue, status: isLoading ? 'Linking...' : relayStatus, icon: <FiZap />, state: anySafetyTriggered ? 'critical' : (isLoading ? 'loading' : 'secure') },
+        ...(canSee(6) ? [
+            { label: 'Delivery Recon', value: 'N/A', status: 'Unavailable', icon: <FiCheckCircle />, state: 'unknown' },
+            { label: 'Compliance', value: 'N/A', status: 'Unavailable', icon: <FiActivity />, state: 'unknown' }
+        ] : []),
+        { label: 'Sensor Health', value: isLoading ? '...' : sensorHealthValue, status: isLoading ? 'Linking...' : sensorStatus, icon: <FiCpu />, state: getMetricsState((activeNodes / activeTanks.length) * 100, isLoading) },
+        ...(canSee(6) ? [
+            { label: 'Market Risk', value: 'N/A', status: 'Unavailable', icon: <FiBarChart2 />, state: 'unknown' }
+        ] : []),
     ];
 
     return (
@@ -79,13 +95,13 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
 
             <div className="metrics-grid-premium">
                 {metrics.map((m, i) => (
-                    <div key={i} className="mini-stat-module">
-                        <div className="mini-icon" style={{ color: m.color }}>{m.icon}</div>
+                    <div key={i} className={`mini-stat-module state-${m.state}`}>
+                        <div className="mini-icon">{m.icon}</div>
                         <div className="mini-content">
                             <span className="mini-label">{m.label}</span>
                             <div className="mini-value-row">
                                 <span className="mini-value">{m.value}</span>
-                                <span className="mini-status" style={{ background: `${m.color}15`, color: m.color }}>
+                                <span className="mini-status">
                                     {m.status}
                                 </span>
                             </div>
@@ -101,24 +117,19 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                 </div>
                 <div className="rssi-nodes-grid">
                     {tanks.length === 0 ? (
-                        <div className="no-nodes-message">No active ESP32 nodes detected</div>
+                        <div className="no-nodes-message">
+                            {stationId ? 'Synchronizing encrypted nodes...' : 'No active ESP32 nodes detected'}
+                        </div>
                     ) : (
                         tanks.map(tank => {
                             if (!tank || !tank.id) return null;
                             const rssi = readings[tank.id]?.signalQuality || 0;
-                            let rssiColor = '#ef4444'; // Critical
                             let rssiStatus = 'Weak';
                             
-                            if (rssi >= -65 && rssi < 0) {
-                                rssiColor = '#10b981'; // Optimal
-                                rssiStatus = 'Strong';
-                            } else if (rssi >= -85 && rssi < 0) {
-                                rssiColor = '#f59e0b'; // Fair
-                                rssiStatus = 'Stable';
-                            }
+                            const rssiState = rssi >= -65 && rssi < 0 ? 'optimal' : (rssi >= -85 && rssi < 0 ? 'fair' : 'critical');
 
                             return (
-                                <div key={tank.id} className="rssi-node-card">
+                                <div key={tank.id} className={`rssi-node-card state-${rssiState}`}>
                                     <div className="node-info">
                                         <span className="node-name">{tank.name || 'Unknown'}</span>
                                         <span className="node-id">ESP: {tank.sensorId || 'N/A'}</span>
@@ -128,15 +139,11 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                                             {[1, 2, 3, 4].map(bar => (
                                                 <div 
                                                     key={bar} 
-                                                    className="bar" 
-                                                    style={{ 
-                                                        height: `${bar * 4}px`,
-                                                        background: rssi >= (bar * 25) ? rssiColor : 'rgba(255,255,255,0.1)'
-                                                    }}
+                                                    className={`bar bar-${bar} ${rssi >= (bar * 25) ? 'filled' : ''}`}
                                                 ></div>
                                             ))}
                                         </div>
-                                        <span className="rssi-value" style={{ color: rssiColor }}>{rssiStatus}</span>
+                                        <span className="rssi-value">{rssiStatus}</span>
                                     </div>
                                 </div>
                             );
@@ -230,6 +237,36 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                     color: var(--color-text-primary);
                     white-space: nowrap;
                 }
+                .mini-stat-module.state-optimal .mini-icon,
+                .mini-stat-module.state-optimal .mini-status,
+                .rssi-node-card.state-optimal .rssi-value { color: #00d4ff; }
+                .mini-stat-module.state-optimal .mini-status { background: rgba(0, 212, 255, 0.15); }
+                .rssi-node-card.state-optimal .bar.filled { background: #00d4ff; }
+
+                .mini-stat-module.state-fair .mini-icon,
+                .mini-stat-module.state-fair .mini-status,
+                .rssi-node-card.state-fair .rssi-value { color: #f59e0b; }
+                .mini-stat-module.state-fair .mini-status { background: rgba(245, 158, 11, 0.15); }
+                .rssi-node-card.state-fair .bar.filled { background: #f59e0b; }
+
+                .mini-stat-module.state-critical .mini-icon,
+                .mini-stat-module.state-critical .mini-status,
+                .rssi-node-card.state-critical .rssi-value { color: #ef4444; }
+                .mini-stat-module.state-critical .mini-status { background: rgba(239, 68, 68, 0.15); }
+                .rssi-node-card.state-critical .bar.filled { background: #ef4444; }
+
+                .mini-stat-module.state-secure .mini-icon,
+                .mini-stat-module.state-secure .mini-status { color: #10b981; }
+                .mini-stat-module.state-secure .mini-status { background: rgba(16, 185, 129, 0.15); }
+
+                .mini-stat-module.state-unknown .mini-icon,
+                .mini-stat-module.state-unknown .mini-status { color: #7a7a95; }
+                .mini-stat-module.state-unknown .mini-status { background: rgba(122, 122, 149, 0.15); }
+
+                .mini-stat-module.state-loading .mini-icon,
+                .mini-stat-module.state-loading .mini-status { color: #94a3b8; }
+                .mini-stat-module.state-loading .mini-status { background: rgba(148, 163, 184, 0.15); }
+
                 .mini-status {
                     font-size: 0.6rem;
                     font-weight: 900;
@@ -306,6 +343,10 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                     width: 3px;
                     border-radius: 1px;
                 }
+                .bar-1 { height: 4px; }
+                .bar-2 { height: 8px; }
+                .bar-3 { height: 12px; }
+                .bar-4 { height: 16px; }
                 .rssi-value {
                     font-size: 0.6rem;
                     font-weight: 900;

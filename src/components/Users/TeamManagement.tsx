@@ -15,7 +15,7 @@ interface TeamMember {
     status?: 'active' | 'pending';
 }
 
-interface PendingRequest {
+interface PendingInvitation {
     id: string;
     full_name: string;
     email: string;
@@ -31,7 +31,7 @@ type Role = typeof ROLES[number];
 export const TeamManagement: React.FC = () => {
     const { currentUser } = useAuth();
     const [members, setMembers] = useState<TeamMember[]>([]);
-    const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+    const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -69,18 +69,18 @@ export const TeamManagement: React.FC = () => {
                 .select('*')
                 .eq('station_id', currentUser.stationId);
 
-            // Pending team member requests sent by this station
+            // Pending team member invitations sent by this station
             const { data: pendingData } = await supabase
                 .from('team_member_requests')
                 .select('*')
                 .eq('station_id', currentUser.stationId)
                 .order('created_at', { ascending: false });
 
-            // Recent audit activity
+            // Recent unified activity
             const threeDaysAgo = new Date();
             threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
             const { data: activitiesData } = await supabase
-                .from('audit_logs')
+                .from('unified_events')
                 .select('*')
                 .eq('station_id', currentUser.stationId)
                 .gte('created_at', threeDaysAgo.toISOString())
@@ -88,8 +88,19 @@ export const TeamManagement: React.FC = () => {
                 .limit(10);
 
             setMembers(membersData || []);
-            setPendingRequests(pendingData || []);
-            setActivities(activitiesData || []);
+            setPendingInvitations(pendingData || []);
+            
+            // Map unified events to the expected activity structure
+            const mappedActivities = (activitiesData || []).map(event => ({
+                id: event.id,
+                user_name: event.metadata?.actor_name || 'System',
+                user_email: event.actor_email,
+                details: event.description,
+                severity: event.severity?.toLowerCase() || 'info',
+                created_at: event.created_at
+            }));
+
+            setActivities(mappedActivities);
         } catch (error) {
             console.error('Error fetching team data:', error);
         } finally {
@@ -103,9 +114,12 @@ export const TeamManagement: React.FC = () => {
             const member = members.find(m => m.id === id);
             await supabase.from('profiles').delete().eq('id', id);
             await AuditService.log(
+                'TEAM',
                 'MEMBER_REMOVED',
                 currentUser?.stationId || '',
-                `Member ${member?.full_name || member?.email} was removed`
+                `Forensic record: Team member ${member?.full_name || member?.email} was removed from the station registry`,
+                'CRITICAL',
+                { memberId: id, memberEmail: member?.email }
             );
             fetchData();
         } catch (error) {
@@ -113,7 +127,7 @@ export const TeamManagement: React.FC = () => {
         }
     };
 
-    const handleSubmitRequest = async (e: React.FormEvent) => {
+    const handleSubmitInvitation = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError('');
 
@@ -128,7 +142,12 @@ export const TeamManagement: React.FC = () => {
 
         setSubmitting(true);
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            
             const { data, error: functionError } = await supabase.functions.invoke('invite-station-staff', {
+                headers: {
+                    Authorization: `Bearer ${session?.access_token}`
+                },
                 body: {
                     email: formData.email.trim().toLowerCase(),
                     full_name: formData.full_name.trim(),
@@ -156,6 +175,16 @@ export const TeamManagement: React.FC = () => {
             setFormData({ full_name: '', email: '', role: 'operator' });
             fetchData();
 
+            // 🟢 Forensic Log
+            await AuditService.log(
+                'TEAM',
+                'INVITE_SENT',
+                currentUser?.stationId || '',
+                `Authority invite issued to ${formData.email} for role: ${formData.role}`,
+                'INFO',
+                { invitedEmail: formData.email, role: formData.role }
+            );
+
             setTimeout(() => {
                 setSubmitSuccess(false);
                 setShowAddModal(false);
@@ -177,9 +206,11 @@ export const TeamManagement: React.FC = () => {
         }
     };
 
-    const getRequestStatusClass = (status: string) => {
+    const getInvitationStatusClass = (status: string) => {
         switch (status?.toLowerCase()) {
+            case 'accepted':
             case 'approved': return 'status-approved';
+            case 'expired':
             case 'rejected': return 'status-rejected';
             default: return 'status-pending';
         }
@@ -230,9 +261,9 @@ export const TeamManagement: React.FC = () => {
                     <span className="tm-stat-value">{members.length}</span>
                 </div>
                 <div className="tm-stat-card">
-                    <span className="tm-stat-label">Pending Requests</span>
+                    <span className="tm-stat-label">Pending Invitations</span>
                     <span className="tm-stat-value tm-pending-count">
-                        {pendingRequests.filter(r => r.status === 'pending').length}
+                        {pendingInvitations.filter(r => r.status === 'pending').length}
                     </span>
                 </div>
                 <div className="tm-stat-card tm-role-card">
@@ -329,7 +360,7 @@ export const TeamManagement: React.FC = () => {
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
                         </svg>
-                        <h3>pending requests</h3>
+                        <h3>pending invitations</h3>
                     </div>
                     <div className="table-wrapper">
                         <table className="tm-table">
@@ -343,13 +374,13 @@ export const TeamManagement: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pendingRequests.length === 0 ? (
+                                {pendingInvitations.length === 0 ? (
                                     <tr>
                                         <td>1</td>
-                                        <td colSpan={4} className="tm-empty-cell">No pending team requests found.</td>
+                                        <td colSpan={4} className="tm-empty-cell">No pending invitations found.</td>
                                     </tr>
                                 ) : (
-                                    pendingRequests.map((req, idx) => (
+                                    pendingInvitations.map((req, idx) => (
                                         <tr key={req.id}>
                                             <td className="tm-sno">{idx + 1}</td>
                                             <td>
@@ -367,7 +398,7 @@ export const TeamManagement: React.FC = () => {
                                                 </span>
                                             </td>
                                             <td>
-                                                <span className={`tm-status-badge ${getRequestStatusClass(req.status)}`}>
+                                                <span className={`tm-status-badge ${getInvitationStatusClass(req.status)}`}>
                                                     {req.status}
                                                 </span>
                                             </td>
@@ -472,7 +503,7 @@ export const TeamManagement: React.FC = () => {
                                 <p>An invitation link has been sent to the user's email address.</p>
                             </div>
                         ) : (
-                            <form className="tm-modal-form" onSubmit={handleSubmitRequest}>
+                            <form className="tm-modal-form" onSubmit={handleSubmitInvitation}>
                                 <div className="tm-station-info">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <circle cx="12" cy="12" r="10" />

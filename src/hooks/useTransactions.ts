@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { FuelTransaction } from '@/types';
 
-export function useTransactions(orgId: string, tankId?: string) {
+export function useTransactions(stationId: string, tankId?: string) {
     const [transactions, setTransactions] = useState<FuelTransaction[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -11,11 +11,11 @@ export function useTransactions(orgId: string, tankId?: string) {
             const { error } = await supabase
                 .from('fuel_transactions')
                 .insert({
-                    station_id: orgId,
+                    station_id: stationId,
                     tank_id: data.tankId,
                     transaction_type: data.type,
                     amount: data.amount,
-                    performed_by_uid: data.performedBy,
+                    performed_by_auth_id: data.performedBy,
                     metadata: data.metadata || {}
                 });
 
@@ -27,7 +27,7 @@ export function useTransactions(orgId: string, tankId?: string) {
     };
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!stationId) return;
 
         const fetchTransactions = async () => {
             try {
@@ -35,8 +35,8 @@ export function useTransactions(orgId: string, tankId?: string) {
                     .from('fuel_transactions')
                     .select('*');
                 
-                if (orgId !== 'SYSTEM_GOVERNANCE') {
-                    query = query.eq('station_id', orgId);
+                if (stationId !== 'SYSTEM_GOVERNANCE') {
+                    query = query.eq('station_id', stationId);
                 }
                 
                 query = query
@@ -56,7 +56,7 @@ export function useTransactions(orgId: string, tankId?: string) {
                     tankId: t.tank_id,
                     amount: Number(t.amount),
                     timestamp: new Date(t.timestamp).getTime(),
-                    performedBy: t.performed_by_uid,
+                    performedBy: t.performed_by_auth_id,
                     metadata: t.metadata
                 } as FuelTransaction)));
             } catch (err) {
@@ -68,9 +68,9 @@ export function useTransactions(orgId: string, tankId?: string) {
 
         fetchTransactions();
 
-        const channelFilter = orgId !== 'SYSTEM_GOVERNANCE' ? `station_id=eq.${orgId}` : undefined;
+        const channelFilter = stationId !== 'SYSTEM_GOVERNANCE' ? `station_id=eq.${stationId}` : undefined;
         const channel = supabase
-            .channel(`fuel_transactions:${orgId}`)
+            .channel(`fuel_transactions:${stationId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_transactions', filter: channelFilter }, () => {
                 fetchTransactions();
             })
@@ -79,7 +79,7 @@ export function useTransactions(orgId: string, tankId?: string) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [orgId, tankId]);
+    }, [stationId, tankId]);
 
     return { transactions, logTransaction, loading };
 }

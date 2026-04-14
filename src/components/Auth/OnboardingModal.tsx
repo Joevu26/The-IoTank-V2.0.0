@@ -39,9 +39,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
         setLoading(true);
         setSaveStatus('Initializing');
         try {
-            const orgId = user.stationId;
-            const userId = user.authUserId;
-            const tankId = `tank-${userId}-${Date.now()}`;
+            const stationId = user.stationId;
+            const authUserId = user.authUserId;
+            const tankId = `tank-${authUserId}-${Date.now()}`;
             const siteId = 'site-default';
 
 
@@ -52,10 +52,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
                 .update({
                     role: 'admin',
                     display_name: user.displayName || 'Admin',
-                    station_id: orgId,
+                    station_id: stationId,
                     site_ids: [siteId]
                 })
-                .eq('auth_user_id', userId);
+                .eq('auth_user_id', authUserId);
             if (profileError) throw profileError;
 
             // 2. Create/Update Organization (Client Billing)
@@ -63,8 +63,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
             const { error: orgError } = await supabase
                 .from('fuel_stations')
                 .upsert({
-                    id: orgId,
-                    auth_user_id: userId,
+                    id: stationId,
+                    auth_user_id: authUserId,
                     email: user.email,
                     station_name: companyInfo.name,
                     station_location: companyInfo.city,
@@ -78,7 +78,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
                 .from('sites')
                 .upsert({
                     id: siteId,
-                    station_id: orgId,
+                    station_id: stationId,
                     site_name: 'Main Facility',
                     location: `${companyInfo.street}, ${companyInfo.city}`,
                     tank_count: 1
@@ -91,9 +91,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
                 .from('tanks')
                 .upsert({
                     id: tankId,
-                    station_id: orgId,
+                    station_id: stationId,
                     site_id: siteId,
-                    auth_user_id: userId,
+                    auth_user_id: authUserId,
                     tank_name: tankInfo.name,
                     fuel_type: tankInfo.fuelType === 'gasoline' ? 'petrol' : tankInfo.fuelType,
                     tank_capacity: tankInfo.capacity,
@@ -220,6 +220,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
                                     <label className="form-label">Fuel Type</label>
                                     <select
                                         className="form-input"
+                                        title="Select Fuel Type"
                                         value={tankInfo.fuelType}
                                         onChange={e => setTankInfo({ ...tankInfo, fuelType: e.target.value as Tank['fuelType'] })}
                                     >

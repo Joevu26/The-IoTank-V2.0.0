@@ -153,8 +153,7 @@ const NewsCard: React.FC<{
                                     article.validationStatus === 'flagged' ? 'flagged' :
                                     (article.relevanceScore ?? 0) > 0.85 ? 'high' : 
                                     (article.relevanceScore ?? 0) > 0.6 ? 'med' : 'normal'
-                                }`}
-                                style={{ width: `${Math.round((article.relevanceScore ?? 0) * 100)}%` }}
+                                } w-${Math.round(((article.relevanceScore ?? 0) * 100) / 5) * 5}p`}
                             />
                         </div>
                     </div>
@@ -188,6 +187,7 @@ const NewsCard: React.FC<{
                         <button
                             className="mi-action-btn-outline"
                             onClick={() => setExpanded(e => !e)}
+                            title={expanded ? 'Minimize intelligence briefing' : 'Analyze article intelligence signals'}
                         >
                             <FiActivity size={12} />
                             {expanded ? 'Close' : 'Analyze'}
@@ -195,6 +195,7 @@ const NewsCard: React.FC<{
                         <button
                             className={`mi-action-btn-outline ${isBookmarked ? 'mi-action-btn-outline--active' : ''}`}
                             onClick={() => onBookmark(article)}
+                            title={isBookmarked ? 'Signal already bookmarked' : 'Save signal to forensic archive'}
                         >
                             <FiBookmark size={12} />
                             {isBookmarked ? 'Saved' : 'Bookmark'}
@@ -204,6 +205,7 @@ const NewsCard: React.FC<{
                             <button
                                 className="mi-action-btn-outline mi-action-btn-outline--ignore"
                                 onClick={() => onIgnore(article.id)}
+                                title="Dismiss as non-critical noise"
                             >
                                 <FiTrash2 size={12} />
                                 Mark as Noise
@@ -215,6 +217,7 @@ const NewsCard: React.FC<{
                             <button
                                 className="mi-action-btn-outline mi-action-btn-outline--delete"
                                 onClick={() => onDelete(article.id)}
+                                title="Permanently purge this item from archive"
                             >
                                 <FiTrash2 size={12} />
                                 Purge
@@ -226,6 +229,7 @@ const NewsCard: React.FC<{
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mi-external-link ml-2"
+                                title="Open Full Article Source"
                             >
                                 <FiExternalLink size={16} />
                             </a>
@@ -233,7 +237,7 @@ const NewsCard: React.FC<{
                     </div>
 
                     {/* Impact Chip - Moved to Action Row Footer */}
-                    <div className={`mi-pill mi-pill--category ${meta.color} bg-opacity-10 border border-current px-3 py-1`}>
+                    <div className="mi-pill mi-pill--category">
                         {article.implicationCategory} IMPACT
                     </div>
                 </div>
@@ -254,8 +258,8 @@ const StatusBanner: React.FC<{
         <div className="mi-banner mi-banner--error">
             <FiWifiOff size={14} />
             <span><strong>No signal.</strong> All news sources are unreachable. Showing fallback data.</span>
-            {onRetry && <button className="mi-banner-btn" onClick={onRetry}>Retry</button>}
-            <button className="mi-banner-dismiss" onClick={onDismiss}><FiX size={12} /></button>
+            {onRetry && <button className="mi-banner-btn" onClick={onRetry} title="Attempt to reconnect to market news sources">Retry</button>}
+            <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss this connectivity warning"><FiX size={12} /></button>
         </div>
     );
     if (type === 'cached-stale') {
@@ -264,8 +268,8 @@ const StatusBanner: React.FC<{
             <div className="mi-banner mi-banner--warn">
                 <FiClock size={14} />
                 <span><strong>Cached results shown</strong> ({mins} min old). Sources may be temporarily unavailable.</span>
-                {onRetry && <button className="mi-banner-btn" onClick={onRetry}>Refresh</button>}
-                <button className="mi-banner-dismiss" onClick={onDismiss}><FiX size={12} /></button>
+                {onRetry && <button className="mi-banner-btn" onClick={onRetry} title="Force refresh from source news feeds">Refresh</button>}
+                <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss stale cache warning"><FiX size={12} /></button>
             </div>
         );
     }
@@ -273,7 +277,7 @@ const StatusBanner: React.FC<{
         <div className="mi-banner mi-banner--warn">
             <FiAlertCircle size={14} />
             <span><strong>One or more sources unavailable.</strong> Displaying partial results.</span>
-            <button className="mi-banner-dismiss" onClick={onDismiss}><FiX size={12} /></button>
+            <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss partial source warning"><FiX size={12} /></button>
         </div>
     );
 };
@@ -283,12 +287,12 @@ const StatusBanner: React.FC<{
 export const MarketPage: React.FC = () => {
     const { currentUser } = useAuth();
     const location = useLocation();
-    const orgId = currentUser?.stationId || 'default-org-id';
+    const stationId = currentUser?.stationId || 'default-org-id';
 
     // Existing hooks (keep metrics & insights)
-    const { signals, risks, prices } = useMarketIntelligence(orgId);
-    const { tanks } = useTanks(orgId);
-    const { insights } = useGeminiInsights(orgId);
+    const { signals, risks, prices } = useMarketIntelligence(stationId);
+    const { tanks } = useTanks(stationId);
+    const { insights } = useGeminiInsights(stationId);
 
     const {
         status: newsStatus,
@@ -377,7 +381,7 @@ export const MarketPage: React.FC = () => {
             const { error } = await supabase
                 .from('market_bookmarks')
                 .insert({
-                    station_id: orgId,
+                    station_id: stationId,
                     title: article.title,
                     url: article.externalUrl || null,
                     source: article.feedSource,
@@ -387,7 +391,7 @@ export const MarketPage: React.FC = () => {
         } catch (err) {
             console.warn('[Market] Bookmark save failed:', err);
         }
-    }, [bookmarked, orgId]);
+    }, [bookmarked, stationId]);
 
     // Ignore handler
     const handleIgnoreNews = useCallback((id: string) => {
@@ -500,13 +504,14 @@ export const MarketPage: React.FC = () => {
                         <div className="flex flex-wrap gap-3 items-center">
                             <button
                                 className={`mi-refresh-btn-premium ${!canRefresh || isRefreshing ? 'mi-refresh-btn-premium--disabled' : ''}`}
+                                title="Scanner for the latest market intelligence signals"
                                 onClick={refresh}
                                 disabled={!canRefresh || isRefreshing}
                             >
                                 <FiRefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
                                 {isRefreshing ? 'Scanning...' : 'Refresh intel'}
                             </button>
-                            <button className="mi-export-btn-premium">
+                            <button className="mi-export-btn-premium" title="Export Market Intelligence Report PDF">
                                 <FiTrendingUp size={14} /> Export
                             </button>
                         </div>
@@ -516,7 +521,7 @@ export const MarketPage: React.FC = () => {
                     <div className="mission-status-grid">
                         {[
                             { label: 'Brent Crude', val: '$74.50', unit: '/bbl', delta: '+1.2%', up: true, sub: 'Global benchmark' },
-                            { label: 'KES/USD Rate', val: '128.40', unit: '', delta: '-0.3%', up: false, sub: 'CBK mid-rate' },
+                            { label: 'GBP/Ksh Rate', val: '162.40', unit: '', delta: '+0.1%', up: true, sub: 'CBK mid-rate' },
                             { label: 'EPRA Pump Price', val: 'KES 184.50', unit: '/L', delta: '+4.2%', up: true, sub: 'AGO · Current cycle' },
                             { label: 'OTS Cycle', val: '14 days', unit: '', delta: 'Jan 15–Feb 14', up: true, sub: 'Next review countdown' },
                         ].map((kpi, idx) => (
@@ -545,6 +550,7 @@ export const MarketPage: React.FC = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
                             className={`mi-tab-btn ${activeTab === tab.id ? 'mi-tab-btn--active' : ''}`}
+                            title={`Switch to ${tab.label} intelligence view`}
                         >
                             <span className="mi-tab-icon">{tab.icon}</span>
                             <span className="mi-tab-label">{tab.label}</span>
@@ -590,6 +596,7 @@ export const MarketPage: React.FC = () => {
                                         key={p}
                                         className={`mi-pill-btn ${priorityFilter === p ? 'mi-pill-btn--active' : ''}`}
                                         onClick={() => setPriorityFilter(p)}
+                                        title={`Filter signals by ${p} priority`}
                                     >
                                         {p === 'all' ? 'All Priority' : p === 'high' ? 'High' : 'Medium'}
                                     </button>
@@ -687,8 +694,7 @@ export const MarketPage: React.FC = () => {
                                     {[45, 52, 48, 65, 78, 82, 75, 88, 92, 85, 78, 84].map((v, i) => (
                                         <div key={i} className="an-bar-col h-full flex items-end flex-1">
                                             <div 
-                                                className={`an-bar w-full rounded-t-lg transition-all ${v > 70 ? 'an-bar--bull' : v > 55 ? 'an-bar--mid' : 'an-bar--bear'}`} 
-                                                style={{ height: `${v}%` }} 
+                                                className={`an-bar w-full rounded-t-lg transition-all ${v > 70 ? 'an-bar--bull' : v > 55 ? 'an-bar--mid' : 'an-bar--bear'} h-${Math.round(v / 5) * 5}p`} 
                                             />
                                         </div>
                                     ))}

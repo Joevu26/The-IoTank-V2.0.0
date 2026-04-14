@@ -196,6 +196,7 @@
 
 .el-filter-bar {
     background: rgba(255, 255, 255, 0.7);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 20px;
@@ -609,6 +610,17 @@
     border-left-color: #F87171;
 }
 
+.el-severity-badge-icon {
+    font-size: 0.6rem;
+    line-height: 1;
+}
+
+.pagination-ellipsis {
+    padding: 0 0.25rem;
+    color: var(--color-text-secondary);
+    font-weight: 700;
+}
+
 /* ── Changes Snapshot ────────────────────────────────────────── */
 .el-changes-snapshot {
     margin-bottom: 1.5rem;
@@ -705,3 +717,69 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Information Footer ─────────────────────────────────────── */
+.el-info-footer {
+    margin-top: 2rem;
+    background: var(--color-bg-card);
+    padding: 2rem;
+    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+}
+
+.el-info-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--color-text-primary);
+}
+
+.el-info-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.el-info-description {
+    margin-bottom: 1.5rem;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.el-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+}
+
+.el-info-item {
+    background: var(--color-bg-body);
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.el-info-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.el-info-item h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--color-text-primary);
+}
+
+.el-info-item p {
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+    line-height: 1.5;
+}

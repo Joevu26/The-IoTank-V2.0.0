@@ -1,8 +1,7 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { MarketSignal, SupplyRisk, RegulatoryNotice, MarketData } from '@/types';
+import { NewsService } from '@/services/NewsService';
 
 export const useMarketIntelligence = (stationId: string) => {
     // Cache key for news feed
@@ -37,14 +36,39 @@ export const useMarketIntelligence = (stationId: string) => {
         return new Promise<void>(resolve => setTimeout(resolve, 500));
     };
 
+    // ── Real-time Listener ──
+    useEffect(() => {
+        const handleNewSignal = (e: any) => {
+            const newSignal = e.detail;
+            setSignals(prev => {
+                const alreadyExists = prev.some(s => s.id === newSignal.id);
+                if (alreadyExists) return prev;
+                const updated = [newSignal, ...prev].slice(0, 50); // Keep last 50
+                try {
+                    localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(updated));
+                } catch (err) { console.warn('Cache update failed', err); }
+                return updated;
+            });
+        };
+
+        window.addEventListener('market-news-update', handleNewSignal);
+        NewsService.startListening();
+
+        return () => {
+            window.removeEventListener('market-news-update', handleNewSignal);
+        };
+    }, []);
+
     useEffect(() => {
         let isMounted = true;
         if (signals.length === 0) setLoading(true);
 
-        // Supabase fetch for signals, risks, notices, and prices
         const fetchData = async () => {
             try {
-                // Fetch Prices
+                // 1. Fetch Historical News (Market News)
+                const historicalNews = await NewsService.fetchRecentNews(20);
+
+                // 2. Fetch Prices
                 const { data: priceData, error: priceError } = await supabase
                     .from('market_prices')
                     .select('*')
@@ -61,7 +85,7 @@ export const useMarketIntelligence = (stationId: string) => {
                     source: p.source as any
                 } as MarketData));
 
-                // Fetch Signals
+                // 3. Fetch Signals (AI / External)
                 const { data: signalData, error: signalError } = await supabase
                     .from('market_signals')
                     .select('*')
@@ -83,7 +107,12 @@ export const useMarketIntelligence = (stationId: string) => {
                     attribution: s.attribution
                 } as MarketSignal));
 
-                // Fetch Risks
+                // Merge Both Sources, Sort by Timestamp
+                const mergedSignals = [...historicalNews, ...mappedSignalsValue]
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .slice(0, 30);
+
+                // 4. Fetch Risks
                 const { data: riskData, error: riskError } = await supabase
                     .from('supply_risks')
                     .select('*')
@@ -101,7 +130,7 @@ export const useMarketIntelligence = (stationId: string) => {
                     source: r.source
                 } as SupplyRisk));
 
-                // Fetch Notices
+                // 5. Fetch Notices
                 const { data: noticeData, error: noticeError } = await supabase
                     .from('regulatory_notices')
                     .select('*')
@@ -121,9 +150,9 @@ export const useMarketIntelligence = (stationId: string) => {
 
                 if (isMounted) {
                     setPrices(mappedPricesValue);
-                    setSignals(mappedSignalsValue);
+                    setSignals(mergedSignals);
                     try {
-                        localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mappedSignalsValue));
+                        localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mergedSignals));
                     } catch (e) {
                         console.warn('Failed to cache signals', e);
                     }
@@ -132,18 +161,15 @@ export const useMarketIntelligence = (stationId: string) => {
                     setLoading(false);
                 }
             } catch (err: unknown) {
-                console.warn('Supabase Fetch Error:', err);
+                console.warn('MarketIntelligence: Fetch Error:', err);
                 if (isMounted) setLoading(false);
             }
         };
 
         fetchData();
 
-        
-        // Safety timeout to prevent infinite white screen
         const timer = setTimeout(() => {
             if (isMounted && loading) {
-                console.warn('MarketIntelligence: Loading timed out, forcing resolution');
                 setLoading(false);
             }
         }, 5000);

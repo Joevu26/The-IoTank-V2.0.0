@@ -9,6 +9,8 @@ import { PredictivePanel } from './PredictivePanel';
 import { PageHeader } from '../Common/PageHeader';
 import { WetstockReconciliation } from './WetstockReconciliation';
 import { ShrinkageHeatmap } from './ShrinkageHeatmap';
+import { ShiftAnalyticsTable } from './ShiftAnalyticsTable';
+
 import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useTankAnalytics30d } from '@/hooks/useSupabase';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -26,13 +28,12 @@ export const AnalyticsPage: React.FC = () => {
 
     // ─── High Performance Analytics Fetching ──────────────────────
     const { analytics: analyticsData } = useTankAnalytics30d(stationId);
-
     const { tanks } = useTanks(stationId);
     const { transactions } = useTransactions(stationId);
 
     // Aggregate stats from the materialized view data
     const stats = (analyticsData || []).reduce((acc: any, tank: any) => {
-        acc.totalVolume += tank.avg_volume; // Example aggregation
+        acc.totalVolume += tank.avg_volume; 
         acc.readingCount += tank.reading_count;
         return acc;
     }, { totalVolume: 0, readingCount: 0, totalSale: 0, totalPurchase: 0, totalProfit: 0, litersSold: 0 });
@@ -77,13 +78,13 @@ export const AnalyticsPage: React.FC = () => {
                 title="Intelligence Hub"
                 description="Advanced telemetry analysis and predictive fuel modeling"
                 action={
-                    <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-2 text-[10px] text-secondary font-medium">
+                    <div className="acp-header-action-wrap">
+                        <div className="acp-header-meta-info">
                             <span>Data Window: Last 90 Days</span>
-                            <span className="w-1 h-1 rounded-full bg-border"></span>
+                            <span className="acp-header-meta-dot"></span>
                             <span>Updated: {lastUpdated}</span>
                         </div>
-                        <button className="btn btn-premium flex items-center gap-2" style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase' }}>
+                        <button className="btn-premium-action">
                             <FiDownload size={14} /> Generate Report
                         </button>
                     </div>
@@ -96,8 +97,8 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-kpi-icon green"><FiDollarSign /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Net Revenue</span>
-                        <span className="acp-kpi-value">${stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        <span className="acp-kpi-sub" style={{ color: '#10b981' }}>↑ +3.4% vs prev</span>
+                        <span className="acp-kpi-value">Ksh {stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        <span className="acp-kpi-sub acp-icon-trend-up">↑ +3.4% vs prev</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
@@ -113,14 +114,14 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Margin</span>
                         <span className="acp-kpi-value">{marginPercent.toFixed(1)}%</span>
-                        <span className="acp-kpi-sub" style={{ color: '#10b981' }}>↑ +0.8% optimal</span>
+                        <span className="acp-kpi-sub acp-icon-trend-up">↑ +0.8% optimal</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
                     <div className="acp-kpi-icon amber"><FiDollarSign /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Rev / Litre</span>
-                        <span className="acp-kpi-value">${revenuePerLitre.toFixed(2)}</span>
+                        <span className="acp-kpi-value">Ksh {revenuePerLitre.toFixed(2)}</span>
                         <span className="acp-kpi-sub">per litre avg.</span>
                     </div>
                 </div>
@@ -129,7 +130,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Inv. Turnover</span>
                         <span className="acp-kpi-value">4.2x</span>
-                        <span className="acp-kpi-sub" style={{ color: '#a855f7' }}>Target: 4.5x</span>
+                        <span className="acp-kpi-sub acp-metric-trend-accent">Target: 4.5x</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
@@ -137,7 +138,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Variance</span>
                         <span className="acp-kpi-value">0.42%</span>
-                        <span className="acp-kpi-sub" style={{ color: '#10b981' }}>Improving</span>
+                        <span className="acp-kpi-sub acp-icon-trend-up">Improving</span>
                     </div>
                 </div>
             </div>
@@ -152,7 +153,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-card">
                         <div className="acp-card-header">
                             <div className="acp-card-title">
-                                <div className="acp-section-icon" style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed' }}><FiActivity /></div>
+                                <div className="acp-section-icon acp-icon-accent-purple"><FiActivity /></div>
                                 <h3>Operational Performance</h3>
                             </div>
                         </div>
@@ -161,22 +162,22 @@ export const AnalyticsPage: React.FC = () => {
                         <WetstockReconciliation
                             tanks={tanks}
                             transactions={transactions}
-                            currency="USD"
+                            currency="Ksh"
                         />
 
                         <div className="acp-two-col">
                             {/* Revenue Intelligence */}
                             <div>
                                 <div className="acp-col-label">
-                                    <span className="acp-col-dot" style={{ background: '#10b981' }}></span>
+                                    <span className="acp-col-dot acp-dot-revenue"></span>
                                     Revenue Intelligence
                                 </div>
                                 <div className="acp-metric-list">
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Net Revenue</span>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div className="acp-metric-val">${stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                                            <span className="acp-metric-badge" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }}><FiTrendingUp size={8} /> +3.4%</span>
+                                        <div className="text-right">
+                                            <div className="acp-metric-val">Ksh {stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                                            <span className="acp-metric-badge acp-metric-trend-positive"><FiTrendingUp size={8} /> +3.4%</span>
                                         </div>
                                     </div>
                                     <div className="acp-metric-row">
@@ -185,9 +186,9 @@ export const AnalyticsPage: React.FC = () => {
                                     </div>
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Sales Growth</span>
-                                        <div style={{ textAlign: 'right' }}>
+                                        <div className="text-right">
                                             <div className="acp-metric-val">+12.4%</div>
-                                            <div style={{ height: '18px', width: '48px', display: 'inline-block', opacity: 0.4 }}>
+                                            <div className="acp-sparkline-mini">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <AreaChart data={displayData.slice(-5)}>
                                                         <Area type="monotone" dataKey="sales" stroke="#a855f7" fill="#a855f7" fillOpacity={0.3} />
@@ -202,7 +203,7 @@ export const AnalyticsPage: React.FC = () => {
                             {/* Inventory Intelligence */}
                             <div>
                                 <div className="acp-col-label">
-                                    <span className="acp-col-dot" style={{ background: '#3b82f6' }}></span>
+                                    <span className="acp-col-dot acp-dot-inventory"></span>
                                     Inventory Intelligence
                                 </div>
                                 <div className="acp-metric-list">
@@ -212,16 +213,16 @@ export const AnalyticsPage: React.FC = () => {
                                     </div>
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Inv. Turnover</span>
-                                        <div style={{ textAlign: 'right' }}>
+                                        <div className="text-right">
                                             <div className="acp-metric-val">4.2x</div>
-                                            <span className="acp-metric-badge" style={{ color: '#7c3aed', background: 'rgba(124, 58, 237, 0.1)' }}>Target: 4.5x</span>
+                                            <span className="acp-metric-badge acp-metric-trend-accent">Target: 4.5x</span>
                                         </div>
                                     </div>
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Margin %</span>
-                                        <div style={{ textAlign: 'right' }}>
+                                        <div className="text-right">
                                             <div className="acp-metric-val">{marginPercent.toFixed(1)}%</div>
-                                            <span className="acp-metric-badge" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.1)' }}><FiTrendingUp size={8} /> +0.8%</span>
+                                            <span className="acp-metric-badge acp-metric-trend-positive"><FiTrendingUp size={8} /> +0.8%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -233,7 +234,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-card">
                         <div className="acp-card-header">
                             <div className="acp-card-title">
-                                <div className="acp-section-icon" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}><FiTarget /></div>
+                                <div className="acp-section-icon acp-icon-accent-amber"><FiTarget /></div>
                                 <h3>Demand Forecast</h3>
                             </div>
                             <div className="acp-toggle">
@@ -245,7 +246,7 @@ export const AnalyticsPage: React.FC = () => {
                         <div className="acp-forecast-tiles">
                             <div className="acp-tile">
                                 <div className="acp-tile-label">7-Day Forecast</div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                <div className="flex justify-between items-end">
                                     <span className="acp-tile-val">12,450 L</span>
                                     <div className="acp-tile-spark">
                                         <ResponsiveContainer width="100%" height="100%">
@@ -264,7 +265,7 @@ export const AnalyticsPage: React.FC = () => {
                                 <div className="acp-tile-label">Confidence Band</div>
                                 <span className="acp-tile-val success">±2.4%</span>
                             </div>
-                            <div className="acp-tile" style={{ borderLeft: '3px solid #f59e0b' }}>
+                            <div className="acp-tile border-l-[3px] border-[#f59e0b]">
                                 <div className="acp-tile-label">Days of Cover</div>
                                 <span className="acp-tile-val amber">14.2 Days</span>
                             </div>
@@ -299,7 +300,7 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-card">
                         <div className="acp-card-header">
                             <div className="acp-card-title">
-                                <div className="acp-section-icon" style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed' }}><FiShield /></div>
+                                <div className="acp-section-icon acp-icon-accent-purple"><FiShield /></div>
                                 <h3>Risk &amp; Variance Analysis</h3>
                             </div>
                         </div>
@@ -311,14 +312,17 @@ export const AnalyticsPage: React.FC = () => {
                                     <div className="acp-variance-hero-label">Primary Analytics Metric</div>
                                     <h4 className="acp-variance-hero-title">Inventory Variance %</h4>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
+                                <div className="text-right">
                                     <div className="acp-variance-number">0.42%</div>
                                     <span className="acp-variance-status">Improving</span>
                                 </div>
                             </div>
-                            <div className="acp-progress-bar">
-                                <div className="acp-progress-fill" style={{ width: '42%', background: '#7c3aed' }}></div>
-                            </div>
+                             <div className="acp-progress-bar">
+                                 <div 
+                                    className="acp-progress-fill acp-progress-purple" 
+                                    ref={(el) => { if (el) el.style.width = '42%'; }}
+                                 ></div>
+                             </div>
                             <div className="acp-variance-note">Critical Threshold: 0.5% &nbsp;|&nbsp; Drift detected in Site A flow sensors</div>
                         </div>
 
@@ -326,8 +330,8 @@ export const AnalyticsPage: React.FC = () => {
                             <div className="acp-metric-list">
                                 <div className="acp-metric-row">
                                     <span className="acp-metric-name">Shrinkage Trend</span>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div className="acp-metric-val" style={{ color: '#10b981' }}>-12%</div>
+                                    <div className="text-right">
+                                        <div className="acp-metric-val acp-icon-trend-up">-12%</div>
                                         <span className="acp-metric-badge badge-green">Improving</span>
                                     </div>
                                 </div>
@@ -337,16 +341,16 @@ export const AnalyticsPage: React.FC = () => {
                                 </div>
                                 <div className="acp-metric-row">
                                     <span className="acp-metric-name">Telemetry stab.</span>
-                                    <span className="acp-metric-val" style={{ color: '#10b981' }}>98.4%</span>
+                                    <span className="acp-metric-val acp-icon-trend-up">98.4%</span>
                                 </div>
                             </div>
                             <div>
                                 <div className="acp-col-label">Abnormal Drawdowns</div>
                                 <div className="acp-drawdown-list">
                                     <div className="acp-drawdown-item">
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <FiAlertTriangle style={{ color: '#ef4444', flexShrink: 0 }} />
-                                            <span className="acp-metric-name" style={{ textTransform: 'none', fontWeight: 600 }}>Spike Detected (Site A)</span>
+                                        <div className="flex items-center gap-2">
+                                            <FiAlertTriangle className="acp-risk-icon-alert" />
+                                            <span className="acp-metric-name !font-semibold !normal-case">Spike Detected (Site A)</span>
                                         </div>
                                         <span className="acp-drawdown-time">Jan 07, 02:15</span>
                                     </div>
@@ -361,13 +365,13 @@ export const AnalyticsPage: React.FC = () => {
 
                     {/* Decision Zone: Scenario Modeling */}
                     <div className="acp-card-dark">
-                        <div style={{ position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', top: '-10px', right: '-10px', opacity: 0.04 }}>
+                        <div className="relative overflow-hidden">
+                            <div className="acp-card-background-icon">
                                 <FiPieChart size={100} color="#fff" />
                             </div>
-                            <div style={{ position: 'relative', zIndex: 1 }}>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white' }}>
-                                    <FiActivity style={{ color: '#a855f7' }} /> Scenario Modeling
+                            <div className="relative z-[1]">
+                                <h3 className="acp-card-dark-header">
+                                    <FiActivity className="text-[#a855f7]" /> Scenario Modeling
                                 </h3>
                                 <div className="acp-card-meta">Data window: 30 days baseline</div>
 
@@ -397,12 +401,12 @@ export const AnalyticsPage: React.FC = () => {
 
                     {/* Decision Zone: Strategic Recommendations */}
                     <div className="acp-card-dark">
-                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                            <FiTrendingUp style={{ color: '#10b981' }} /> Strategic Recommendations
-                        </h3>
+                        <div className="acp-rec-meta-wrap">
+                            <FiTrendingUp className="acp-icon-trend-up" /> Strategic Recommendations
+                        </div>
                         <div className="acp-rec-list">
                             <div className="acp-rec-item critical">
-                                <div style={{ flex: 1 }}>
+                                <div className="flex-1">
                                     <div className="acp-rec-top">
                                         <span className="acp-rec-priority">🔴 Critical</span>
                                         <div className="acp-rec-scores">
@@ -415,7 +419,7 @@ export const AnalyticsPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="acp-rec-item watch">
-                                <div style={{ flex: 1 }}>
+                                <div className="flex-1">
                                     <div className="acp-rec-top">
                                         <span className="acp-rec-priority">🟡 Watch</span>
                                         <div className="acp-rec-scores">
@@ -428,7 +432,7 @@ export const AnalyticsPage: React.FC = () => {
                                 </div>
                             </div>
                             <div className="acp-rec-item optimize">
-                                <div style={{ flex: 1 }}>
+                                <div className="flex-1">
                                     <div className="acp-rec-top">
                                         <span className="acp-rec-priority">🟢 Optimize</span>
                                         <div className="acp-rec-scores">
@@ -447,10 +451,11 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-card">
                         <div className="acp-card-header">
                             <div className="acp-card-title">
-                                <div className="acp-section-icon" style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed' }}><FiShield /></div>
+                                <div className="acp-section-icon acp-icon-accent-purple"><FiShield /></div>
                                 <h3>Model Transparency</h3>
                             </div>
                         </div>
+
                         <div className="acp-model-rows">
                             <div className="acp-model-row">
                                 <span className="acp-model-key">Model Version</span>
@@ -476,8 +481,15 @@ export const AnalyticsPage: React.FC = () => {
 
                 </aside>
             </div>
+
+            {/* Shift Archive: Absolute Bottom Strategy */}
+            <div className="mt-8 mb-12">
+                <ShiftAnalyticsTable />
+            </div>
+
         </div>
     );
 };
 
 export default AnalyticsPage;
+

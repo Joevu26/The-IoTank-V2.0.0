@@ -11,12 +11,12 @@ import {
 import './BillingPage.css';
 
 interface BillingInfo {
+    station_id: string; // Unified identifier
     current_debt: number;
     total_paid: number;
     account_status: string;
     next_billing_date: string;
     station_name: string;
-    id: string;
 }
 
 interface Transaction {
@@ -31,14 +31,14 @@ interface Transaction {
 }
 
 const BILLING_MODEL_FEATURES = [
-    { text: 'Fixed monthly service fee: $25', icon: <FaCheckCircle /> },
+    { text: 'Fixed monthly service fee: Ksh 3,500', icon: <FaCheckCircle /> },
     { text: 'Full database & storage hosting', icon: <FaCheckCircle /> },
     { text: 'AI-powered procurement analytics', icon: <FaCheckCircle /> },
     { text: 'Unlimited real-time monitoring', icon: <FaCheckCircle /> },
 ];
 
 const MOCK_BILLING: BillingInfo = {
-    id: 'demo-id',
+    station_id: 'demo-id',
     current_debt: 12500,
     total_paid: 450000,
     account_status: 'healthy',
@@ -64,7 +64,7 @@ export const BillingPage: React.FC = () => {
     const [payMethod, setPayMethod] = useState<'mpesa' | 'bank_transfer' | 'card'>('mpesa');
     const [paying, setPaying] = useState(false);
     const [payFeedback, setPayFeedback] = useState('');
-    const [clientId, setClientId] = useState<string | null>(null);
+    const [stationId, setStationId] = useState<string | null>(null);
     const [activeBillingTab, setActiveBillingTab] = useState<'overview' | 'usage' | 'history'>('overview');
     const [isDemo, setIsDemo] = useState(false);
 
@@ -74,29 +74,40 @@ export const BillingPage: React.FC = () => {
             setLoading(true);
 
             try {
-                const { data: cbData, error: billingError } = await supabase
-                    .from('fuel_stations')
-                    .select('*')
-                    .eq('auth_user_id', currentUser.authUserId)
-                    .maybeSingle();
+                // Production-Ready Query: Standardizing on station_id and owner linkage
+                let query = supabase.from('fuel_stations').select('*');
+
+                if (currentUser.stationId && currentUser.stationId !== 'SYSTEM_GOVERNANCE') {
+                    // Standard user path: Fetch by assigned station ID
+                    query = query.eq('station_id', currentUser.stationId);
+                } else if (currentUser.isSystemAccount) {
+                    // System Admin path: Usually sees nothing unless searching
+                    setLoading(false);
+                    return;
+                } else {
+                    // Provisioning Fallback: Fetch by owner_id if station_id is not yet assigned to profile
+                    query = query.eq('owner_id', currentUser.authUserId);
+                }
+
+                const { data: cbData, error: billingError } = await query.maybeSingle();
 
                 if (billingError) throw billingError;
 
                 if (cbData) {
                     setBilling(cbData);
-                    setClientId(cbData.id);
+                    setStationId(cbData.station_id);
 
                     const { data: txData } = await supabase
                         .from('transactions')
                         .select('*')
-                        .eq('station_id', cbData.id)
+                        .eq('station_id', cbData.station_id)
                         .order('created_at', { ascending: false })
                         .limit(20);
 
                     setTransactions(txData || []);
                     setIsDemo(false);
                 } else {
-                    console.log("[BILLING] No production record identified. Initializing Simulation Mode...");
+                    console.log("[BILLING] No production record found. Defaulting to Simulation Mode.");
                     setBilling(MOCK_BILLING);
                     setTransactions(MOCK_TRANSACTIONS);
                     setIsDemo(true);
@@ -115,9 +126,9 @@ export const BillingPage: React.FC = () => {
 
     if (!canSee(5)) {
         return (
-            <div className="billing-restricted-view">
-                <div className="restricted-icon-wrap">
-                    <FaShieldAlt size={48} color="#EF4444" />
+            <div className="billing-restricted-view" role="alert">
+                <div className="restricted-icon-wrap" aria-hidden="true">
+                    <FaShieldAlt size={48} className="restricted-shield-icon" />
                 </div>
                 <h2>Security Protocol Enforced</h2>
                 <p>
@@ -125,8 +136,8 @@ export const BillingPage: React.FC = () => {
                     Your current credential set does not grant access to this infrastructure.
                 </p>
                 <div className="restricted-actions">
-                    <button onClick={() => navigate('/dashboard')} className="btn-primary">Return to Hub</button>
-                    <button onClick={() => window.open('mailto:security@iotank.com')} className="btn-outline">Request Clearance</button>
+                    <button onClick={() => navigate('/dashboard')} className="btn-primary" aria-label="Return to Dashboard">Return to Hub</button>
+                    <button onClick={() => window.open('mailto:security@iotank.com')} className="btn-outline" aria-label="Email support for access">Request Clearance</button>
                 </div>
             </div>
         );
@@ -138,11 +149,11 @@ export const BillingPage: React.FC = () => {
         const amount = parseFloat(payAmount);
         if (!amount || amount <= 0) { setPayFeedback('Please enter a valid amount.'); return; }
         if (!payRef.trim()) { setPayFeedback('Please enter a payment reference.'); return; }
-        if (!clientId) return;
+        if (!stationId) return;
 
         setPaying(true);
         const { error } = await supabase.rpc('process_payment', {
-            p_station_id: clientId,
+            p_station_id: stationId,
             p_amount: amount,
             p_payment_method: payMethod,
             p_payment_reference: payRef.trim(),
@@ -155,16 +166,15 @@ export const BillingPage: React.FC = () => {
             setPayFeedback(`✅ Payment of KSh ${amount.toLocaleString()} recorded!`);
             setPayAmount('');
             setPayRef('');
-            const { data: updated } = await supabase.from('fuel_stations').select('*').eq('id', clientId).single();
+            const { data: updated } = await supabase.from('fuel_stations').select('*').eq('station_id', stationId).single();
             if (updated) setBilling(updated);
-            const { data: txData } = await supabase.from('transactions').select('*').eq('station_id', clientId).order('created_at', { ascending: false }).limit(20);
+            const { data: txData } = await supabase.from('transactions').select('*').eq('station_id', stationId).order('created_at', { ascending: false }).limit(20);
             setTransactions(txData || []);
         }
         setPaying(false);
     };
 
     const formatDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-    const txColor = (type: string) => ['payment', 'credit'].includes(type) ? 'var(--color-success)' : 'var(--color-warning)';
     const txIcon = (type: string) => ['payment', 'credit'].includes(type) ? <FaArrowDown /> : <FaArrowUp />;
 
     if (loading) {
@@ -189,25 +199,14 @@ export const BillingPage: React.FC = () => {
                     <motion.div 
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
-                        style={{
-                            background: 'var(--color-warning-bg)',
-                            border: '1px solid var(--color-warning-border)',
-                            borderRadius: '12px',
-                            padding: '0.75rem 1.25rem',
-                            marginBottom: '1.5rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '1rem',
-                            fontSize: '0.85rem'
-                        }}
+                        className="simulation-insight-banner"
                     >
                         <FaExclamationTriangle color="var(--color-warning)" />
-                        <div style={{ flex: 1 }}>
+                        <div className="simulation-insight-text">
                             <strong>Simulation Insight</strong>: You are viewing the premium UI architecture with synthetic data. This typically happens for administrative accounts that haven't been provisioned with a dedicated billing ledger.
                         </div>
                         <button 
-                            className="btn-outline" 
-                            style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
+                            className="btn-outline simulation-insight-btn" 
                             onClick={() => window.location.href = 'mailto:devops@iotank.com?subject=Billing Provisioning Request'}
                         >
                             Provision Ledger
@@ -221,7 +220,7 @@ export const BillingPage: React.FC = () => {
                     <h1>Billing & Governance</h1>
                     <p className="billing-header-subtitle">Infrastructure overhead and automated financial auditing.</p>
                 </div>
-                <select className="billing-period-selector">
+                <select className="billing-period-selector" title="Select Billing Period">
                     <option>Last 30 Days</option>
                     <option>Fiscal Quarter</option>
                     <option>Annual View</option>
@@ -261,12 +260,8 @@ export const BillingPage: React.FC = () => {
                             {/* Balance Card */}
                             <div className={`billing-glass-card balance-card ${isOverdue ? 'overdue' : 'healthy'}`}>
                                 <div className="balance-header">
-                                    <span style={{ fontWeight: 700 }}>Active Balance</span>
-                                    <span className="balance-status-tag" style={{
-                                        background: isOverdue ? 'var(--color-danger-bg)' : 'rgba(16, 185, 129, 0.1)',
-                                        color: isOverdue ? 'var(--color-danger)' : '#10b981',
-                                        border: `1px solid ${isOverdue ? 'var(--color-danger-border)' : 'rgba(16, 185, 129, 0.2)'}`
-                                    }}>
+                                    <span className="billing-label-bold">Active Balance</span>
+                                    <span className={`balance-status-tag ${isOverdue ? 'status-tag--overdue' : 'status-tag--healthy'}`}>
                                         {billing.account_status}
                                     </span>
                                 </div>
@@ -282,60 +277,51 @@ export const BillingPage: React.FC = () => {
                             {/* Plan Card */}
                             <div className="billing-glass-card plan-card">
                                 <div className="balance-header">
-                                    <span style={{ fontWeight: 700 }}>Current Deployment</span>
+                                    <span className="billing-label-bold">Current Deployment</span>
                                     <span className="plan-badge">Standard Tier</span>
                                 </div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: 800 }}>IoT Enterprise Suite</div>
+                                <div className="bill-text-large">IoT Enterprise Suite</div>
                                 <ul className="plan-feature-list">
                                     {BILLING_MODEL_FEATURES.map((f, i) => (
                                         <li key={i} className="plan-feature-item">
-                                            <span style={{ color: 'var(--color-success)' }}>{f.icon}</span>
-                                            <span style={{ fontSize: '0.75rem' }}>{f.text}</span>
+                                            <span className="bill-text-success">{f.icon}</span>
+                                            <span className="bill-text-small">{f.text}</span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
 
                             {/* New Intelligence Card */}
-                            <div className="billing-glass-card intelligence-card" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid rgba(0,0,0,0.05)' }}>
+                            <div className="billing-glass-card intelligence-card intelligence-card-premium">
                                 <div className="balance-header">
-                                    <span style={{ fontWeight: 700 }}>Credits & Intelligence</span>
+                                    <span className="billing-label-bold">Credits & Intelligence</span>
                                     <FaDatabase color="var(--color-accent-primary)" />
                                 </div>
-                                <div className="usage-value" style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>4.2k</div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>Active Tokens</div>
-                                <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '0.75rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--color-text-secondary)' }}>
+                                <div className="usage-value usage-value-hero">4.2k</div>
+                                <div className="usage-label-sub">Active Tokens</div>
+                                <div className="usage-stats-divider">
+                                    <div className="usage-quota-line">
                                         <span>Monthly Quota</span>
-                                        <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>10k</span>
+                                        <span className="usage-quota-value">10k</span>
                                     </div>
-                                    <div className="usage-progress-bar" style={{ marginTop: '0.4rem', height: '4px' }}>
-                                        <div className="usage-progress-fill" style={{ width: '42%', background: 'var(--color-accent-primary)' }}></div>
+                                    <div className="usage-progress-bar mt-2">
+                                        <div className="usage-progress-fill w-42p"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="billing-glass-card payment-form-card">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                            <div className="bill-flex-header">
                                 <div className="rp-mini-icon rp-mini-icon--accent"><FaCreditCard /></div>
-                                <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>Record Manual Remittance</h2>
+                                <h2 className="bill-margin-reset bill-text-large-ui">Record Manual Remittance</h2>
                             </div>
 
                             {payFeedback && (
                                 <motion.div 
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    style={{
-                                        padding: '1rem',
-                                        borderRadius: '12px',
-                                        marginBottom: '1.5rem',
-                                        background: payFeedback.includes('✅') ? 'var(--color-success-bg)' : 'var(--color-danger-bg)',
-                                        color: payFeedback.includes('✅') ? 'var(--color-success)' : 'var(--color-danger)',
-                                        border: `1px solid ${payFeedback.includes('✅') ? 'var(--color-success-border)' : 'var(--color-danger-border)'}`,
-                                        fontSize: '0.9rem',
-                                        fontWeight: 600
-                                    }}
+                                    className={`billing-feedback-banner ${payFeedback.includes('✅') ? 'billing-feedback-banner--success' : 'billing-feedback-banner--danger'}`}
                                 >
                                     {payFeedback}
                                 </motion.div>
@@ -368,6 +354,7 @@ export const BillingPage: React.FC = () => {
                                         className="form-input"
                                         value={payMethod} 
                                         onChange={e => setPayMethod(e.target.value as any)}
+                                        title="Payment Method"
                                     >
                                         <option value="mpesa">M-Pesa Moble</option>
                                         <option value="bank_transfer">Direct Deposit</option>
@@ -397,9 +384,9 @@ export const BillingPage: React.FC = () => {
                                 </div>
                                 <div className="usage-value">78.4 GB</div>
                                 <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill" style={{ width: '78%', background: 'var(--color-accent-primary)' }}></div>
+                                    <div className="usage-progress-fill w-78p"></div>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>
+                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
                                     78% of 100GB Monthly Limit
                                 </div>
                             </div>
@@ -410,9 +397,9 @@ export const BillingPage: React.FC = () => {
                                 </div>
                                 <div className="usage-value">12.5k</div>
                                 <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill" style={{ width: '45%', background: 'var(--color-accent-pink)' }}></div>
+                                    <div className="usage-progress-fill w-45p"></div>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>
+                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
                                     45% of 30k Credit Tokens
                                 </div>
                             </div>
@@ -423,9 +410,9 @@ export const BillingPage: React.FC = () => {
                                 </div>
                                 <div className="usage-value">99.98%</div>
                                 <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill" style={{ width: '99%', background: 'var(--color-success)' }}></div>
+                                    <div className="usage-progress-fill w-99p"></div>
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--color-text-secondary)', marginTop: '0.5rem' }}>
+                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
                                     Platform Availability Guaranteed
                                 </div>
                             </div>
@@ -434,7 +421,7 @@ export const BillingPage: React.FC = () => {
                         <div className="billing-table-container">
                             <div className="billing-table-header">
                                 <h2><FaChartLine /> Real-time Metering Ledger</h2>
-                                <span className="balance-status-tag" style={{ background: 'var(--color-success-bg)', color: 'var(--color-success)' }}>Live Sync</span>
+                                <span className="balance-status-tag status-tag--live-sync">Live Sync</span>
                             </div>
                             <table className="billing-table">
                                 <thead>
@@ -448,12 +435,12 @@ export const BillingPage: React.FC = () => {
                                 <tbody>
                                     {[...Array(5)].map((_, i) => (
                                         <tr key={i}>
-                                            <td style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-family-mono)', fontSize: '0.8rem' }}>
+                                            <td className="bill-text-mono bill-text-secondary">
                                                 {format(new Date(Date.now() - i * 86400000), 'dd MMM yyyy')}
                                             </td>
-                                            <td style={{ fontWeight: 700 }}>2.{i} GB</td>
+                                            <td className="bill-font-medium">2.{i} GB</td>
                                             <td> {150 + i * 20} REQ</td>
-                                            <td style={{ color: 'var(--color-accent-primary)', fontWeight: 800 }}>KSh {(450 + i * 15).toLocaleString()}</td>
+                                            <td className="bill-text-accent bill-font-bold">KSh {(450 + i * 15).toLocaleString()}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -478,8 +465,8 @@ export const BillingPage: React.FC = () => {
                                 </button>
                             </div>
                             {transactions.length === 0 ? (
-                                <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text-disabled)' }}>
-                                    <FaHistory size={48} style={{ opacity: 0.1, marginBottom: '1rem' }} />
+                                <div className="empty-ledger-state">
+                                    <FaHistory className="empty-ledger-icon" aria-hidden="true" />
                                     <p>No financial activity recorded in the current ledger period.</p>
                                 </div>
                             ) : (
@@ -497,28 +484,24 @@ export const BillingPage: React.FC = () => {
                                     <tbody>
                                         {transactions.map(tx => (
                                             <tr key={tx.id}>
-                                                <td style={{ color: 'var(--color-text-secondary)', fontSize: '0.8rem' }}>{formatDate(tx.created_at)}</td>
-                                                <td>
-                                                    <div className="tx-type-group" style={{ color: txColor(tx.transaction_type) }}>
-                                                        {txIcon(tx.transaction_type)}
-                                                        <span style={{ textTransform: 'capitalize' }}>{tx.transaction_type.replace('_', ' ')}</span>
-                                                    </div>
+                                                <td className="tx-date-cell">{formatDate(tx.created_at)}</td>
+                                                <td className="tx-type-cell">
+                                                    <span className={`tx-type-badge ${tx.transaction_type}`}>
+                                                        {tx.transaction_type.replace('_', ' ')}
+                                                    </span>
                                                 </td>
-                                                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                <td className="tx-desc-cell" title={tx.description}>
                                                     {tx.description || 'System Charge'}
                                                 </td>
-                                                <td style={{ textTransform: 'uppercase', fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                                                <td className="tx-method-cell">
                                                     {tx.payment_method || '—'}
                                                 </td>
-                                                <td style={{ fontWeight: 800, color: txColor(tx.transaction_type) }}>
+                                                <td className="tx-amount-cell" data-type={tx.transaction_type}>
+                                                    {txIcon(tx.transaction_type)}
                                                     {['payment', 'credit'].includes(tx.transaction_type) ? '−' : '+'} KSh {tx.amount.toLocaleString()}
                                                 </td>
-                                                <td>
-                                                    <span className="payment-status-chip" style={{
-                                                        background: tx.payment_status === 'completed' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
-                                                        color: tx.payment_status === 'completed' ? 'var(--color-success)' : 'var(--color-warning)',
-                                                        border: `1px solid ${tx.payment_status === 'completed' ? 'var(--color-success-border)' : 'var(--color-warning-border)'}`
-                                                    }}>
+                                                <td className="tx-status-cell">
+                                                    <span className={`payment-status-chip ${tx.payment_status}`}>
                                                         {tx.payment_status}
                                                     </span>
                                                 </td>

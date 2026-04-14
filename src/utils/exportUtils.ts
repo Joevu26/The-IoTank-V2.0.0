@@ -48,7 +48,7 @@ interface jsPDFWithAutoTable extends jsPDF {
  */
 export const generatePDF = (reportData: any, title: string) => {
     const doc = new jsPDF() as jsPDFWithAutoTable;
-    const orgId = reportData.orgId || 'ioTank-industrial';
+    const stationId = reportData.stationId || 'ioTank-industrial';
     const generatedDate = new Date().toLocaleString();
 
     // -- Header --
@@ -58,7 +58,7 @@ export const generatePDF = (reportData: any, title: string) => {
 
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text(`Organization: ${orgId}`, 14, 28);
+    doc.text(`Organization: ${stationId}`, 14, 28);
     doc.text(`Generated: ${generatedDate}`, 14, 33);
 
     doc.setDrawColor(200, 200, 200);

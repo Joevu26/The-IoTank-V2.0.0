@@ -7,6 +7,7 @@ import {
 import './AlertsCenter.css';
 import { useAlerts, resolveAlert, useTanks, updateTank } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
+import { AuditService } from '@/services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
 import { Alert, AlertSeverityLabel } from '@/types';
 import { getSeverityClass } from '../../services/AlertScoringEngine';
@@ -102,10 +103,16 @@ const EscalationLadder: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts })
                 </div>
             </div>
             <div className="ladder-bar">
-                <div className="ladder-segment critical" style={{ width: `${getWidth(counts.CRITICAL)}%` }} />
-                <div className="ladder-segment high" style={{ width: `${getWidth(counts.HIGH)}%` }} />
-                <div className="ladder-segment watch" style={{ width: `${getWidth(counts.WATCH)}%` }} />
-                <div className="ladder-segment info" style={{ width: `${getWidth(counts.INFO)}%` }} />
+                <style>{`
+                    .escalation-ladder-container .ladder-segment.critical { width: ${getWidth(counts.CRITICAL)}%; }
+                    .escalation-ladder-container .ladder-segment.high { width: ${getWidth(counts.HIGH)}%; }
+                    .escalation-ladder-container .ladder-segment.watch { width: ${getWidth(counts.WATCH)}%; }
+                    .escalation-ladder-container .ladder-segment.info { width: ${getWidth(counts.INFO)}%; }
+                `}</style>
+                <div className="ladder-segment critical" />
+                <div className="ladder-segment high" />
+                <div className="ladder-segment watch" />
+                <div className="ladder-segment info" />
             </div>
         </div>
     );
@@ -181,11 +188,11 @@ export const AlertsCenter: React.FC = () => {
     const [escalationDelay, setEscalationDelay] = useState('2h');
 
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || '';
+    const stationId = currentUser?.stationId || '';
 
-    const { alerts: rawActiveAlerts, loading: activeLoading } = useAlerts(orgId, false);
-    const { alerts: alertHistory } = useAlerts(orgId, true);
-    const { tanks, loading: tanksLoading } = useTanks(orgId);
+    const { alerts: rawActiveAlerts, loading: activeLoading } = useAlerts(stationId, false);
+    const { alerts: alertHistory } = useAlerts(stationId, true);
+    const { tanks, loading: tanksLoading } = useTanks(stationId);
 
     useEffect(() => {
         setIsLoading(true);
@@ -236,7 +243,20 @@ export const AlertsCenter: React.FC = () => {
         });
     }, [alertHistory, historySearch]);
 
-    const handleResolve = (id: string) => { resolveAlert(id, currentUser?.authUserId || 'SYSTEM'); };
+    const handleResolve = async (id: string) => { 
+        await resolveAlert(id, currentUser?.authUserId || 'SYSTEM'); 
+        
+        // 🟢 Forensic Log
+        const alert = activeAlerts.find(a => a.id === id);
+        await AuditService.log(
+            'SYSTEM',
+            'ALERT_RESOLVED',
+            stationId,
+            `Operator resolved ${alert?.type || 'system'} alert: ${alert?.title || id}`,
+            'INFO',
+            { alertId: id, alertType: alert?.type }
+        );
+    };
     const handleInvestigate = (alert: Alert) => { 
         if (alert.rootCauseLink) {
             const { type, id } = alert.rootCauseLink;
@@ -254,6 +274,17 @@ export const AlertsCenter: React.FC = () => {
                 ? { lowLevelThreshold: value } 
                 : { criticalLevelThreshold: value };
             await updateTank(tankId, updates);
+
+            // 🟢 Forensic Log
+            const tank = tanks.find(t => t.id === tankId);
+            await AuditService.log(
+                'SYSTEM',
+                'THRESHOLD_UPDATED',
+                stationId,
+                `Recalibrated ${type} volume threshold for ${tank?.name || tankId} to ${value}L`,
+                'WARNING',
+                { tankId, type, newValue: value }
+            );
         } catch (err) {
             console.error('Threshold update failed:', err);
         }
@@ -315,12 +346,12 @@ export const AlertsCenter: React.FC = () => {
 
                     <div className="hud-top-actions">
                         {activeTab === 'thresholds' && (
-                            <button className="tactical-btn-primary btn-sm">
+                            <button className="tactical-btn-primary btn-sm" title="Propagate threshold logic to all tanks" aria-label="Propagate Logic">
                                 <FiCheckCircle /> Propagate Logic
                             </button>
                         )}
                         {activeTab === 'preferences' && (
-                            <button className="tactical-btn-primary btn-sm">
+                            <button className="tactical-btn-primary btn-sm" title="Commit orchestration preferences" aria-label="Commit Orchestration">
                                 <FiCheckCircle /> Commit Orchestration
                             </button>
                         )}
@@ -348,6 +379,8 @@ export const AlertsCenter: React.FC = () => {
                                                             className={`filter-reel-chip ${severityFilter === f ? 'active' : ''}`} 
                                                             data-severity={f.toLowerCase()}
                                                             onClick={() => setSeverityFilter(f)}
+                                                            title={`Filter by ${f} severity`}
+                                                            aria-label={`Filter by ${f} severity`}
                                                         >
                                                             {f}
                                                         </button>
@@ -380,6 +413,8 @@ export const AlertsCenter: React.FC = () => {
                                                         placeholder="Query log history..."
                                                         value={historySearch}
                                                         onChange={e => setHistorySearch(e.target.value)}
+                                                        title="Search forensic audit log"
+                                                        aria-label="Search forensic audit log"
                                                     />
                                                 </div>
                                             </div>
@@ -416,7 +451,7 @@ export const AlertsCenter: React.FC = () => {
                                                                 </td>
                                                                 <td className="timestamp-cell">{new Date(item.timestamp).toLocaleDateString()}</td>
                                                                 <td>
-                                                                    <button className="row-action-btn" onClick={() => handleInvestigate(item)}>
+                                                                    <button className="row-action-btn" onClick={() => handleInvestigate(item)} title="Investigate alert root cause" aria-label="Audit alert">
                                                                         Audit <FiArrowRight size={12} />
                                                                     </button>
                                                                 </td>
@@ -454,6 +489,7 @@ export const AlertsCenter: React.FC = () => {
                                                             type="range" min="5" max="120" value={telemetryGap} 
                                                             onChange={e => setTelemetryGap(Number(e.target.value))} 
                                                             className="tactical-range" 
+                                                            title="Sensor Dropout Tolerance Range"
                                                         />
                                                         <p className="control-hint">Allowed neural disconnect before critical integrity alerts.</p>
                                                     </div>
@@ -466,6 +502,7 @@ export const AlertsCenter: React.FC = () => {
                                                             type="range" min="1" max="25" value={deliveryVariance} 
                                                             onChange={e => setDeliveryVariance(Number(e.target.value))} 
                                                             className="tactical-range" 
+                                                            title="Delivery Audit Variance Tolerance"
                                                         />
                                                         <p className="control-hint">Maximum neural discrepancy allowed in fuel audit reconciliation.</p>
                                                     </div>
@@ -532,7 +569,9 @@ export const AlertsCenter: React.FC = () => {
                                                                     onChange={e => handleLocalThresholdChange(tank.id, 'critical', Number(e.target.value))} 
                                                                     onMouseUp={() => commitThresholdUpdate(tank.id, 'critical')}
                                                                     onTouchEnd={() => commitThresholdUpdate(tank.id, 'critical')}
-                                                                    className="tactical-range" 
+                                                                    className="tactical-range"
+                                                                    title={`Critical fuel volume for ${tank.name}`}
+                                                                    aria-label={`Critical fuel volume threshold for ${tank.name}`}
                                                                 />
                                                             </div>
                                                             <div className="logic-control">
@@ -548,7 +587,9 @@ export const AlertsCenter: React.FC = () => {
                                                                     onChange={e => handleLocalThresholdChange(tank.id, 'low', Number(e.target.value))} 
                                                                     onMouseUp={() => commitThresholdUpdate(tank.id, 'low')}
                                                                     onTouchEnd={() => commitThresholdUpdate(tank.id, 'low')}
-                                                                    className="tactical-range" 
+                                                                    className="tactical-range"
+                                                                    title={`Low fuel volume for ${tank.name}`}
+                                                                    aria-label={`Low fuel volume threshold for ${tank.name}`}
                                                                 />
                                                             </div>
                                                         </div>
@@ -575,7 +616,7 @@ export const AlertsCenter: React.FC = () => {
                                                         <div className="toggle-label"><FiBell /> Native Push Services</div>
                                                         <p>Biological bypass for real-time tactical pulses.</p>
                                                     </div>
-                                                    <button className={`tactical-switch ${NotificationService.isEnabled() ? 'active' : ''}`} onClick={() => {}}>
+                                                    <button className={`tactical-switch ${NotificationService.isEnabled() ? 'active' : ''}`} onClick={() => {}} title="Toggle native push notifications" aria-label="Toggle native push notifications">
                                                         <div className="switch-knob" />
                                                     </button>
                                                 </div>
@@ -584,7 +625,7 @@ export const AlertsCenter: React.FC = () => {
                                                         <div className="toggle-label"><FiMail /> Email Intelligence</div>
                                                         <p>Forensic summaries delivered to mission control.</p>
                                                     </div>
-                                                    <button className={`tactical-switch ${emailEnabled ? 'active' : ''}`} onClick={() => setEmailEnabled(!emailEnabled)}>
+                                                    <button className={`tactical-switch ${emailEnabled ? 'active' : ''}`} onClick={() => setEmailEnabled(!emailEnabled)} title="Toggle email intelligence notifications" aria-label="Toggle email intelligence notifications">
                                                         <div className="switch-knob" />
                                                     </button>
                                                 </div>
@@ -594,7 +635,12 @@ export const AlertsCenter: React.FC = () => {
                                                 <h4 className="dispatch-subtitle">Escalation Logic</h4>
                                                 <div className="select-group-tactical">
                                                     <label>Chain of Command Delay</label>
-                                                    <select value={escalationDelay} onChange={e => setEscalationDelay(e.target.value)} className="select-tactical w-full">
+                                                    <select 
+                                                        value={escalationDelay} 
+                                                        onChange={e => setEscalationDelay(e.target.value)} 
+                                                        className="select-tactical w-full"
+                                                        title="Escalation Delay Period"
+                                                    >
                                                         <option value="1h">1 hour (High Priority)</option>
                                                         <option value="2h">2 hours (Operational)</option>
                                                         <option value="4h">4 hours (Deep Maintenance)</option>

@@ -197,10 +197,10 @@
     display: flex;
 }
 
-.ladder-segment.critical { background: #ef4444; }
-.ladder-segment.high { background: #f97316; }
-.ladder-segment.watch { background: #f59e0b; }
-.ladder-segment.info { background: #3b82f6; }
+.ladder-segment.critical { background: #ef4444; width: var(--segment-width, 0%); }
+.ladder-segment.high { background: #f97316; width: var(--segment-width, 0%); }
+.ladder-segment.watch { background: #f59e0b; width: var(--segment-width, 0%); }
+.ladder-segment.info { background: #3b82f6; width: var(--segment-width, 0%); }
 
 .sidebar-meta-block {
     margin-top: auto;

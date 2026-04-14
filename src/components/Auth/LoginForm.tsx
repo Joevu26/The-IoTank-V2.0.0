@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { FaGoogle, FaTimesCircle, FaEnvelope, FaLock, FaShieldAlt, FaDollarSign, FaChartBar, FaSearch, FaCog } from 'react-icons/fa';
 import { PasswordInput } from './PasswordInput';
-import { authRateLimiter } from '@/utils/rateLimiter';
 import './LoginForm.css';
 import TermsModal from '../Landing/TermsModal';
 import '../Landing/TermsModal.css';
 import { OnboardingModal } from './OnboardingModal';
 import { RegistrationRequestForm } from './RegistrationRequestForm';
+import { AuditService } from '@/services/AuditService';
+import { supabase } from '@/config/supabase';
 import { getAuthFriendlyErrorMessage } from '@/utils/authErrors';
 import brandMark from '@/assets/iotank-logo-v3.png';
 
@@ -23,36 +24,55 @@ export const LoginForm: React.FC = () => {
     const [rateLimitError, setRateLimitError] = useState('');
     const [remainingAttempts, setRemainingAttempts] = useState(0);
 
-    const { signIn, signInWithGoogle, currentUser } = useAuth();
+    const { signIn, signInWithGoogle, currentUser, mfaChallengeRequired, verifyMFA, cancelMFAChallenge, signOut } = useAuth();
     const navigate = useNavigate();
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isTermsOpen, setIsTermsOpen] = useState(false);
     const [showRegRequest, setShowRegRequest] = useState(false);
+    const [mfaCode, setMfaCode] = useState('');
+    const [mfaLoading, setMfaLoading] = useState(false);
+    const [shouldShake, setShouldShake] = useState(false);
+
+    // Disable auto-redirect to prevent "instant login" mystery.
+    // We now show an "Active Session" state in the UI instead.
+    useEffect(() => {
+        if (currentUser?.stationId && !mfaChallengeRequired) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [currentUser, mfaChallengeRequired, navigate]);
 
 
 
 
-    const formatResetTime = (timeMs: number): string => {
-        const minutes = Math.ceil((timeMs - Date.now()) / (1000 * 60));
-        if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
-        const hours = Math.ceil(minutes / 60);
-        return `${hours} hour${hours > 1 ? 's' : ''}`;
-    };
+
 
     const processSignIn = async () => {
         try {
-            authRateLimiter.recordAttempt(email.toLowerCase().trim());
             const userCredential = await signIn(email, password);
             if (userCredential?.user) {
-                // Audit log is written after the user profile is loaded via AuthContext,
-                // so currentUser (with a valid org ID) is available. Skipping here avoids
-                // the 400 error caused by passing 'pending' as a station_id UUID.
+                // Log success
+                await supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: true });
+
+                // 🟢 Forensic Log
+                await AuditService.log(
+                    'AUTH',
+                    'LOGIN',
+                    userCredential.user.user_metadata?.station_id || 'SYSTEM',
+                    `Identity verification successful for ${email}`,
+                    'INFO',
+                    { method: 'PASSWORD', email }
+                );
             }
             navigate('/dashboard');
         } catch (err: any) {
             console.error('Auth Error:', err);
+            // Log failure
+            await supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: false });
+            
             const friendlyMsg = getAuthFriendlyErrorMessage(err);
             setError(friendlyMsg);
+            setShouldShake(true);
+            setTimeout(() => setShouldShake(false), 600);
         } finally {
             setLoading(false);
         }
@@ -63,18 +83,55 @@ export const LoginForm: React.FC = () => {
         setError('');
         setRateLimitError('');
         const identifier = email.toLowerCase().trim();
-        const rateLimit = authRateLimiter.canAttempt(identifier);
 
-        if (!rateLimit.allowed) {
-            setRateLimitError(`Too many failed attempts. Please try again in ${formatResetTime(rateLimit.resetTime!)}.`);
-            setRemainingAttempts(rateLimit.remainingAttempts);
-            setLoading(false);
+        setLoading(true);
+
+        try {
+            // Check rate limit on server
+            const { data: limitData, error: limitErr } = await supabase.rpc('check_auth_attempt', { p_email: identifier });
+            
+            if (limitErr) throw limitErr;
+
+            const limit = Array.isArray(limitData) ? limitData[0] : limitData;
+
+            if (limit && !limit.allowed) {
+                const resetDate = new Date(limit.reset_time);
+                const minutes = Math.ceil((resetDate.getTime() - Date.now()) / (1000 * 60));
+                setRateLimitError(`Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`);
+                setRemainingAttempts(0);
+                setLoading(false);
+                return;
+            }
+
+            setRemainingAttempts(limit?.remaining_attempts || 0);
+            await processSignIn();
+        } catch (err) {
+            console.error('Rate limit check failed:', err);
+            // Fallback: allow attempt if RPC fails (don't lock out users due to infra issues)
+            await processSignIn();
+        }
+    };
+
+    const handleMFASubmit = async (e?: React.FormEvent, overrideCode?: string) => {
+        if (e) e.preventDefault();
+        const codeToVerify = overrideCode || mfaCode;
+        if (!codeToVerify || codeToVerify.length !== 6) {
+            setError('Please enter a valid 6-digit code.');
             return;
         }
-
-        setRemainingAttempts(rateLimit.remainingAttempts);
-        setLoading(true);
-        await processSignIn();
+        setError('');
+        setMfaLoading(true);
+        try {
+            await verifyMFA(codeToVerify);
+            navigate('/dashboard');
+        } catch (err: any) {
+            console.error('MFA Verification Error:', err);
+            setError(err.message || 'Invalid verification code. Please try again.');
+            setShouldShake(true);
+            setTimeout(() => setShouldShake(false), 600);
+        } finally {
+            setMfaLoading(false);
+        }
     };
 
 
@@ -93,12 +150,14 @@ export const LoginForm: React.FC = () => {
         setRateLimitError('');
         setLoading(true);
         try {
+            // signInWithGoogle() triggers a browser redirect to Google.
+            // The browser navigates away — no code runs after this line.
+            // When Google returns, the OAuth callback lands back at the app
+            // and the useEffect above handles navigation to /dashboard.
             await signInWithGoogle();
-            navigate('/dashboard');
         } catch (err: any) {
             console.error("Google Auth Error:", err);
             setError(getAuthFriendlyErrorMessage(err));
-        } finally {
             setLoading(false);
         }
     };
@@ -153,69 +212,161 @@ export const LoginForm: React.FC = () => {
                         <RegistrationRequestForm onBack={() => setShowRegRequest(false)} />
                     )}
 
-                    <div className={`login-card card ${showOnboarding || showRegRequest ? 'hidden' : ''}`}>
+                    <div className={`login-card card ${showOnboarding || showRegRequest ? 'hidden' : ''} ${shouldShake ? 'shake' : ''}`}>
 
-                        <div className="login-header">
-                            <h2 className="login-title">Welcome Back</h2>
-                            <p className="login-subtitle">Sign in to your dashboard</p>
-                        </div>
-                        <div className="login-body">
-                            <>
-                                {rateLimitError && (
-                                    <div className="alert alert-danger flex items-start gap-2" role="alert">
-                                        <FaTimesCircle className="mt-1 flex-shrink-0" />
-                                        <div>
-                                            <span>{rateLimitError}</span>
-                                            {remainingAttempts > 0 && <div className="text-sm mt-1 opacity-75">{remainingAttempts} attempt{remainingAttempts > 1 ? 's' : ''} remaining</div>}
-                                        </div>
-                                    </div>
-                                )}
-                                {error && (
-                                    <div className="alert alert-danger flex items-start gap-2" role="alert">
-                                        <FaTimesCircle className="mt-1 flex-shrink-0" />
-                                        <span>{error}</span>
-                                    </div>
-                                )}
-                                <form onSubmit={handleSubmit} className="login-form">
-                                    <div style={{ opacity: 0, position: 'absolute', top: -1000, left: -1000, height: 0, width: 0, overflow: 'hidden' }} aria-hidden="true">
-                                        <input type="text" name="username_fake" tabIndex={-1} autoComplete="off" />
-                                        <input type="password" name="password_fake" tabIndex={-1} autoComplete="off" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="email"><FaEnvelope className="inline-icon" /> Email Address</label>
-                                        <input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required aria-required="true" autoComplete="new-password" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label htmlFor="password"><FaLock className="inline-icon" /> Password</label>
-                                        <PasswordInput id="password" name="password" value={password} onChange={setPassword} showStrength={false} placeholder="Enter your password" autoComplete="new-password" />
-                                    </div>
-                                    <button 
-                                        type="submit" 
-                                        className="btn btn-primary" 
-                                        disabled={loading}
-                                        style={{ 
-                                            minWidth: '220px', 
-                                            height: '48px', 
-                                            margin: '0 auto', 
-                                            display: 'flex', 
-                                            justifyContent: 'center',
-                                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                                        }}
-                                    >
-                                        {loading ? (
-                                            <div className="loading-dots">
-                                                <span></span><span></span><span></span>
+                        {currentUser && !mfaChallengeRequired ? (
+                            <div className="active-session-card animate-in fade-in zoom-in-95 duration-400">
+                                <div className="login-header">
+                                    <div className="avatar-preview mb-4">
+                                        {currentUser.photoURL ? (
+                                            <img src={currentUser.photoURL} alt="Profile" className="w-16 h-16 rounded-full border-4 border-blue-500/20 shadow-lg mx-auto" />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto shadow-lg text-white font-black text-xl">
+                                                {currentUser.displayName?.charAt(0) || currentUser.email.charAt(0).toUpperCase()}
                                             </div>
-                                        ) : 'Sign In'}
+                                        )}
+                                    </div>
+                                    <h2 className="login-title">Active Session Detected</h2>
+                                    <p className="login-subtitle">You are already identified as <span className="text-blue-500 font-bold">{currentUser.displayName || currentUser.email}</span></p>
+                                </div>
+                                <div className="login-body flex flex-col gap-3">
+                                    <button 
+                                        className="btn btn-primary login-btn-submit h-[56px] text-[13px]"
+                                        onClick={() => navigate('/dashboard')}
+                                    >
+                                        Go to Dashboard
                                     </button>
-
-                                </form>
-                                <button onClick={handleGoogleSignIn} className="btn btn-secondary btn-block mt-4" disabled={loading}><FaGoogle /> Continue with Google</button>
-                                 <div className="login-footer">
-                                    <Link to="/forgot-password" title="Forgot password link" className="text-link">Lost Access?</Link>
+                                    <button 
+                                        className="btn btn-outline h-[56px] text-[13px] border-slate-200 hover:bg-slate-50"
+                                        onClick={() => signOut()}
+                                    >
+                                        Sign out to switch account
+                                    </button>
+                                </div>
+                            </div>
+                        ) : mfaChallengeRequired ? (
+                            <>
+                                <div className="login-header">
+                                    <div className="mfa-lock-icon">🔐</div>
+                                    <h2 className="login-title">Two-Factor Auth</h2>
+                                    <p className="login-subtitle">Open your authenticator app and enter the 6-digit code</p>
+                                </div>
+                                <div className="login-body">
+                                    {error && (
+                                        <div className="alert alert-danger flex items-start gap-2" role="alert">
+                                            <FaTimesCircle className="mt-1 flex-shrink-0" />
+                                            <span>{error}</span>
+                                        </div>
+                                    )}
+                                    <form onSubmit={handleMFASubmit} className="login-form">
+                                        <div className="form-group">
+                                            <label htmlFor="mfa-code"><FaShieldAlt className="inline-icon" /> Verification Code</label>
+                                            <input
+                                                id="mfa-code"
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[0-9]{6}"
+                                                maxLength={6}
+                                                value={mfaCode}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                                    setMfaCode(val);
+                                                    if (error) setError('');
+                                                    if (val.length === 6 && !mfaLoading) {
+                                                        handleMFASubmit(undefined, val);
+                                                    }
+                                                }}
+                                                placeholder="000000"
+                                                autoFocus
+                                                required
+                                                className="mfa-input-display"
+                                            />
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary login-btn-submit"
+                                            disabled={mfaLoading || mfaCode.length !== 6}
+                                        >
+                                            {mfaLoading ? <div className="loading-dots"><span></span><span></span><span></span></div> : 'Verify & Sign In'}
+                                        </button>
+                                    </form>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline btn-block mt-3"
+                                        onClick={() => { cancelMFAChallenge(); setError(''); setMfaCode(''); }}
+                                    >
+                                        ← Back to Login
+                                    </button>
                                 </div>
                             </>
-                        </div>
+                        ) : (
+                            <>
+                                <div className="login-header">
+                                    <h2 className="login-title">Welcome Back</h2>
+                                    <p className="login-subtitle">Sign in to your dashboard</p>
+                                </div>
+                                <div className="login-body">
+                                    {rateLimitError && (
+                                        <div className="alert alert-danger flex items-start gap-2" role="alert">
+                                            <FaTimesCircle className="mt-1 flex-shrink-0" />
+                                            <div>
+                                                <span>{rateLimitError}</span>
+                                                {remainingAttempts > 0 && <div className="text-sm mt-1 opacity-75">{remainingAttempts} attempt{remainingAttempts > 1 ? 's' : ''} remaining</div>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {error && (
+                                        <div className="alert alert-danger flex items-start gap-2" role="alert">
+                                            <FaTimesCircle className="mt-1 flex-shrink-0" />
+                                            <span>{error}</span>
+                                        </div>
+                                    )}
+                                    <form onSubmit={handleSubmit} className="login-form">
+                                        <div className="hidden-honey-pot" aria-hidden="true">
+                                            <input type="text" name="username_fake" tabIndex={-1} autoComplete="off" />
+                                            <input type="password" name="password_fake" tabIndex={-1} autoComplete="off" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="email"><FaEnvelope className="inline-icon" /> Email Address</label>
+                                            <input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required aria-required="true" autoComplete="new-password" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label htmlFor="password"><FaLock className="inline-icon" /> Password</label>
+                                            <PasswordInput id="password" name="password" value={password} onChange={setPassword} showStrength={false} placeholder="Enter your password" autoComplete="new-password" />
+                                        </div>
+
+                                        <div className="form-group-utility flex items-center justify-between mb-8 mt-2 px-1">
+                                            <label className="remember-me-toggle flex items-center gap-3 cursor-pointer group">
+                                                <div className="relative flex items-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        defaultChecked 
+                                                        className="peer appearance-none w-5 h-5 rounded-md border-2 border-slate-200/50 bg-white/10 checked:bg-blue-500 checked:border-blue-500 transition-all duration-200 cursor-pointer"
+                                                    />
+                                                    <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 pointer-events-none left-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                </div>
+                                                <span className="text-[11px] font-black text-slate-500 group-hover:text-blue-500 transition-colors uppercase tracking-widest select-none">Stay Signed In</span>
+                                            </label>
+                                            <Link to="/forgot-password" title="Recover account access" className="lost-access-action-btn flex items-center gap-2 text-[10px] font-black text-white uppercase tracking-[0.15em] py-2.5 px-5 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 shadow-[0_4px_15px_-5px_rgba(244,63,94,0.4)] hover:shadow-[0_6px_20px_-5px_rgba(244,63,94,0.6)] active:scale-95 transition-all">
+                                                <FaLock className="text-[12px]" />
+                                                Lost Access?
+                                            </Link>
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            className="btn btn-primary login-btn-submit-animated"
+                                            disabled={loading}
+                                        >
+                                            {loading ? <div className="loading-dots"><span></span><span></span><span></span></div> : 'Sign In'}
+                                        </button>
+                                    </form>
+                                    <button onClick={handleGoogleSignIn} className="btn btn-secondary btn-block mt-4" disabled={loading}><FaGoogle /> Continue with Google</button>
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     <div className={`registration-promo-card card ${showOnboarding || showRegRequest ? 'hidden' : ''}`}>

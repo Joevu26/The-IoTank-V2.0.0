@@ -11,6 +11,7 @@ import TermsModal from '../Landing/TermsModal';
 import { PhotoNudgeBanner } from './PhotoNudgeBanner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi';
+import { PageLoader } from '../Common/PageLoader';
 import brandMark from '@/assets/iotank-logo-v3.png';
 
 const TourGuide = lazy(() => import('../Tour/TourGuide').then(module => ({ default: module.TourGuide })));
@@ -131,7 +132,9 @@ export const MainLayout: React.FC = () => {
                 )}
 
                 <main className={`main-content ${isFullBleedPage ? 'full-bleed' : ''}`}>
-                    <Outlet />
+                    <Suspense fallback={<PageLoader />}>
+                        <Outlet />
+                    </Suspense>
                 </main>
 
                 <footer className="mission-control-footer">
@@ -170,9 +173,9 @@ export const MainLayout: React.FC = () => {
                         <div className="v-divider hidden lg:block"></div>
 
                         <div className="footer-social">
-                            <a href="https://facebook.com" target="_blank" rel="noreferrer" className="social-pill"><FiFacebook /></a>
-                            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="social-pill"><FiInstagram /></a>
-                            <a href="https://twitter.com" target="_blank" rel="noreferrer" className="social-pill"><FiTwitter /></a>
+                            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-pill" title="Facebook" aria-label="IoTank on Facebook"><FiFacebook /></a>
+                            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="social-pill" title="Instagram" aria-label="IoTank on Instagram"><FiInstagram /></a>
+                            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-pill" title="Twitter" aria-label="IoTank on Twitter"><FiTwitter /></a>
                         </div>
                     </div>
                 </footer>

@@ -1,10 +1,9 @@
-/* eslint-disable react/no-unescaped-entities */
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { UserRole } from '@/types';
-
 import { ProvisioningGuard } from './ProvisioningGuard';
+import './ProtectedRoute.css';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -33,11 +32,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (loading) {
         return (
-            <div className="flex h-screen w-screen flex-col items-center justify-center" style={{ 
-                background: 'var(--color-bg-primary)',
-                backgroundImage: 'radial-gradient(circle at center, rgba(0, 212, 255, 0.05) 0%, transparent 70%)'
-            }}>
-                <div className="flex flex-col items-center gap-8">
+            <div className="clearance-overlay">
+                <div className="clearance-content">
                     <div className="advanced-loader">
                         <div className="loader-pulse"></div>
                         <div className="loader-ring"></div>
@@ -45,12 +41,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                         <div className="loader-ring"></div>
                     </div>
                     
-                    <div className="text-center mt-2">
-                        <p className="text-primary font-semibold text-lg mb-1" style={{ letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                    <div className="clearance-status">
+                        <p className="clearance-title">
                             Verifying system clearance
                         </p>
-                        <p className="text-secondary text-sm animate-pulse">
-                            Synchronizing security protocols...
+                        <p className="clearance-subtitle animate-pulse">
+                            Establishing secure telemetry baseline...
                         </p>
                     </div>
 
@@ -58,42 +54,22 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                         <div className="psych-progress-bar"></div>
                     </div>
 
-                    <div style={{
-                        width: '360px',
-                        height: '240px',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        borderRadius: '24px',
-                        background: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-                        border: '8px solid rgba(255,255,255,0.8)'
-                    }}>
+                    <div className="clearance-video-wrap">
                         <video
                             src="https://v1.pinimg.com/videos/iht/expMp4/59/24/45/592445ca657c7225e76d41bf1d4c17aa_720w.mp4"
                             autoPlay
                             muted
                             loop
                             playsInline
-                            style={{
-                                width: '400px',
-                                height: 'auto',
-                                position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                pointerEvents: 'none'
-                            }}
+                            className="clearance-video"
                             onCanPlay={(e) => (e.currentTarget.muted = true)}
                         />
                     </div>
                 </div>
 
                 {loadingTimeout && (
-                    <div className="mt-8 animate-fade-in text-center p-6 bg-white rounded-xl shadow-lg border border-slate-100 max-w-sm">
-                        <p className="text-xs text-secondary mb-4">Establishing secure connection is taking longer than expected.</p>
+                    <div className="clearance-timeout-card">
+                        <p className="clearance-timeout-msg">Establishing secure connection is taking longer than expected.</p>
                         <button
                             className="btn btn-primary btn-sm"
                             onClick={() => window.location.reload()}
@@ -117,7 +93,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <ProvisioningGuard>
             {/* 1. Check specific roles if provided */}
             {requiredRole && !hasRole(requiredRole) ? (
-                <div className="flex flex-col items-center justify-center" style={{ minHeight: '100vh', padding: '2rem' }}>
+                <div className="denied-container">
                     <h1 className="text-3xl font-bold mb-4">Access Denied</h1>
                     <p className="text-secondary mb-6">
                         You don't have permission to access this page.
@@ -127,7 +103,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                     </a>
                 </div>
             ) : requiredLevel !== undefined && !canSee(requiredLevel) ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate to="/unauthorized" replace />
             ) : (
                 <>{children}</>
             )}

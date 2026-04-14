@@ -1,0 +1,17 @@
+.mini-icon-status {
+    color: var(--dynamic-color);
+}
+
+.mini-status-badge {
+    background: var(--dynamic-bg);
+    color: var(--dynamic-color);
+}
+
+.signal-bar-fill {
+    height: var(--bar-height);
+    background: var(--fill-color);
+}
+
+.rssi-value-text {
+    color: var(--rssi-color);
+}

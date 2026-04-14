@@ -48,8 +48,8 @@ const PartnersClientsSection: React.FC = () => {
         theme: string;
     }
 
-    const partnersAnim = useScrollAnimation(0.15);
-    const industriesAnim = useScrollAnimation(0.15);
+    const { elementRef: partnersRef, isVisible: partnersVisible } = useScrollAnimation(0.15);
+    const { elementRef: industriesRef, isVisible: industriesVisible } = useScrollAnimation(0.15);
 
     const partners: Partner[] = [
         { name: "Espressif Systems", logoUrl: logoEspressif },
@@ -118,7 +118,7 @@ const PartnersClientsSection: React.FC = () => {
             <div className="pc-container">
 
                 {/* PARTNERS SECTION */}
-                <div ref={partnersAnim.elementRef} className={`reveal-on-scroll ${partnersAnim.isVisible ? 'is-visible' : ''}`} style={{ marginBottom: '80px' }}>
+                <div ref={partnersRef} className={`reveal-on-scroll ${partnersVisible ? 'is-visible' : ''}`} style={{ marginBottom: '80px' }}>
                     <div className="pc-header">
                         <div className="pc-pill ecosystem">Innovation Ecosystem</div>
                         <h2 className="pc-title">Our <span className="text-cyan">Strategic Partners</span></h2>
@@ -143,7 +143,7 @@ const PartnersClientsSection: React.FC = () => {
                 </div>
 
                 {/* TARGETED INDUSTRIES SECTION */}
-                <div ref={industriesAnim.elementRef} className={`clients-wrapper reveal-on-scroll ${industriesAnim.isVisible ? 'is-visible' : ''}`}>
+                <div ref={industriesRef} className={`clients-wrapper reveal-on-scroll ${industriesVisible ? 'is-visible' : ''}`}>
                     <div className="pc-header">
                         <div className="pc-pill industries">Targeted Industries</div>
                         <h2 className="pc-title">Where Fuel Failure Is <span className="text-orange">Not an Option</span></h2>

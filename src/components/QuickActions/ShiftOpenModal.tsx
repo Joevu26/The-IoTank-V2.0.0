@@ -18,74 +18,100 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
     const { currentUser } = useAuth();
     const { tanks } = useTanks(currentUser?.stationId || '');
     const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map(t => t.id));
+    const [isStarting, setIsStarting] = React.useState(false);
 
     if (!isOpen) return null;
-
     const handleStart = async () => {
         const now = new Date();
         const nowString = now.toISOString();
+        if (!currentUser) return;
 
-        // Set shift status to 'open' in local storage
-        localStorage.setItem('iotank_shift_status', 'open');
-        localStorage.setItem('iotank_shift_start_time', nowString);
-        
-        // Capture opening volumes using real-time telemetry instead of stale db entries
-        const startVolumes: Record<string, number> = {};
-        tanks.forEach(t => {
-            const currentReading = Object.values(readings).find(r => r.tankId === t.id);
-            const liveVolume = currentReading?.volumeCorrected || currentReading?.volume || t.currentVolume || 0;
-            startVolumes[t.id] = liveVolume;
-        });
-        localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(startVolumes));
-        localStorage.removeItem('iotank_shift_closed_at');
-        
-        // Trigger a custom event so Navbar can update if needed
-        window.dispatchEvent(new Event('iotank_shift_changed'));
-
-        // 1. Database Notification
+        setIsStarting(true);
         try {
+            // 1. Update stateless shift tracker in DB
+            const { error: shiftError } = await supabase
+                .from('current_station_shifts')
+                .upsert({
+                    station_id: currentUser.stationId,
+                    status: 'OPEN',
+                    updated_at: nowString,
+                    updated_by: currentUser.authUserId
+                });
+
+            if (shiftError) throw shiftError;
+
+            // 2. Database Notification (Unified Timeline)
             await AuditService.log(
+                'SHIFT',
                 'SHIFT_STARTED',
-                currentUser?.stationId || 'Unknown',
-                `Shift opened by ${currentUser?.email} at ${now.toLocaleTimeString()}`
+                currentUser.stationId,
+                `Shift opened by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}`,
+                'INFO',
+                { time: nowString }
             );
 
+            // Legacy alert for backward compatibility with notification bell
             await supabase.from('alerts').insert({
-                station_id: currentUser?.stationId,
-                auth_user_id: currentUser?.authUserId,
+                station_id: currentUser.stationId,
+                auth_user_id: currentUser.authUserId,
                 alert_type: 'info',
                 severity: 'info',
                 title: 'Operation Started',
-                message: `Shift opened by ${currentUser?.email} at ${now.toLocaleTimeString()}`,
-                alert_data: { type: 'shift_open', user: currentUser?.email, time: nowString }
+                message: `Shift opened by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}`,
+                alert_data: { type: 'shift_open', user: currentUser.email, time: nowString }
             });
+
+            // 3. Volatile start volumes (kept in localStorage for active session only)
+            const startVolumes: Record<string, number> = {};
+            tanks.forEach(t => {
+                const currentReading = readings[t.id];
+                const liveVolume = currentReading?.volumeCorrected || currentReading?.volume || t.currentVolume || 0;
+                startVolumes[t.id] = liveVolume;
+            });
+            localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(startVolumes));
+            localStorage.setItem('iotank_shift_status', 'open');
+            localStorage.setItem('iotank_shift_start_time', nowString);
+            localStorage.setItem('iotank_shift_opened_by', JSON.stringify({ 
+                authUserId: currentUser.authUserId, 
+                display: currentUser.displayName || currentUser.email 
+            }));
+            
+            // 4. Browser Notification
+            NotificationService.show('🚀 Shift Initialized', {
+                body: `Station: ${currentUser?.stationId}\nTime: ${now.toLocaleTimeString()}\nOperator: ${currentUser.displayName || currentUser.email}`,
+                tag: 'shift-open'
+            });
+
+            // 5. Off-Platform SMTP Tactical Email
+            try {
+                await EmailDispatchService.sendSecurityAlert({
+                    to: 'admin@iotank.com',
+                    type: 'SYSTEM_CRITICAL',
+                    siteName: currentUser?.companyName || 'Fuel Station',
+                    details: {
+                       timestamp: nowString,
+                       operator: currentUser?.email || 'Unknown',
+                       description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
+                    }
+                });
+            } catch (mailErr) {
+                console.error('[ShiftOpen] Tactical email failed:', mailErr);
+            }
+
+            onClose();
         } catch (err) {
-            console.error('[ShiftOpen] Alert/Audit insert failed:', err);
-        }
-
-        // 2. Browser Notification
-        NotificationService.show('🚀 Shift Initialized', {
-            body: `Station: ${currentUser?.companyName || 'Fuel Station'}\nTime: ${now.toLocaleTimeString()}\nOperator: ${currentUser?.email}`,
-            tag: 'shift-open'
-        });
-
-        // 3. Off-Platform SMTP Tactical Email
-        try {
-            await EmailDispatchService.sendSecurityAlert({
-                to: 'admin@iotank.com', // In production, this would be the destination admin email
-                type: 'SYSTEM_CRITICAL',
-                siteName: currentUser?.companyName || 'Fuel Station',
-                details: {
-                   timestamp: nowString,
-                   operator: currentUser?.email || 'Unknown',
-                   description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
+            console.error('[ShiftOpen] Activation failed:', err);
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Shift Activation Failed',
+                    message: 'Check connectivity and try again.',
+                    type: 'error',
+                    attribution: 'ACTIVATION SERVICE'
                 }
-            });
-        } catch (mailErr) {
-            console.error('[ShiftOpen] Tactical email failed:', mailErr);
+            }));
+        } finally {
+            setIsStarting(false);
         }
-
-        onClose();
     };
 
     const stationName = currentUser?.companyName || 'Fuel Station';
@@ -102,7 +128,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                             <span className="modal-badge violet">BEGIN</span>
                         </div>
                     </div>
-                    <button className="close-btn" type="button" onClick={onClose}><FiX size={18} /></button>
+                    <button className="close-btn" type="button" onClick={onClose} title="Close" aria-label="Close"><FiX size={18} /></button>
                 </div>
 
                 <div className="p-1">
@@ -128,8 +154,8 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
                     <div className="form-actions pt-6 pb-2 border-none">
                         <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-                        <button type="button" className="btn-submit" onClick={handleStart}>
-                            Start Recording Shift
+                        <button type="button" className="btn-submit" onClick={handleStart} disabled={isStarting}>
+                            {isStarting ? 'Committing Shift...' : 'Start Recording Shift'}
                         </button>
                     </div>
                 </div>

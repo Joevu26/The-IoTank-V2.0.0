@@ -146,9 +146,9 @@ export async function convertToWebP(file: File | Blob, quality: number = 0.8): P
 /**
  * Throttled execution for high-frequency telemetry parsers
  */
-export function throttle(func: Function, limit: number) {
+export function throttle<T extends (...args: any[]) => any>(func: T, limit: number) {
     let inThrottle: boolean;
-    return function(this: any, ...args: any[]) {
+    return function(this: any, ...args: Parameters<T>) {
         if (!inThrottle) {
             func.apply(this, args);
             inThrottle = true;

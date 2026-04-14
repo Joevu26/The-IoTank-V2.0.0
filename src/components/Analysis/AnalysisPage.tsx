@@ -20,6 +20,7 @@ import { CSVAnalysisCategory, PDFAnalysisCategory } from '@/types';
 import { useTransactions } from '@/hooks/useTransactions';
 import { format } from 'date-fns';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
+import './AnalysisPage.css';
 
 const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -35,10 +36,10 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 const AnalysisPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || 'default-org';
-    const userId = currentUser?.authUserId || 'guest';
+    const stationId = currentUser?.stationId || 'default-org';
+    const authUserId = currentUser?.authUserId || 'guest';
 
-    const { transactions } = useTransactions(orgId);
+    const { transactions } = useTransactions(stationId);
     const [timeFilter, setTimeFilter] = useState('Week');
 
     const stats = transactions.reduce((acc, tx) => {
@@ -78,7 +79,7 @@ const AnalysisPage: React.FC = () => {
         pdfResult,
         error,
         reset
-    } = useFileAnalysis(orgId, userId);
+    } = useFileAnalysis(stationId, authUserId);
 
     const [category, setCategory] = useState<CSVAnalysisCategory | PDFAnalysisCategory>('general');
 
@@ -150,7 +151,7 @@ const AnalysisPage: React.FC = () => {
                                 ))}
                             </div>
                         </div>
-                        <div style={{ width: '100%', height: 120 }}>
+                        <div className="ap-chart-wrapper">
                             <ResponsiveContainer>
                                 <AreaChart data={displayData}>
                                     <defs>
@@ -282,7 +283,7 @@ const AnalysisPage: React.FC = () => {
                                                     <span>{csvResult.dataQuality.completeness}%</span>
                                                 </div>
                                                 <div className="bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                                    <div className="bg-success h-full" style={{ width: `${csvResult.dataQuality.completeness}%` }}></div>
+                                                    <div className={`ap-progress-fill w-${Math.round((csvResult.dataQuality.completeness || 0) / 5) * 5}p`}></div>
                                                 </div>
                                             </div>
                                             {csvResult.dataQuality.issues.length > 0 && (

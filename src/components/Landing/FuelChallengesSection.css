@@ -80,6 +80,7 @@
     gap: 6px;
     padding: 28px 16px;
     background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(0, 0, 0, 0.07);
     border-radius: 16px;
@@ -112,6 +113,7 @@
     max-width: 760px;
     margin: 0 auto;
     background: rgba(255, 255, 255, 0.55);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(0, 0, 0, 0.07);
     border-left: 4px solid var(--cyber-emerald);
@@ -441,6 +443,7 @@
 .chat-revolution {
     margin-top: 32px;
     background: rgba(255, 255, 255, 0.4);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid var(--obsidian-border);
     padding: 24px;
@@ -617,6 +620,7 @@
 
 .tc-card {
     background: rgba(255, 255, 255, 0.65);
+    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-left: 4px solid #dc2626;
@@ -717,6 +721,7 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;

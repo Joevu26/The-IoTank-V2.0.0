@@ -217,10 +217,10 @@
     }
 }
 
-/* Custom Scrollbar for Action Queue */
+/* Custom Scrollbar for Action Queue & Trays */
 .custom-scrollbar::-webkit-scrollbar {
     display: block !important;
-    width: 4px !important;
+    width: 6px !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -229,18 +229,18 @@
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background: #cbd5e1 !important;
-    /* slate-300 */
     border-radius: 10px !important;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #94a3b8 !important;
-    /* slate-400 */
 }
 
 .custom-scrollbar {
-    scrollbar-width: thin !important;
-    scrollbar-color: #cbd5e1 transparent !important;
+    @supports (scrollbar-width: auto) {
+        scrollbar-width: thin !important;
+        scrollbar-color: #cbd5e1 transparent !important;
+    }
 }
 
 /* Tab Content Transitions */
@@ -257,5 +257,9 @@
         opacity: 1;
         transform: translateY(0) scale(1);
     }
+}
+
+.variance-panel-body {
+    max-height: calc(90vh - 180px);
 }
 

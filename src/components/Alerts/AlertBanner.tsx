@@ -153,7 +153,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alert, floating }) => 
             {showVerification && (
                 <RefillVerificationModal
                     alert={alert}
-                    orgId={currentUser?.stationId || ''}
+                    stationId={currentUser?.stationId || ''}
                     onClose={() => {
                         setShowVerification(false);
                         setDismissed(true); // Dismiss banner after verification

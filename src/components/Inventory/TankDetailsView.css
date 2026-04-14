@@ -791,6 +791,19 @@
 }
 
 /* ── ── ── ── ── ── ── ── ── ── ── ── ── ──
+   COMPLIANCE & UTILITIES
+── ── ── ── ── ── ── ── ── ── ── ── ── ── */
+.live-trends-chart-container {
+    height: 350px;
+    width: 100%;
+}
+
+.progress-bar-fill-dynamic {
+    width: var(--progress-width, 0%);
+    transition: width 1s ease-out;
+}
+
+/* ── ── ── ── ── ── ── ── ── ── ── ── ── ──
    INTELLIGENCE SELECTOR
 ── ── ── ── ── ── ── ── ── ── ── ── ── ── */
 .intelligence-selector-container {
@@ -910,7 +923,6 @@
 .table-responsive {
     width: 100%;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     margin-bottom: 1rem;
 }
 

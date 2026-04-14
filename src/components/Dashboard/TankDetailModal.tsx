@@ -3,32 +3,34 @@ import { createPortal } from 'react-dom';
 import { Tank } from '@/types';
 import { useHistoricalReadings, updateTank } from '@/hooks/useSupabase';
 import { useConsumptionAnalytics } from '@/hooks/useConsumptionAnalytics';
-import { TankViewer } from '../3D/TankViewer';
+import { TankVisual2D } from '../Common/TankVisual2D';
 import { TimeSeriesChart } from '../Analytics/TimeSeriesChart';
 import { PredictivePanel } from '../Analytics/PredictivePanel';
 import { FiX, FiActivity, FiSettings, FiDownload, FiShare2, FiRefreshCw } from 'react-icons/fi';
 import { formatVolume } from '@/utils/formatUtils';
 import { exportToCSV } from '@/utils/exportUtils';
+import { useAuth } from '@/hooks/useAuth';
 import './TankDetailModal.css';
 
 interface TankDetailModalProps {
     tank: Tank;
-    orgId: string;
+    stationId: string;
     onClose: () => void;
 }
 
 export const TankDetailModal: React.FC<TankDetailModalProps> = ({
     tank,
-    orgId,
+    stationId,
     onClose
 }) => {
+    const { canSee } = useAuth();
     const [activeTab, setActiveTab] = useState<'visual' | 'analytics' | 'config'>('visual');
     const [timeRange] = useState({
         start: Date.now() - 24 * 60 * 60 * 1000, // Last 24 hours
         end: Date.now()
     });
 
-    const { readings } = useHistoricalReadings(orgId, tank.id, timeRange);
+    const { readings } = useHistoricalReadings(stationId, tank.id, timeRange);
     const latestReading = readings.length > 0 ? readings[readings.length - 1] : null;
     const analytics = useConsumptionAnalytics(tank, readings);
 
@@ -41,7 +43,6 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
         if (type === 'download') {
             exportToCSV(readings, `${tank.name}_Telemetry_${new Date().toISOString().split('T')[0]}`);
         } else {
-            // Sharing is still mocked as it requires specific backend integration (email triggers etc)
             await new Promise(resolve => setTimeout(resolve, 800));
             alert('Report shared with authorized site personnel.');
         }
@@ -54,23 +55,16 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
         setSaving(true);
         try {
             const form = e.target as HTMLFormElement;
-            const newCoeff = parseFloat((form.elements.namedItem('thermalCoefficient') as HTMLInputElement).value);
-            const newThreshold = parseFloat((form.elements.namedItem('highLevelThreshold') as HTMLInputElement).value);
-            const esp32Address = (form.elements.namedItem('esp32Address') as HTMLInputElement).value;
-            const sensorHeight = parseFloat((form.elements.namedItem('sensorHeight') as HTMLInputElement).value);
-            const sensorOffset = parseFloat((form.elements.namedItem('sensorOffset') as HTMLInputElement).value);
-            const temperatureAlertThreshold = parseFloat((form.elements.namedItem('temperatureAlertThreshold') as HTMLInputElement).value);
+            const updates = {
+                thermalCoefficient: parseFloat((form.elements.namedItem('thermalCoefficient') as HTMLInputElement).value),
+                highLevelThreshold: parseFloat((form.elements.namedItem('highLevelThreshold') as HTMLInputElement).value),
+                esp32Address: (form.elements.namedItem('esp32Address') as HTMLInputElement).value,
+                sensorHeight: parseFloat((form.elements.namedItem('sensorHeight') as HTMLInputElement).value),
+                sensorOffset: parseFloat((form.elements.namedItem('sensorOffset') as HTMLInputElement).value),
+                temperatureAlertThreshold: parseFloat((form.elements.namedItem('temperatureAlertThreshold') as HTMLInputElement).value),
+            };
 
-            await updateTank(tank.id, {
-                thermalCoefficient: newCoeff,
-                highLevelThreshold: newThreshold,
-                esp32Address,
-                sensorHeight,
-                sensorOffset,
-                temperatureAlertThreshold,
-            });
-
-            // Allow state to settle visually
+            await updateTank(tank.id, updates);
             alert('Hardware configuration synchronized.');
         } catch (error) {
             console.error('Error updating config:', error);
@@ -81,68 +75,79 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
     };
 
     return createPortal(
-        <div className="modal-overlay animate-in fade-in duration-300">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="tank-modal-title">
             <div className="modal-container tank-detail-modal">
                 {/* Modal Header */}
                 <div className="modal-header">
                     <div className="header-info">
-                        <h2>{tank.name}</h2>
-                        <p className="text-secondary">{tank.location} • {tank.fuelType.toUpperCase()}</p>
+                        <h2 id="tank-modal-title">{tank.name}</h2>
+                        <p className="text-secondary">{tank.location || 'Primary Station'} • {tank.fuelType.toUpperCase()}</p>
                     </div>
                     <div className="header-actions">
                         <button
-                            className="btn btn-icon"
-                            title="Download Data"
+                            className="btn-icon"
+                            title="Download Telemetry CSV"
                             onClick={() => handleExport('download')}
                             disabled={exporting !== null}
+                            aria-label="Download CSV"
                         >
-                            {exporting === 'download' ? <FiRefreshCw className="spinner" /> : <FiDownload />}
+                            {exporting === 'download' ? <FiRefreshCw className="spinner animate-spin" /> : <FiDownload />}
                         </button>
                         <button
-                            className="btn btn-icon"
-                            title="Share Report"
+                            className="btn-icon"
+                            title="Share Analytical Report"
                             onClick={() => handleExport('share')}
                             disabled={exporting !== null}
+                            aria-label="Share Report"
                         >
-                            {exporting === 'share' ? <FiRefreshCw className="spinner" /> : <FiShare2 />}
+                            {exporting === 'share' ? <FiRefreshCw className="spinner animate-spin" /> : <FiShare2 />}
                         </button>
-                        <button className="btn btn-icon close-btn" onClick={onClose}><FiX /></button>
+                        <button 
+                            className="btn-icon close-btn" 
+                            onClick={onClose}
+                            title="Close Modal"
+                            aria-label="Close"
+                        >
+                            <FiX />
+                        </button>
                     </div>
                 </div>
 
                 {/* Navigation Tabs */}
-                <div className="modal-tabs">
+                <nav className="modal-tabs" aria-label="Tank Details Tabs">
                     <button
                         className={`tab-btn ${activeTab === 'visual' ? 'active' : ''}`}
                         onClick={() => setActiveTab('visual')}
                     >
                         <FiActivity className="tab-icon" /> Visual Hub
                     </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('analytics')}
-                    >
-                        <FiActivity className="tab-icon" /> AI Analytics
-                    </button>
-                    <button
-                        className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('config')}
-                    >
-                        <FiSettings className="tab-icon" /> Configuration
-                    </button>
-                </div>
+                    {canSee(6) && (
+                        <button
+                            className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('analytics')}
+                        >
+                            <FiActivity className="tab-icon" /> AI Analytics
+                        </button>
+                    )}
+                    {canSee(5) && (
+                        <button
+                            className={`tab-btn ${activeTab === 'config' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('config')}
+                        >
+                            <FiSettings className="tab-icon" /> Configuration
+                        </button>
+                    )}
+                </nav>
 
                 {/* Modal Content */}
                 <div className="modal-content-scrollable">
                     {activeTab === 'visual' && (
-                        <div className="visual-tab">
+                        <div className="visual-tab animate-in fade-in slide-in-from-bottom-2">
                             <div className="visual-grid">
                                 <div className="visual-main">
-                                    <TankViewer
+                                    <TankVisual2D
                                         fuelLevel={latestReading?.fuelLevel || 0}
                                         fuelType={tank.fuelType}
-                                        capacity={tank.capacity}
-                                        tankName={tank.name}
                                         shape={tank.shape as any}
                                         height={tank.height}
                                         diameter={tank.diameter}
@@ -150,29 +155,29 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
                                     />
                                 </div>
                                 <div className="visual-stats">
-                                    <div className="stat-card card">
+                                    <div className="stat-card">
                                         <span className="stat-label">Corrected Volume</span>
                                         <span className="stat-value">{formatVolume(latestReading?.volumeCorrected || 0)}</span>
-                                        <span className="stat-trend text-success">↑ 2.3% vs yesterday</span>
+                                        <span className="stat-trend text-success">Total Inventory</span>
                                     </div>
-                                    <div className="stat-card card">
+                                    <div className="stat-card">
                                         <span className="stat-label">Consumption Rate</span>
                                         <span className="stat-value">{analytics.defillRate.toFixed(1)} L/hr</span>
-                                        <span className={`stat-trend ${analytics.isTheftSuspected ? 'text-danger' : 'text-secondary'}`}>
+                                        <span className={`stat-trend ${analytics.isTheftSuspected ? 'text-red-600' : 'text-slate-400'}`}>
                                             {analytics.isTheftSuspected ? 'ALERT: Rapid Defill' : `${analytics.trend.toUpperCase()}`}
                                         </span>
                                     </div>
-                                    <div className="stat-card card">
+                                    <div className="stat-card">
                                         <span className="stat-label">Time to Empty (ETE)</span>
                                         <span className="stat-value">{analytics.ete}</span>
-                                        <span className={`stat-subtext ${analytics.isLeakageSuspected ? 'text-warning' : 'text-secondary'}`}>
+                                        <span className={`stat-subtext ${analytics.isLeakageSuspected ? 'text-orange-500' : 'text-slate-400'}`}>
                                             {analytics.isLeakageSuspected ? 'Possible Leakage Detected' : 'Forecast based on 24h trend'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="live-trends mt-6">
+                            <div className="live-trends mt-10">
                                 <h3>Live Level Trend</h3>
                                 <TimeSeriesChart
                                     data={readings}
@@ -185,22 +190,22 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
                     )}
 
                     {activeTab === 'analytics' && (
-                        <div className="analytics-tab p-4">
-                            <PredictivePanel stationId={orgId} tankId={tank.id} />
+                        <div className="analytics-tab animate-in fade-in slide-in-from-bottom-2">
+                            <PredictivePanel stationId={stationId} tankId={tank.id} />
 
-                            <div className="grid grid-cols-2 gap-4 mt-6">
+                            <div className="grid-2 mt-10">
                                 <TimeSeriesChart
                                     data={readings}
                                     title="Temperature Variance"
                                     dataKey="temperature"
-                                    color="var(--chart-temperature)"
+                                    color="var(--chart-temperature, #ef4444)"
                                     unit="°C"
                                 />
                                 <TimeSeriesChart
                                     data={readings}
                                     title="Corrected Volume (L)"
                                     dataKey="volumeCorrected"
-                                    color="var(--chart-volume)"
+                                    color="var(--chart-volume, #3b82f6)"
                                     unit="L"
                                 />
                             </div>
@@ -208,82 +213,90 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
                     )}
 
                     {activeTab === 'config' && (
-                        <div className="config-tab p-6">
-                            <div className="section-header mb-6">
-                                <h3>Technical Specifications</h3>
-                                <p className="text-secondary text-sm">Industrial calibration for thermal expansion and sensor geometry.</p>
+                        <div className="config-tab animate-in fade-in slide-in-from-bottom-2">
+                            <div className="form-header">
+                                <h3 className="form-title">Technical Specifications</h3>
+                                <p className="form-subtitle">Industrial calibration for thermal expansion and sensor geometry.</p>
                             </div>
 
                             <form onSubmit={handleUpdateConfig} className="config-form">
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid-2">
                                     <div className="form-group">
-                                        <label>Capacity (Liters)</label>
-                                        <input type="number" defaultValue={tank.capacity} disabled />
+                                        <label htmlFor="cap-read">Capacity (Liters)</label>
+                                        <input id="cap-read" type="number" defaultValue={tank.capacity} disabled title="Read-only capacity" />
                                     </div>
                                     <div className="form-group">
-                                        <label>Fuel Type</label>
-                                        <input type="text" defaultValue={tank.fuelType} disabled />
+                                        <label htmlFor="fuel-read">Fuel Type</label>
+                                        <input id="fuel-read" type="text" defaultValue={tank.fuelType} disabled title="Read-only fuel type" />
                                     </div>
                                     <div className="form-group">
-                                        <label>Thermal Expansion Coeff (α)</label>
-                                        <input type="number" name="thermalCoefficient" defaultValue={tank.thermalCoefficient} step="0.0001" />
+                                        <label htmlFor="thermal-input">Thermal Expansion Coeff (α)</label>
+                                        <input id="thermal-input" type="number" name="thermalCoefficient" defaultValue={tank.thermalCoefficient} step="0.0001" title="Thermal Expansion Coefficient" />
                                     </div>
                                     <div className="form-group">
-                                        <label>Safe Fill Limit (%)</label>
-                                        <input type="number" name="highLevelThreshold" defaultValue={tank.highLevelThreshold} />
+                                        <label htmlFor="limit-input">Safe Fill Limit (%)</label>
+                                        <input id="limit-input" type="number" name="highLevelThreshold" defaultValue={tank.highLevelThreshold} title="High Level Alert Threshold" />
                                     </div>
                                 </div>
 
-                                <div className="divider my-8"></div>
+                                <div className="divider"></div>
 
-                                <div className="section-header mb-6">
-                                    <h3>Hardware & Calibration</h3>
-                                    <p className="text-secondary text-sm">Link physical ESP32 devices and set ultrasonic sensor offsets.</p>
+                                <div className="form-header">
+                                    <h3 className="form-title">Hardware & Calibration</h3>
+                                    <p className="form-subtitle">Link physical ESP32 devices and set ultrasonic sensor offsets.</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid-2">
                                     <div className="form-group">
-                                        <label>ESP32 MAC Address / ID</label>
+                                        <label htmlFor="esp-input">ESP32 MAC Address / ID</label>
                                         <input
+                                            id="esp-input"
                                             type="text"
                                             name="esp32Address"
                                             placeholder="XX:XX:XX:XX:XX:XX"
                                             defaultValue={tank.esp32Address}
+                                            title="ESP32 Hardware Identity"
                                         />
                                     </div>
                                     <div className="form-group">
-                                        <label>Sensor Height (cm)</label>
+                                        <label htmlFor="height-input">Sensor Height (cm)</label>
                                         <input
+                                            id="height-input"
                                             type="number"
                                             name="sensorHeight"
                                             defaultValue={tank.sensorHeight}
                                             placeholder="Measured from bottom"
+                                            title="Mounting Height from Tank Floor"
                                         />
                                         <small className="help-text">Distance from tank bottom to sensor face.</small>
                                     </div>
                                     <div className="form-group">
-                                        <label>Calibration Offset (cm)</label>
+                                        <label htmlFor="offset-input">Calibration Offset (cm)</label>
                                         <input
+                                            id="offset-input"
                                             type="number"
                                             name="sensorOffset"
                                             defaultValue={tank.sensorOffset}
+                                            title="Installation Depth Offset"
                                         />
                                         <small className="help-text">Adjustment for mounting protrusions.</small>
                                     </div>
                                     <div className="form-group">
-                                        <label>Temp Alert Threshold (°C)</label>
+                                        <label htmlFor="temp-input">Temp Alert Threshold (°C)</label>
                                         <input
+                                            id="temp-input"
                                             type="number"
                                             name="temperatureAlertThreshold"
                                             defaultValue={tank.temperatureAlertThreshold}
+                                            title="Maximum Temperature Threshold"
                                         />
                                         <small className="help-text">Trigger alert if fuel exceeds this temp.</small>
                                     </div>
                                 </div>
 
                                 <div className="mt-10">
-                                    <button type="submit" className="btn btn-primary w-full md:w-auto" disabled={saving}>
-                                        {saving ? 'Synchronizing Supabase...' : 'Apply Calibration Logic'}
+                                    <button type="submit" className="btn-primary" disabled={saving}>
+                                        {saving ? 'Synchronizing Ledger...' : 'Apply Calibration Logic'}
                                     </button>
                                 </div>
                             </form>

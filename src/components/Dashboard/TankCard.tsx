@@ -5,7 +5,8 @@ import { useLatestReading, useHistoricalReadings } from '@/hooks/useSupabase';
 import { useConsumptionAnalytics } from '@/hooks/useConsumptionAnalytics';
 import { formatVolume, formatTemperature } from '@/utils/formatUtils';
 import { getFuelStatus } from '@/utils/dashboardUtils';
-import { FiMapPin, FiClock, FiRefreshCw, FiActivity, FiThermometer, FiDollarSign, FiAlertCircle } from 'react-icons/fi';
+import { FiMapPin, FiClock, FiRefreshCw, FiActivity, FiThermometer, FiAlertCircle } from 'react-icons/fi';
+
 import { useNavigate } from 'react-router-dom';
 import '../Common/DesignSystemCards.css';
 import './TankCard.css';
@@ -28,7 +29,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
     const reading = liveReading || initialReading;
 
     const [isSyncing, setIsSyncing] = useState(false);
-    const [currency, setCurrency] = useState<'USD' | 'Ksh'>('USD');
+    const currency = 'Ksh';
 
     // 2. Fetch 24h historical data only when needed (e.g. hovered or detailed view)
     // For the initial grid, we can skip this heavy fetching
@@ -86,17 +87,31 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
         return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
-    // Toggle currency for asset value
-    const toggleCurrency = (e: React.MouseEvent) => {
+    // Asset value configuration link
+    const handleConfigurePrice = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setCurrency(prev => prev === 'USD' ? 'Ksh' : 'USD');
+        navigate(`/settings?tab=inventory&tankId=${tank.id}`);
     };
 
-    // Simulated Asset Value Calculation
+    // Calculated Asset Value logic
     const getAssetValue = () => {
-        if (!reading) return isGhost ? '0.00' : '0.00';
-        const pricePerLiter = currency === 'USD' ? 1.45 : 190.50; // Mock prices
-        return (reading.volumeCorrected * pricePerLiter).toLocaleString(undefined, {
+        if (!reading) return '0.00';
+        const retailPrice = (tank as any).metadata?.retailPrice;
+        
+        if (!retailPrice || retailPrice <= 0) {
+            return (
+                <button 
+                    className="text-amber-500 hover:text-amber-600 font-extrabold text-[10px] underline underline-offset-2 animate-pulse"
+                    onClick={handleConfigurePrice}
+                    title="Price not set. Click to configure."
+                >
+                    N/A (SET PRICE)
+                </button>
+            );
+        }
+
+        const volume = reading.volumeCorrected || reading.volume || 0;
+        return (volume * retailPrice).toLocaleString(undefined, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
@@ -108,7 +123,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
             onMouseEnter={() => setShowDetailedAnalytics(true)}
         >
             <div className="p-4 flex flex-col flex-1">
-                {/* Card Header */}
                 <div className="tank-card-header">
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2 mb-1">
@@ -119,7 +133,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                             <FiMapPin className="inline-icon" />
                             {tank.location}
                         </p>
-
                     </div>
 
                     <div className={`status-badge ${status.className}`}>
@@ -127,9 +140,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                     </div>
                 </div>
 
-                {/* Main Dashboard Components Grid */}
                 <div className="command-center-grid">
-                    {/* Level Gauge Section */}
                     <div className="gauge-section relative flex flex-col items-center">
                         <svg className="fuel-gauge" viewBox="0 0 200 110">
                             <path
@@ -161,7 +172,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                             </text>
                         </svg>
                         
-                        {/* Interactive Volume Button */}
                         <button 
                             className="volume-action-btn"
                             onClick={handleCardClick}
@@ -172,7 +182,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                         </button>
                     </div>
 
-                    {/* Live Metrics Grid */}
                     <div className="metrics-grid">
                         <div className="metric-box">
                             <div className="flex items-center gap-1.5">
@@ -197,9 +206,9 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                                 {isGhost ? '0%' : `${tank.leakProbability || 0}%`}
                             </span>
                         </div>
-                        <div className="metric-box clickable" onClick={toggleCurrency}>
+                        <div className="metric-box clickable" onClick={handleConfigurePrice}>
                             <div className="flex items-center gap-1.5">
-                                <FiDollarSign className="text-secondary text-[10px]" />
+                                <FiActivity className="text-secondary text-[10px]" />
                                 <span className="metric-label">Value ({currency})</span>
                             </div>
                             <span className="metric-value">
@@ -233,28 +242,42 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                     </div>
                 </div>
 
-                {/* Command Center Footer */}
                 <div className="command-footer">
                     <div className="last-update">
-                        <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Last Sync</span>
+                        <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Telemetry Link</span>
                         <div className="flex items-center gap-2 mt-1">
                             <FiClock className="text-secondary" />
                             <span className="last-update-tag">
-                                {reading ? formatTime(reading.timestamp) : (isGhost ? 'Waiting for Link...' : 'Never')}
+                                {reading ? formatTime(reading.timestamp) : (isGhost ? 'Waiting...' : 'Offline')}
                             </span>
                         </div>
                     </div>
 
-                    <button
-                        className={`sync-btn ${isSyncing ? 'syncing' : ''}`}
-                        onClick={handleSync}
-                        disabled={isSyncing || isGhost}
-                        title={isGhost ? "Hardware Needed" : "Force Sync Telemetry"}
-                    >
-                        <FiRefreshCw />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            className="view-hint-glass"
+                            onClick={handleCardClick}
+                            disabled={isGhost}
+                            title="Interactive Analytics"
+                        >
+                            <FiActivity size={12} />
+                            View Details
+                        </button>
+
+                        <button
+                            className={`sync-btn ${isSyncing ? 'syncing' : ''}`}
+                            onClick={handleSync}
+                            disabled={isSyncing || isGhost}
+                            title={isGhost ? "Hardware Needed" : "Force Sync Telemetry"}
+                        >
+                            <FiRefreshCw />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 });
+
+// Fix for react/display-name linter violation
+TankCard.displayName = 'TankCard';

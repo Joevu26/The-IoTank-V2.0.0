@@ -20,26 +20,26 @@ export class ProfilePhotoService {
     /**
      * Upload User Profile Photo.
      */
-    static async uploadProfilePhoto(userId: string, file: File | Blob): Promise<PhotoUploadResult> {
-        return this.uploadAsset(`users/${userId}/profile_photo_${Date.now()}.webp`, {
+    static async uploadProfilePhoto(authUserId: string, file: File | Blob): Promise<PhotoUploadResult> {
+        return this.uploadAsset(`users/${authUserId}/profile_photo_${Date.now()}.webp`, {
             table: 'profiles',
             column: 'photo_url',
             filterColumn: 'auth_user_id',
-            filterValue: userId,
-            oldUrlPattern: `users/${userId}/profile_photo_`
+            filterValue: authUserId,
+            oldUrlPattern: `users/${authUserId}/profile_photo_`
         }, file);
     }
 
     /**
      * Upload Organization Logo.
      */
-    static async uploadOrganizationLogo(orgId: string, file: File | Blob): Promise<PhotoUploadResult> {
-        return this.uploadAsset(`organizations/${orgId}/logo_${Date.now()}.webp`, {
+    static async uploadOrganizationLogo(stationId: string, file: File | Blob): Promise<PhotoUploadResult> {
+        return this.uploadAsset(`organizations/${stationId}/logo_${Date.now()}.webp`, {
             table: 'fuel_stations',
             column: 'logo_url',
             filterColumn: 'id',
-            filterValue: orgId,
-            oldUrlPattern: `organizations/${orgId}/logo_`
+            filterValue: stationId,
+            oldUrlPattern: `organizations/${stationId}/logo_`
         }, file);
     }
 

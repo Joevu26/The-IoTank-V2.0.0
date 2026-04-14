@@ -168,7 +168,7 @@ function ColorDot({ color }: { color: string }) {
 
 export const ReportingPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const orgId = currentUser?.stationId || '';
+    const stationId = currentUser?.stationId || '';
     const userName = currentUser?.displayName || currentUser?.email || 'Unknown';
 
     // ── Selected report & builder state
@@ -188,11 +188,11 @@ export const ReportingPage: React.FC = () => {
     const [docId, setDocId] = useState('');
     
     // ── Live data hooks
-    const { reports: savedReports, loading: reportsLoading, refresh: refreshReports } = useReports(orgId);
+    const { reports: savedReports, loading: reportsLoading, refresh: refreshReports } = useReports(stationId);
 
     // ── Raw data hooks (for shift recon & procurement)
-    const { shifts } = useShifts(orgId, {});
-    const { tanks } = useTanks(orgId);
+    const { shifts } = useShifts(stationId, {});
+    const { tanks } = useTanks(stationId);
 
     const tankNames = useMemo(() => {
         const m: Record<string, string> = {};
@@ -225,7 +225,7 @@ export const ReportingPage: React.FC = () => {
     };
 
     const handleGenerate = async () => {
-        if (!selectedTemplate || !orgId) return;
+        if (!selectedTemplate || !stationId) return;
         
         setIsPreviewing(true); // Show loading state
         const now = new Date();
@@ -253,7 +253,7 @@ export const ReportingPage: React.FC = () => {
 
         try {
             const { error } = await supabase.from('reports').insert([{
-                station_id: orgId,
+                station_id: stationId,
                 name: selectedTemplate.name,
                 report_type: selectedTemplate.id,
                 report_data: reportData,
@@ -445,6 +445,8 @@ export const ReportingPage: React.FC = () => {
                                 <input
                                     type="date"
                                     className="rp-date-input"
+                                    title="Custom Start Date"
+                                    placeholder="YYYY-MM-DD"
                                     value={customStart}
                                     onChange={e => { setCustomStart(e.target.value); resetGenerate(); }}
                                     disabled={!selectedId}
@@ -453,6 +455,8 @@ export const ReportingPage: React.FC = () => {
                                 <input
                                     type="date"
                                     className="rp-date-input"
+                                    title="Custom End Date"
+                                    placeholder="YYYY-MM-DD"
                                     value={customEnd}
                                     onChange={e => { setCustomEnd(e.target.value); resetGenerate(); }}
                                     disabled={!selectedId}
@@ -467,6 +471,7 @@ export const ReportingPage: React.FC = () => {
                             <label className="rp-builder-label">Tank</label>
                             <select
                                 className="rp-select"
+                                title="Filter by Specific Tank"
                                 value={selectedTankId}
                                 onChange={e => { setSelectedTankId(e.target.value); resetGenerate(); }}
                                 disabled={!selectedId}
@@ -479,6 +484,7 @@ export const ReportingPage: React.FC = () => {
                             <label className="rp-builder-label">Product</label>
                             <select
                                 className="rp-select"
+                                title="Filter by Fuel Product"
                                 value={selectedProduct}
                                 onChange={e => { setSelectedProduct(e.target.value); resetGenerate(); }}
                                 disabled={!selectedId}
@@ -490,7 +496,7 @@ export const ReportingPage: React.FC = () => {
                         </div>
                         <div className="rp-select-group">
                             <label className="rp-builder-label">Site</label>
-                            <select className="rp-select" disabled={!selectedId}>
+                            <select className="rp-select" title="Filter by Operational Site" disabled={!selectedId}>
                                 <option>All Sites</option>
                             </select>
                         </div>
@@ -655,7 +661,7 @@ export const ReportingPage: React.FC = () => {
                                             <th>Date Created</th>
                                             <th>Created By</th>
                                             <th>Formats</th>
-                                            <th style={{ textAlign: 'right' }}>Actions</th>
+                                            <th className="rp-text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -679,7 +685,7 @@ export const ReportingPage: React.FC = () => {
                                             <th>Date Created</th>
                                             <th>Created By</th>
                                             <th>Formats</th>
-                                            <th style={{ textAlign: 'right' }}>Actions</th>
+                                            <th className="rp-text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -719,7 +725,7 @@ export const ReportingPage: React.FC = () => {
                                                             {formats.map(f => <FormatBadge key={f} fmt={f} />)}
                                                         </div>
                                                     </td>
-                                                    <td style={{ textAlign: 'right' }}>
+                                                    <td className="rp-text-right">
                                                         <button 
                                                             className="rp-action-dl-btn" 
                                                             title="Re-download Report"

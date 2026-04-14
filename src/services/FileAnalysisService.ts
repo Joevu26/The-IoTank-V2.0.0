@@ -14,13 +14,13 @@ class FileAnalysisService {
      */
     async uploadFile(
         file: File,
-        orgId: string,
-        userId: string,
+        stationId: string,
+        authUserId: string,
         onProgress?: (progress: number) => void
     ): Promise<FileUpload> {
         const fileId = crypto.randomUUID();
         const extension = file.name.split('.').pop();
-        const storagePath = `uploads/${orgId}/${fileId}.${extension}`;
+        const storagePath = `uploads/${stationId}/${fileId}.${extension}`;
 
         // Supabase storage upload
         const { error: uploadError } = await supabase.storage
@@ -46,9 +46,9 @@ class FileAnalysisService {
             fileSize: file.size,
             storageUrl: storagePath,
             publicUrl: publicUrl,
-            uploadedBy: userId,
+            uploadedBy: authUserId,
             uploadedAt: Date.now(),
-            stationId: orgId,
+            stationId: stationId,
             analysisStatus: 'pending'
         };
 
@@ -56,8 +56,8 @@ class FileAnalysisService {
             .from('file_uploads')
             .upsert({
                 id: fileId,
-                station_id: orgId,
-                user_id: userId,
+                station_id: stationId,
+                supabase_uid: authUserId,
                 file_name: file.name,
                 file_type: file.type.includes('pdf') ? 'pdf' : 'csv',
                 file_size: file.size,

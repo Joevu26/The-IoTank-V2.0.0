@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiInfo, FiAlertCircle, FiCheckCircle, FiShield, FiArrowRight } from 'react-icons/fi';
 
+import './Toast.css';
+
 export type ToastType = 'info' | 'warning' | 'success' | 'error';
 
 interface ToastProps {
@@ -17,6 +19,7 @@ interface ToastProps {
 export const Toast: React.FC<ToastProps> = ({ 
     message, 
     type = 'info', 
+    duration = 5000,
     onClose,
     actionLabel,
     onAction
@@ -50,30 +53,24 @@ export const Toast: React.FC<ToastProps> = ({
         onClose();
     };
 
+    React.useEffect(() => {
+        if (duration > 0 && !actionLabel) {
+            const timer = setTimeout(() => {
+                onClose();
+            }, duration);
+            return () => clearTimeout(timer);
+        }
+    }, [duration, onClose, actionLabel]);
+
     return createPortal(
         <AnimatePresence mode="wait">
-            <div className="toast-portal-root" style={{ position: 'relative', zIndex: 99999999 }}>
+            <div className={`toast-portal-root toast-${type}`}>
                 {/* Fixed Overlay Backdrop */}
                 <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     className="toast-modal-overlay"
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        backdropFilter: 'blur(16px)',
-                        WebkitBackdropFilter: 'blur(16px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 99999999,
-                        padding: '24px'
-                    }}
                 >
                     {/* Modern High-Fidelity Card */}
                     <motion.div 
@@ -82,109 +79,42 @@ export const Toast: React.FC<ToastProps> = ({
                         exit={{ opacity: 0, scale: 0.95, y: -20 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                         className="toast-modal-card"
-                        style={{ 
-                            maxWidth: '440px',
-                            width: '100%',
-                            background: 'rgba(255, 255, 255, 0.95)',
-                            backdropFilter: 'blur(32px) saturate(1.8)',
-                            borderRadius: '40px',
-                            boxShadow: '0 48px 100px -24px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.4) inset',
-                            padding: '48px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            textAlign: 'center',
-                            border: '1px solid rgba(255, 255, 255, 0.5)',
-                            overflow: 'hidden'
-                        }}
                     >
                         {/* Premium Icon Ring / Mesh Gradient Wrapper */}
-                        <div style={{ position: 'relative', marginBottom: '32px' }}>
+                        <div className="toast-icon-container">
                             <motion.div 
                                 animate={{ 
                                     boxShadow: ['0 0 20px rgba(99, 102, 241, 0.2)', '0 0 40px rgba(99, 102, 241, 0.5)', '0 0 20px rgba(99, 102, 241, 0.2)']
                                 }}
                                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                                style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    borderRadius: '24px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
-                                }}
+                                className="toast-icon-wrapper"
                             >
-                                <div style={{ position: 'absolute', inset: 0, opacity: 0.4, background: 'radial-gradient(circle at 50% 0%, #fff, transparent 70%)' }} />
-                                <div style={{ position: 'relative', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_50%_0%,_#fff,_transparent_70%)]" />
+                                <div className="relative text-white flex items-center justify-center">
                                     {getIcon()}
                                 </div>
                             </motion.div>
                             
-                            <div style={{ 
-                                position: 'absolute', 
-                                top: '-8px', 
-                                left: '-8px', 
-                                right: '-8px', 
-                                bottom: '-8px', 
-                                borderRadius: '36px', 
-                                border: '1px solid rgba(99, 102, 241, 0.2)',
-                                animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-                            }} />
+                            <div className="toast-icon-pulse animate-pulse" />
                         </div>
 
                         {/* Impactful Header Section */}
-                        <h3 style={{ 
-                            fontSize: '2.25rem', 
-                            fontWeight: 900, 
-                            color: '#0f172a', 
-                            lineHeight: 1.1, 
-                            letterSpacing: '-0.05em', 
-                            marginBottom: '16px' 
-                        }}>
+                        <h3 className="toast-title">
                             {getTitle()}
                         </h3>
                         
-                        <p style={{ 
-                            fontSize: '1.05rem', 
-                            fontWeight: 700, 
-                            color: '#64748b', 
-                            lineHeight: 1.6, 
-                            marginBottom: '40px', 
-                            padding: '0 16px' 
-                        }}>
+                        <p className="toast-message">
                             {message}
                         </p>
 
                         {/* Action Buttons Stack */}
-                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+                        <div className="toast-actions">
                             {actionLabel && (
                                 <motion.button 
                                     whileHover={{ scale: 1.02, translateY: -2 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={handleAction}
-                                    style={{
-                                        width: '100%',
-                                        maxWidth: '280px',
-                                        height: '56px',
-                                        borderRadius: '16px',
-                                        background: '#6366f1',
-                                        color: 'white',
-                                        fontWeight: 900,
-                                        fontSize: '14px',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.1em',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '12px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 12px 24px -6px rgba(99, 102, 241, 0.5)',
-                                        transition: 'box-shadow 0.2s'
-                                    }}
+                                    className="btn-toast-primary"
                                 >
                                     {actionLabel}
                                     <FiArrowRight size={18} />
@@ -192,23 +122,10 @@ export const Toast: React.FC<ToastProps> = ({
                             )}
                             
                             <motion.button 
-                                whileHover={{ backgroundColor: 'rgba(241, 245, 249, 1)', color: '#0f172a' }}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={onClose}
-                                style={{
-                                    width: '100%',
-                                    maxWidth: '280px',
-                                    height: '48px',
-                                    borderRadius: '12px',
-                                    background: 'rgba(241, 245, 249, 0.5)',
-                                    color: '#475569', // Darker slate for better visibility
-                                    fontWeight: 900,
-                                    fontSize: '12px',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '1px',
-                                    border: '1px solid rgba(203, 213, 225, 0.8)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
+                                className="btn-toast-secondary"
                             >
                                 {actionLabel ? 'Close and solve later' : 'Understood, proceed'}
                             </motion.button>

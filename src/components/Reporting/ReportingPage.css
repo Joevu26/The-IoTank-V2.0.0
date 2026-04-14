@@ -1023,6 +1023,10 @@
     text-align: left;
 }
 
+.rp-text-right {
+    text-align: right;
+}
+
 .rp-saved-table th {
     padding: 1rem 1.25rem;
     font-size: 0.7rem;

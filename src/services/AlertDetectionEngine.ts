@@ -246,7 +246,8 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
 
         if (!isShiftOpen) {
             // CASE A: Shift is CLOSED. Any drop is suspicious.
-            if (dropRate > rapidDropThreshold) {
+            const MIN_THEFT_VOLUME = 5.0; // Liters - Increased threshold to mitigate ultrasonic jitter
+            if (volumeDrop > MIN_THEFT_VOLUME && dropRate > rapidDropThreshold) {
                 const { score, label } = scoreByType('composite-supply-risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
@@ -289,7 +290,8 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             }
         } else {
             // CASE B: Shift is OPEN. Drop is expected, but siphoning (Parallel Pull) is theft.
-            if (dropRate > maxPumpFlow) {
+            const MIN_THEFT_VOLUME = 5.0; // Liters - Standardized noise rejection threshold
+            if (volumeDrop > MIN_THEFT_VOLUME && dropRate > maxPumpFlow) {
                 const { score, label } = scoreByType('composite-supply-risk', 0.95);
                 drafts.push({
                     tankId: tank.id,
@@ -313,7 +315,8 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         }
 
         // ── 6. REFILL DETECTION (Automated Delivery Sensing) ───────────────────────
-        const refillThreshold = ctx.refillDetectionThreshold || 10; // Default 10L increase
+        // [HARDENING]: Normalize threshold to 1% of capacity, fallback to 20L for safety
+        const refillThreshold = ctx.tank.capacity ? (ctx.tank.capacity * 0.01) : (ctx.refillDetectionThreshold || 20);
         const volumeIncrease = currVol - prevVol;
 
         if (volumeIncrease > refillThreshold) {

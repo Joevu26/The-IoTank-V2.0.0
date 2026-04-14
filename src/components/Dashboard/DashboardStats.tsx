@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
-import { Tank, Alert, TankReading } from '@/types';
+import { Tank, Alert } from '@/types';
 import { useAllLatestReadings } from '@/hooks/useSupabase';
 import { ShiftCloseCard } from './ShiftCloseCard';
 import { FiLayers, FiTrendingUp, FiCheckCircle } from 'react-icons/fi';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import '../Common/DesignSystemCards.css';
 import './DashboardStats.css';
 
@@ -10,42 +12,43 @@ interface DashboardStatsProps {
     tanks: Tank[];
     stationId: string;
     alerts: Alert[];
-    currency: 'USD' | 'Ksh';
-    onCurrencyToggle: () => void;
 }
 
 export const DashboardStats: React.FC<DashboardStatsProps> = ({
     tanks,
-    stationId,
-    currency,
-    onCurrencyToggle
+    stationId
 }) => {
+    const navigate = useNavigate();
+    const { canSee } = useAuth();
     
     // --- CUMULATIVE METRICS LOGIC ---
     // Fetch readings for all tanks to calculate totals safely
     const tankIds = useMemo(() => tanks.map(t => t.id), [tanks]);
     const { readings: allReadings } = useAllLatestReadings(stationId, tankIds);
-    const readingsArray = useMemo(() => Object.values(allReadings) as TankReading[], [allReadings]);
+    // CUMULATIVE METRICS LOGIC
+    const { totalVolume, totalAssetValue, hasMissingPrices } = useMemo(() => {
+        let volTotal = 0;
+        let assetTotal = 0;
+        let missing = false;
 
-    // Total Volume across all tanks
-    const totalVolume = useMemo(() => {
-        return readingsArray.reduce((sum: number, r: TankReading) => sum + (r.volumeCorrected || r.volume || 0), 0);
-    }, [readingsArray]);
+        for (const tank of tanks) {
+            const reading = allReadings[tank.id];
+            const vol = reading?.volumeCorrected || reading?.volume || tank.currentVolume || 0;
+            
+            // [FORENSIC HARDENING]: Strictly use Authorized Retail Price from Settings (Tank Metadata)
+            const price = Number((tank as any).metadata?.retailPrice) || 0;
 
-    // Total Asset Value across all tanks (Dynamic Pricing)
-    const totalAssetValue = useMemo(() => {
-        const savedPrices = localStorage.getItem('iotank_fuel_pricing');
-        const fuelPrices = savedPrices ? JSON.parse(savedPrices) : {};
+            volTotal += vol;
+            assetTotal += (vol * price);
+            if (price <= 0 && vol > 0) missing = true;
+        }
 
-        return readingsArray.reduce((sum: number, r: TankReading) => {
-            const tank = tanks.find(t => t.id === r.tankId);
-            const fuelType = tank?.fuelType || 'diesel';
-            const price = fuelPrices[fuelType] || (currency === 'USD' ? 1.45 : 190.50);
-
-            const val = (r.volumeCorrected || r.volume || 0) * price;
-            return sum + val;
-        }, 0);
-    }, [readingsArray, currency, tanks]);
+        return { 
+            totalVolume: volTotal, 
+            totalAssetValue: assetTotal, 
+            hasMissingPrices: missing 
+        };
+    }, [allReadings, tanks]);
 
 
     // Trend calculation (mock for demo)
@@ -62,35 +65,53 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
                         <FiLayers className="stat-icon text-primary" />
                     </div>
                     <div className="stat-value-large text-success">
-                        {Math.round(totalVolume).toLocaleString()}
+                        {tanks.length === 0 && stationId ? (
+                            <span className="animate-pulse">...</span>
+                        ) : (
+                            Math.round(totalVolume).toLocaleString()
+                        )}
                         <span className="text-sm text-secondary font-normal ml-1">L</span>
                     </div>
                     <div className="stat-meta">
                         <span className="text-xs text-secondary">
-                            Across {tanks.length} Active Tanks
+                            {tanks.length === 0 && stationId ? 'Synchronizing fleet...' : `Across ${tanks.length} Active Tanks`}
                         </span>
                     </div>
                 </div>
 
-                {/* Card 2: Cumulative Asset Value */}
-                <div className="ds-card ds-card-panel stat-card clickable" onClick={onCurrencyToggle}>
-                    <div className="stat-header">
-                        <span className="stat-label">Total Asset Value</span>
-                        <FiCheckCircle className="stat-icon text-success" />
+                {/* Card 2: Cumulative Asset Value (Level 6+) */}
+                {canSee(6) && (
+                    <div 
+                        className="ds-card ds-card-panel stat-card clickable group" 
+                        onClick={() => navigate('/settings')}
+                        title={hasMissingPrices ? "Configure Fuel Prices to enable valuation" : "View Inventory Pricing"}
+                    >
+                        <div className="stat-header">
+                            <span className="stat-label">Total Asset Value</span>
+                            <FiCheckCircle className={`stat-icon ${hasMissingPrices ? 'text-amber-500' : 'text-success'}`} />
+                        </div>
+                        <div className="stat-value-large text-success">
+                            {tanks.length === 0 && stationId ? (
+                                <span className="animate-pulse">...</span>
+                            ) : hasMissingPrices ? (
+                                <span className="text-amber-500 underline text-sm animate-pulse flex items-center gap-2">
+                                    N/A (SET PRICES)
+                                </span>
+                            ) : (
+                                <>Ksh {totalAssetValue.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                })}</>
+                            )}
+                        </div>
+                        <div className="stat-meta">
+                            <span className="text-xs text-secondary">Global Revaluation</span>
+                            <span className="text-xs font-bold text-success flex items-center gap-1">
+                                <FiTrendingUp /> {totalTrend}
+                            </span>
+                        </div>
                     </div>
-                    <div className="stat-value-large text-success">
-                        KES {totalAssetValue.toLocaleString(undefined, {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0
-                        })}
-                    </div>
-                    <div className="stat-meta">
-                        <span className="text-xs text-secondary">Global Revaluation</span>
-                        <span className="text-xs font-bold text-success flex items-center gap-1">
-                            <FiTrendingUp /> {totalTrend}
-                        </span>
-                    </div>
-                </div>
+                )}
                 {/* Card 3: Shift Management (Action) */}
                 <div className="shift-mgmt-wrapper h-full">
                     <ShiftCloseCard tank={tanks[0] || null} />

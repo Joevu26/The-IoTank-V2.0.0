@@ -44,13 +44,13 @@ export const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Scroll Animations
-  const problemAnim = useScrollAnimation();
-  const excellenceAnim = useScrollAnimation();
-  const solutionAnim = useScrollAnimation();
-  const testimonialAnim = useScrollAnimation();
-  const dashboardSimAnim = useScrollAnimation();
-  const newsletterAnim = useScrollAnimation();
-  const finalCTAAnim = useScrollAnimation();
+  const { elementRef: problemRef, isVisible: problemVisible } = useScrollAnimation();
+  const { elementRef: excellenceRef, isVisible: excellenceVisible } = useScrollAnimation();
+  const { elementRef: solutionRef, isVisible: solutionVisible } = useScrollAnimation();
+  const { elementRef: testimonialRef, isVisible: testimonialVisible } = useScrollAnimation();
+  const { elementRef: dashboardSimRef, isVisible: dashboardSimVisible } = useScrollAnimation();
+  const { elementRef: newsletterRef, isVisible: newsletterVisible } = useScrollAnimation();
+  const { elementRef: finalCTARef, isVisible: finalCTAVisible } = useScrollAnimation();
 
   const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
   const videos: string[] = [
@@ -313,7 +313,7 @@ export const LandingPage: React.FC = () => {
       </header>
 
       {/* 2. SECTION 1 — THE ECONOMIC REALITY (Chaos/Risk - Slate) */}
-      <div ref={problemAnim.elementRef} className={`reveal-on-scroll ${problemAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={problemRef} className={`reveal-on-scroll ${problemVisible ? 'is-visible' : ''}`}>
         <section id="problem" className="section-bg-mist" style={{ paddingTop: '40px', paddingBottom: '16px' }}>
           <div className="container">
             <CrisisIntro onShowCalculator={() => setIsLossCalcOpen(true)} />
@@ -434,7 +434,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* NEW: INTERACTIVE DASHBOARD SIMULATION */}
-      <div ref={dashboardSimAnim.elementRef} className={`reveal-on-scroll ${dashboardSimAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={dashboardSimRef} className={`reveal-on-scroll ${dashboardSimVisible ? 'is-visible' : ''}`}>
         <Suspense fallback={<div className="section-loader">Loading Dashboard...</div>}>
           <InteractiveDashboardSnippet />
         </Suspense>
@@ -448,7 +448,7 @@ export const LandingPage: React.FC = () => {
 
       {/* 5. SECTION 4 — THE SIX RISK FACTORS (Control - Deep Navy) */}
 
-      <div ref={solutionAnim.elementRef} className={`reveal-on-scroll ${solutionAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={solutionRef} className={`reveal-on-scroll ${solutionVisible ? 'is-visible' : ''}`}>
         <section id="risks" className="section section-bg-light-gray">
           <div className="container">
 
@@ -458,7 +458,7 @@ export const LandingPage: React.FC = () => {
       </div>
 
       {/* 6. SECTION 5 — AUTHORITY & COMPLIANCE (Deep Navy to White) */}
-      <div ref={excellenceAnim.elementRef} className={`reveal-on-scroll ${excellenceAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={excellenceRef} className={`reveal-on-scroll ${excellenceVisible ? 'is-visible' : ''}`}>
         <section className="section section-bg-dark-navy">
           <Suspense fallback={<div className="section-loader">Loading...</div>}>
             <ExcellenceSection />
@@ -600,7 +600,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* NEW: PREMIUM TESTIMONIAL CAROUSEL */}
-      <div ref={testimonialAnim.elementRef} className={`reveal-on-scroll ${testimonialAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={testimonialRef} className={`reveal-on-scroll ${testimonialVisible ? 'is-visible' : ''}`}>
         <Suspense fallback={<div className="section-loader">Loading Testimonials...</div>}>
           <TestimonialCarousel />
         </Suspense>
@@ -631,13 +631,13 @@ export const LandingPage: React.FC = () => {
       </Suspense>
 
       {/* NEW: LEAD MAGNET NEWSLETTER */}
-      <div ref={newsletterAnim.elementRef} className={`reveal-on-scroll ${newsletterAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={newsletterRef} className={`reveal-on-scroll ${newsletterVisible ? 'is-visible' : ''}`}>
         <Suspense fallback={<div className="section-loader">Loading Newsletter...</div>}>
           <LeadMagnetNewsletter />
         </Suspense>
       </div>
 
-      <div ref={finalCTAAnim.elementRef} className={`reveal-on-scroll ${finalCTAAnim.isVisible ? 'is-visible' : ''}`}>
+      <div ref={finalCTARef} className={`reveal-on-scroll ${finalCTAVisible ? 'is-visible' : ''}`}>
 
 
         <section className="final-cta-modern">
