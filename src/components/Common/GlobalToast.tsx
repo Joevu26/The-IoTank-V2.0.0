@@ -12,12 +12,15 @@ interface ToastData {
 export const GlobalToast: React.FC = () => {
     const [toast, setToast] = useState<ToastData | null>(null);
     const [visible, setVisible] = useState(false);
+    const [progress, setProgress] = useState(100);
 
     useEffect(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        let progressInterval: ReturnType<typeof setInterval>;
+
         const handleToast = (event: Event) => {
             const customEvent = event as CustomEvent<any>;
             
-            // Handle both market signals and generic system toasts
             if (event.type === 'market-news-update') {
                 const signal = customEvent.detail;
                 setToast({
@@ -31,12 +34,22 @@ export const GlobalToast: React.FC = () => {
             }
             
             setVisible(true);
+            setProgress(100);
 
-            const timer = setTimeout(() => {
+            if (timer) clearTimeout(timer);
+            if (progressInterval) clearInterval(progressInterval);
+
+            const duration = 6000;
+            const step = 100;
+            
+            progressInterval = setInterval(() => {
+                setProgress(prev => Math.max(0, prev - (step / duration) * 100));
+            }, step);
+
+            timer = setTimeout(() => {
                 setVisible(false);
-            }, 6000);
-
-            return () => clearTimeout(timer);
+                clearInterval(progressInterval);
+            }, duration);
         };
 
         window.addEventListener('market-news-update', handleToast);
@@ -45,6 +58,8 @@ export const GlobalToast: React.FC = () => {
         return () => {
             window.removeEventListener('market-news-update', handleToast);
             window.removeEventListener('system-toast', handleToast);
+            if (timer) clearTimeout(timer);
+            if (progressInterval) clearInterval(progressInterval);
         };
     }, []);
 
@@ -52,56 +67,52 @@ export const GlobalToast: React.FC = () => {
 
     const getIcon = () => {
         switch (toast.type) {
-            case 'success': return <FiCheckCircle size={20} className="text-emerald-500" />;
-            case 'error': return <FiAlertCircle size={20} className="text-rose-500" />;
-            case 'market': return <FiBell size={20} className="text-indigo-500" />;
-            default: return <FiInfo size={20} className="text-blue-500" />;
+            case 'success': return <FiCheckCircle size={18} />;
+            case 'error': return <FiAlertCircle size={18} />;
+            case 'market': return <FiBell size={18} />;
+            default: return <FiInfo size={18} />;
         }
     };
 
-    const getBorderColor = () => {
+    const getSeverityLabel = () => {
         switch (toast.type) {
-            case 'success': return 'border-l-emerald-500';
-            case 'error': return 'border-l-rose-500';
-            case 'market': return 'border-l-indigo-500';
-            default: return 'border-l-blue-500';
+            case 'success': return 'OPERATIONAL_SUCCESS';
+            case 'error': return 'SYSTEM_EXCEPTION';
+            case 'market': return 'MARKET_SIGNAL';
+            default: return 'SYSTEM_ADVISORY';
         }
     };
 
     return (
         <div
-            className={`fixed top-6 right-6 z-[10000] transition-all duration-500 ease-in-out transform ${visible ? 'translate-y-0 opacity-100 scale-100' : '-translate-y-10 opacity-0 scale-95 pointer-events-none'}`}
+            className={`precision-toast-container ${visible ? 'active' : ''}`}
             role="alert"
         >
-            <div className={`ds-card ds-card-panel flex items-start gap-4 p-4 min-w-[320px] max-w-sm bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-l-4 ${getBorderColor()} shadow-2xl`}>
-                <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full shrink-0">
-                    {getIcon()}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {toast.attribution || 'System Message'}
-                        </span>
-                        <span className="text-[10px] text-slate-300 font-medium">Just Now</span>
+            <div className={`precision-toast-card status-${toast.type}`}>
+                <div className="toast-accent-line" />
+                <div className="toast-header-compact">
+                    <div className="toast-title-stack">
+                        <span className="toast-attribution">{toast.attribution || 'SYSTEM INTERFACE'}</span>
+                        <h4 className="toast-title-text">{toast.title}</h4>
                     </div>
-
-                    <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-0.5 line-clamp-1">
-                        {toast.title}
-                    </h4>
-
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed font-medium">
-                        {toast.message}
-                    </p>
+                    <button onClick={() => setVisible(false)} className="toast-close-trigger">
+                        <FiX size={14} />
+                    </button>
                 </div>
 
-                <button
-                    onClick={() => setVisible(false)}
-                    className="p-1 text-slate-300 hover:text-slate-600 transition-colors"
-                    title="Dismiss Notification"
-                >
-                    <FiX size={16} />
-                </button>
+                <div className="toast-body-tactical">
+                    <div className="toast-icon-wrapper">
+                        {getIcon()}
+                    </div>
+                    <div className="toast-content-wrapper">
+                        <span className="toast-severity-pill">{getSeverityLabel()}</span>
+                        <p className="toast-message-text">{toast.message}</p>
+                    </div>
+                </div>
+
+                <div className="toast-progress-container">
+                    <div className="toast-progress-bar" style={{ width: `${progress}%` }} />
+                </div>
             </div>
         </div>
     );

@@ -159,15 +159,20 @@ export function calculateRollingAverage(
  * Get status label and class based on fuel level
  */
 export function getFuelStatus(
-    fuelLevel: number,
-    tank: Tank
+    fuelLevel: number
 ): { label: string; className: string; severity: 'ok' | 'warning' | 'critical' } {
-    if (fuelLevel <= tank.criticalLevelThreshold) {
-        return { label: 'CRITICAL', className: 'status-critical', severity: 'critical' };
-    } else if (fuelLevel <= tank.lowLevelThreshold) {
-        return { label: 'LOW', className: 'status-warning', severity: 'warning' };
+    if (fuelLevel >= 98) {
+        return { label: 'CRITICAL OVERFILL', className: 'status-overfill', severity: 'critical' };
+    } else if (fuelLevel >= 95) {
+        return { label: 'OPERATOR WARNING', className: 'status-high', severity: 'warning' };
+    } else if (fuelLevel >= 50) {
+        return { label: 'MID-POINT CHECK', className: 'status-nominal', severity: 'ok' };
+    } else if (fuelLevel <= 5) {
+        return { label: 'EMERGENCY STOP', className: 'status-critical', severity: 'critical' };
+    } else if (fuelLevel <= 20) {
+        return { label: 'REORDER', className: 'status-low', severity: 'warning' };
     }
-    return { label: 'OK', className: 'status-ok', severity: 'ok' };
+    return { label: 'OK / NOMINAL', className: 'status-nominal', severity: 'ok' };
 }
 
 // Helper functions

@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
-import { supabase } from '../../config/supabase';
 import { sanitizeText, validateEmail } from '@/utils/sanitization';
 import { 
   FiX, 
@@ -83,8 +82,14 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
       }
 
       // 2. SUBMIT: Routing via hardened Edge Function (enforces server-side reCAPTCHA & sanitization)
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('submit-registration-request', {
-        body: {
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/submit-registration-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': anonKey || ''
+        },
+        body: JSON.stringify({
           full_name: sanitizeText(formData.full_name, 120),
           email: formData.email.toLowerCase().trim(),
           phone: sanitizeText(formData.phone, 40),
@@ -92,10 +97,15 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
           county: sanitizeText(formData.county, 80),
           notes: sanitizeText(formData.notes, 500),
           recaptcha_token: recaptchaToken || null,
-        }
+        })
       });
 
-      if (functionError) throw functionError;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error: ${response.statusText}`);
+      }
+
+      const functionData = await response.json();
       if (functionData && !functionData.success) throw new Error(functionData.error || 'Registration failed');
 
       

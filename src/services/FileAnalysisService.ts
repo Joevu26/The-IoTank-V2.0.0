@@ -9,6 +9,27 @@ import {
 } from '@/types';
 
 class FileAnalysisService {
+    private async getSafeAuthHeaders(): Promise<Record<string, string>> {
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const headers: Record<string, string> = { 
+            'Content-Type': 'application/json',
+            'apikey': anonKey || ''
+        };
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            
+            if (isValidToken && session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        } catch (e) {
+            console.warn('[FileAnalysisService] Auth check failed, proceeding with limited headers.');
+        }
+
+        return headers;
+    }
+
     /**
      * Uploads a file to Supabase Storage and creates a record in the database
      */
@@ -96,9 +117,11 @@ class FileAnalysisService {
         `;
 
         try {
-            // Calling Supabase Edge Function
-            const { data, error: functionError } = await supabase.functions.invoke('gemini-proxy', {
-                body: {
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/gemini-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
                     endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
                         contents: [{
@@ -117,11 +140,15 @@ class FileAnalysisService {
                             responseMimeType: 'application/json'
                         }
                     }
-                }
+                })
             });
 
-            if (functionError) throw functionError;
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(`AI Analysis Error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
 
+            const data = await response.json();
             const aiResponse = JSON.parse(data.candidates[0].content.parts[0].text);
 
             const result: CSVAnalysisResult = {
@@ -189,8 +216,11 @@ class FileAnalysisService {
         `;
 
         try {
-            const { data, error: functionError } = await supabase.functions.invoke('gemini-proxy', {
-                body: {
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/gemini-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
                     endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
                         contents: [{
@@ -209,11 +239,15 @@ class FileAnalysisService {
                             responseMimeType: 'application/json'
                         }
                     }
-                }
+                })
             });
 
-            if (functionError) throw functionError;
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(`AI Analysis Error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
 
+            const data = await response.json();
             const aiResponse = JSON.parse(data.candidates[0].content.parts[0].text);
 
             const result: PDFAnalysisResult = {

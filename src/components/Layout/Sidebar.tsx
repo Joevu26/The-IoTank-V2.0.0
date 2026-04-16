@@ -14,8 +14,10 @@ import {
     MdOutlineEventNote,
     MdCreditCard,
 } from 'react-icons/md';
+import { prefetch } from '@/utils/prefetch';
+import * as Factories from '@/App';
 
-import { FiHome, FiTruck, FiShield } from 'react-icons/fi';
+import { FiHome, FiTruck } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
 import { enableGovernanceConsole } from '@/config/supabase';
 import './Sidebar.css';
@@ -43,6 +45,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Level 6 (Supervisor): Core Ops, Monitoring, No Billing/Users
     // Level 7 (Operator): Monitor Only, No Reports/Settings
     // ── ─────────────────────────────────────────────────────────────────────────
+    
+    const getFactoryForPath = (path: string) => {
+        switch (path) {
+            case '/dashboard': return Factories.DashboardFactory;
+            case '/inventory': return Factories.InventoryPageFactory;
+            case '/deliveries': return Factories.DeliveriesPageFactory;
+            case '/analytics': return Factories.AnalyticsPageFactory;
+            case '/event-log': return Factories.EventLogPageFactory;
+            case '/market': return Factories.MarketPageFactory;
+            case '/alerts': return Factories.AlertsCenterFactory;
+            case '/reporting': return Factories.ReportingPageFactory;
+            case '/users': return Factories.TeamManagementFactory;
+            case '/settings': return Factories.SettingsPageFactory;
+            case '/help': return Factories.HelpPageFactory;
+            default: return null;
+        }
+    };
 
     const menuItems = [
         { name: 'Core Operations', isSection: true, path: 'sec-core', level: 7 },
@@ -55,8 +74,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'Event Log', path: '/event-log', icon: <MdOutlineEventNote />, level: 6 },
         { name: t('market'), path: '/market', icon: <MdTrendingUp />, level: 7 },
         { name: t('alerts'), path: '/alerts', icon: <MdWarning />, level: 7 },
-        { name: 'Forensic Security', path: '/security', icon: <FiShield />, level: 6 },
-        { name: 'Doc Intelligence', path: '/analysis', icon: <MdAssessment />, level: 6 },
         { name: t('reporting'), path: '/reporting', icon: <MdAssessment />, level: 6 },
 
         { name: 'Administration', isSection: true, path: 'sec-admin', level: 6 },
@@ -128,6 +145,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     to={item.path}
                                     className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                                     onClick={closeMobile}
+                                    onMouseEnter={() => {
+                                        const factory = getFactoryForPath(item.path);
+                                        if (factory) prefetch(factory);
+                                    }}
                                     title={collapsed && !mobileOpen ? item.name : ''}
                                 >
                                     <span className="nav-icon">{item.icon}</span>

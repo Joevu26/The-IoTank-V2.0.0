@@ -30,7 +30,7 @@ export interface TankReading {
     volume: number;      // Liters (Measured)
     fuelLevel: number;   // Percentage (0-100)
     volumeCorrected: number; // Standardized volume
-    signalQuality: number; // Percentage (0-100)
+    signalQuality: string | number; // Percentage (0-100) or Text Label
     rssi: number;        // Signal strength (dBm)
     deviceId: string;    // ESP32 unique identifier
     processingLocation: 'edge' | 'cloud';

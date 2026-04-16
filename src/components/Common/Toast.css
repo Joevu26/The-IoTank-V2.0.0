@@ -52,8 +52,8 @@
     align-items: center;
     justify-content: center;
     color: white;
-    background: linear-gradient(135deg, var(--ds-color-accent, #6366f1), var(--ds-color-accent-dark, #4f46e5));
-    box-shadow: 0 15px 30px -10px rgba(99, 102, 241, 0.5);
+    background: linear-gradient(135deg, #00d4ff, #0072ff); /* Industrial Cyan/Blue Sync */
+    box-shadow: 0 15px 30px -10px rgba(0, 212, 255, 0.5);
     position: relative;
     z-index: 2;
 }
@@ -62,7 +62,7 @@
     position: absolute;
     inset: -8px;
     border-radius: 32px;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(0, 212, 255, 0.2);
     z-index: 1;
 }
 
@@ -99,7 +99,7 @@
     max-width: 280px;
     height: 56px;
     border-radius: 16px;
-    background: #6366f1;
+    background: #0072ff; /* Industrial Blue Sync */
     color: white;
     font-size: 0.875rem;
     font-weight: 900;
@@ -111,42 +111,50 @@
     gap: 12px;
     border: none;
     cursor: pointer;
-    box-shadow: 0 12px 24px -6px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 12px 24px -6px rgba(0, 114, 255, 0.5);
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .btn-toast-primary:hover {
-    background: #4f46e5;
+    background: #0056b3;
     transform: translateY(-2px);
-    box-shadow: 0 15px 30px -6px rgba(99, 102, 241, 0.6);
+    box-shadow: 0 15px 30px -6px rgba(0, 114, 255, 0.6);
 }
 
 .btn-toast-secondary {
     width: 100%;
     max-width: 280px;
-    height: 52px;
-    border-radius: 16px;
-    background: rgba(248, 250, 252, 0.8);
-    color: #475569;
-    font-size: 0.8125rem;
+    height: 54px;
+    border-radius: 20px;
+    background: rgba(0, 212, 255, 0.12); /* Brighter Cyan Tint for Visibility */
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: #0072ff;
+    font-size: 0.75rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.075em;
+    letter-spacing: 0.12em;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid #f1f5f9;
+    border: 1px solid rgba(0, 212, 255, 0.4); /* Stronger Industrial Border */
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+    position: relative;
+    overflow: hidden;
 }
 
 .btn-toast-secondary:hover {
-    background: #ffffff;
-    color: #0f172a;
-    border-color: #e2e8f0;
-    transform: translateY(-1px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    background: rgba(0, 212, 255, 0.2);
+    color: #0056b3;
+    border-color: rgba(0, 212, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-toast-secondary:active {
+    transform: translateY(0);
 }
 
 /* Success State Overrides */

@@ -1,13 +1,13 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { FiX, FiPlayCircle } from 'react-icons/fi';
+import { FiX, FiShield, FiArrowRight, FiActivity, FiDatabase, FiLock } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useAllLatestReadings } from '@/hooks/useSupabase';
 import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { AuditService } from '@/services/AuditService';
-import '../Inventory/AddTankModal.css';
+import './ShiftOpenModal.css';
 
 interface ShiftOpenModalProps {
     isOpen: boolean;
@@ -21,6 +21,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
     const [isStarting, setIsStarting] = React.useState(false);
 
     if (!isOpen) return null;
+
     const handleStart = async () => {
         const now = new Date();
         const nowString = now.toISOString();
@@ -45,9 +46,14 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 'SHIFT',
                 'SHIFT_STARTED',
                 currentUser.stationId,
-                `Shift opened by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}`,
+                `Forensic Session Initialized: Shift commenced by personnel [${currentUser.displayName || currentUser.email}] at ${now.toLocaleTimeString()}. Telemetry synchronization verified.`,
                 'INFO',
-                { time: nowString }
+                { 
+                    startTime: nowString, 
+                    operator: currentUser.email,
+                    displayName: currentUser.displayName,
+                    stationId: currentUser.stationId
+                }
             );
 
             // Legacy alert for backward compatibility with notification bell
@@ -57,7 +63,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 alert_type: 'info',
                 severity: 'info',
                 title: 'Operation Started',
-                message: `Shift opened by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}`,
+                message: `Operational shift initialized by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}. Telemetry tracking is now active.`,
                 alert_data: { type: 'shift_open', user: currentUser.email, time: nowString }
             });
 
@@ -117,45 +123,67 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
     const stationName = currentUser?.companyName || 'Fuel Station';
 
     return createPortal(
-        <div className="add-tank-modal-overlay animate-in fade-in duration-300">
-            <div className="add-tank-modal-content max-w-lg">
-                <div className="modal-header">
-                    <div className="header-text-container">
-                        <h2>Start Local Shift</h2>
-                        <p>Initialize your station operations for the day.</p>
-                        <div className="modal-header-badges">
-                            <span className="modal-badge amethyst">Session</span>
-                            <span className="modal-badge violet">BEGIN</span>
-                        </div>
+        <div className="shift-modal-overlay">
+            <div className="shift-modal-content">
+                <div className="shift-modal-header">
+                    <div className="shift-header-info">
+                        <h2>Commence Shift</h2>
+                        <p>Initialize operational tracking and telemetry.</p>
                     </div>
-                    <button className="close-btn" type="button" onClick={onClose} title="Close" aria-label="Close"><FiX size={18} /></button>
+                    <button className="shift-close-btn" type="button" onClick={onClose} title="Close" aria-label="Close">
+                        <FiX size={20} />
+                    </button>
                 </div>
 
-                <div className="p-1">
-                    <div className="atm-section plum">
-                        <div className="atm-section-header">
-                            <div className="atm-section-icon"><FiPlayCircle size={14} /></div>
-                            <span className="atm-section-title">Shift Initialization</span>
-                        </div>
-                        <div className="atm-section-body p-8 text-center bg-white rounded-b-[18px]">
-                            <div className="inline-flex items-center px-4 py-2 bg-indigo-50 rounded-xl border border-indigo-100 mb-6">
-                                <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Session Dashboard</span>
-                            </div>
-
-                            <h2 className="text-[28px] font-black text-slate-800 tracking-tight leading-none mb-3">
-                                Good day, <span className="text-[#855AFF]">{stationName}</span>!
-                            </h2>
-                            
-                            <p className="text-slate-500 font-semibold leading-relaxed max-w-[300px] mx-auto text-sm">
-                                IoTank wishes you success. Your shift recording and telemetry tracking are ready to begin.
-                            </p>
+                <div className="shift-modal-body">
+                    <div className="shift-hero-icon-container">
+                        <div className="shift-icon-glow" />
+                        <div className="shift-hero-icon">
+                            <FiShield size={48} strokeWidth={2.5} />
                         </div>
                     </div>
 
-                    <div className="form-actions pt-6 pb-2 border-none">
-                        <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-                        <button type="button" className="btn-submit" onClick={handleStart} disabled={isStarting}>
-                            {isStarting ? 'Committing Shift...' : 'Start Recording Shift'}
+                    <div className="shift-welcome">
+                        <h3>Welcome back, <span className="shift-station-name">{stationName}</span></h3>
+                    </div>
+
+                    <p className="shift-description">
+                        IoTank systems are primed. Forensic shift recording and telemetry tracking are ready to initialize.
+                    </p>
+
+                    <div className="shift-readiness-grid">
+                        <div className="readiness-item">
+                            <span className="readiness-label">Telemetry</span>
+                            <span className="readiness-status"><FiActivity size={12} className="inline mr-1" /> Active</span>
+                        </div>
+                        <div className="readiness-item">
+                            <span className="readiness-label">Tanks</span>
+                            <span className="readiness-status"><FiDatabase size={12} className="inline mr-1" /> Bound</span>
+                        </div>
+                        <div className="readiness-item">
+                            <span className="readiness-label">Security</span>
+                            <span className="readiness-status"><FiLock size={12} className="inline mr-1" /> Secured</span>
+                        </div>
+                    </div>
+
+                    <div className="shift-actions">
+                        <button type="button" className="btn-shift-cancel" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button 
+                            type="button" 
+                            className="btn-shift-start" 
+                            onClick={handleStart} 
+                            disabled={isStarting}
+                        >
+                            {isStarting ? (
+                                'Initializing System...'
+                            ) : (
+                                <>
+                                    Commence Recording
+                                    <FiArrowRight size={18} />
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>

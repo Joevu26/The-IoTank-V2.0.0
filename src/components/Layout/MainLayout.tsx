@@ -12,6 +12,7 @@ import { PhotoNudgeBanner } from './PhotoNudgeBanner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi';
 import { PageLoader } from '../Common/PageLoader';
+import { TankIQSidebar } from '../Analysis/TankIQSidebar';
 import brandMark from '@/assets/iotank-logo-v3.png';
 
 const TourGuide = lazy(() => import('../Tour/TourGuide').then(module => ({ default: module.TourGuide })));
@@ -21,6 +22,7 @@ import './MainLayout.css';
 export const MainLayout: React.FC = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isTankIQOpen, setIsTankIQOpen] = useState(false);
 
     // Modal state for footer links
     const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
@@ -122,8 +124,16 @@ export const MainLayout: React.FC = () => {
                 onActivity={resetMobileTimer}
             />
 
+            <TankIQSidebar 
+                isOpen={isTankIQOpen} 
+                onClose={() => setIsTankIQOpen(false)} 
+            />
+
             <div className="content-wrapper">
-                <Navbar onToggleSidebar={toggleSidebar} />
+                <Navbar 
+                    onToggleSidebar={toggleSidebar} 
+                    onToggleTankIQ={() => setIsTankIQOpen(!isTankIQOpen)}
+                />
                 {showNudge && currentUser && (
                     <PhotoNudgeBanner
                         onUploadClick={handleNudgeUpload}

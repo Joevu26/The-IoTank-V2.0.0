@@ -89,9 +89,7 @@ export const SettingsPage: React.FC = () => {
             setToast({
  message: '✅ Two-Factor Authentication is now active.', type: 'success' 
 });
-            await AuditService.log('SECURITY', 'MFA_ENABLED', currentUser?.stationId || 'SYSTEM', 'User enabled TOTP MFA.', 'INFO', {
-
-});
+            await AuditService.log('SECURITY', 'MFA_ENABLED', currentUser?.stationId || 'SYSTEM', 'Identity protection: Two-Factor Authentication enrolled', 'INFO', {});
         
 } catch (err: any) {
             setToast({
@@ -108,8 +106,8 @@ export const SettingsPage: React.FC = () => {
         try {
             await unenrollMFA();
             setMfaEnabled(false);
-            setToast({ message: 'Two-Factor Authentication has been removed.', type: 'success' });
-            await AuditService.log('SECURITY', 'MFA_DISABLED', currentUser?.stationId || 'SYSTEM', 'User disabled TOTP MFA.', 'INFO', {});
+            setToast({ message: 'Identity protection: Two-Factor Authentication has been removed. Account security level decreased.', type: 'success' });
+            await AuditService.log('SECURITY', 'MFA_DISABLED', currentUser?.stationId || 'SYSTEM', 'Security alert: Two-Factor Authentication de-registered. Manual bypass active.', 'WARNING', {});
         } catch (err: any) {
             setToast({ message: err.message || 'Failed to disable MFA.', type: 'error' });
         } finally {
@@ -204,9 +202,9 @@ export const SettingsPage: React.FC = () => {
                 'CALIBRATION',
                 'SETTINGS_CHANGED',
                 currentUser?.stationId || 'SYSTEM',
-                `Updated retail price for ${(tankToUpdate as any).name} to ${normalizedPrice} Ksh`,
+                `Manual Retail Price Correction: [${tankToUpdate.fuelType.toUpperCase()}] price adjusted from ${oldPrice} Ksh to ${normalizedPrice} Ksh per litre.`,
                 'INFO',
-                { tankId, retailPrice: normalizedPrice, currency: 'Ksh' }
+                { tankId, fuelType: tankToUpdate.fuelType, retailPrice: normalizedPrice, currency: 'Ksh', oldPrice }
             );
         } catch (err) {
             console.error('Price update error:', err);
@@ -268,6 +266,7 @@ export const SettingsPage: React.FC = () => {
 
     // Device Management State
     const [recentCommands, setRecentCommands] = useState<DeviceCommand[]>([]);
+    const [localPendingIds, setLocalPendingIds] = useState<string[]>([]);
     const [selectedDevice, setSelectedDevice] = useState<string>('');
     const [wifiConfig, setWifiConfig] = useState({ ssid: '', password: '' });
     const [isSendingCommand, setIsSendingCommand] = useState(false);
@@ -292,6 +291,7 @@ export const SettingsPage: React.FC = () => {
         try {
             const cmds = await DeviceCommandService.getRecentCommands(currentUser.stationId);
             setRecentCommands(cmds as any);
+            setLocalPendingIds(DeviceCommandService.getLocalPendingIds());
         } catch (err) {
             console.error("Failed to load commands:", err);
         }
@@ -412,12 +412,11 @@ currentUser.stationId
             setOrgForm(prev =>({
  ...prev, logo_url: publicUrl 
 }));
-            await AuditService.log('SYSTEM', 'UPLOAD_LOGO', currentUser.stationId, `Uploaded station logo: ${
-filePath
-}`);
+            await AuditService.log('SYSTEM', 'UPLOAD_LOGO', currentUser.stationId, `Branding synchronized: Station logo updated to node ${filePath}`);
             setToast({
- message: 'Station branding updated.', type: 'success' 
-});
+                message: `Branding synchronized: Station logo updated for ${orgForm.name}.`,
+                type: 'success' 
+            });
         
 } catch (err: any) {
             console.error('Logo upload error:', err);
@@ -448,7 +447,7 @@ err.message
             
             await updateUser({ photoURL: publicUrl } as any);
             setProfileForm(prev => ({ ...prev, photo_url: publicUrl }));
-            await AuditService.log('SYSTEM', 'UPLOAD_AVATAR', currentUser.stationId || 'SYSTEM', `Uploaded profile photo: ${filePath}`);
+            await AuditService.log('SYSTEM', 'UPLOAD_AVATAR', currentUser.stationId || 'SYSTEM', `Identity signature updated: Profile photo synchronized to ${filePath}`);
             setToast({ message: 'Profile photo updated.', type: 'success' });
         } catch (err: any) {
             console.error('Profile photo upload error:', err);
@@ -470,8 +469,8 @@ err.message
             }).eq('station_id', currentUser.stationId);
             
             if (syncError) throw syncError;
-            await AuditService.log('SYSTEM', 'UPDATE_COMPANY', currentUser.stationId, `Updated station profile: ${orgForm.name}`, 'INFO', {});
-            setToast({ message: 'Station information saved.', type: 'success' });
+            await AuditService.log('SYSTEM', 'UPDATE_COMPANY', currentUser.stationId, `Operational profile modified: Station identity set to "${orgForm.name}"`, 'INFO', {});
+            setToast({ message: `Station profile for "${orgForm.name}" has been synchronized.`, type: 'success' });
         } catch (err) {
             console.error(err);
             setToast({ message: 'Failed to save station information.', type: 'error' });
@@ -488,8 +487,8 @@ err.message
                 displayName: profileForm.displayName,
                 address: { ...currentUser?.address, street: profileForm.address } as any
             });
-            await AuditService.log('SYSTEM', 'UPDATE_PROFILE', currentUser?.stationId || 'SYSTEM', `Updated user profile: ${profileForm.displayName}`, 'INFO', {});
-            setToast({ message: 'Profile information updated.', type: 'success' });
+            await AuditService.log('SYSTEM', 'UPDATE_PROFILE', currentUser?.stationId || 'SYSTEM', `Operator identity modified: Profile name set to "${profileForm.displayName}"`, 'INFO', {});
+            setToast({ message: `Identity updated: Profile saved for ${profileForm.displayName}.`, type: 'success' });
         } catch (err) {
             console.error(err);
             setToast({ message: 'Failed to update profile.', type: 'error' });
@@ -549,7 +548,7 @@ err.message
             setConfirmPassword('');
             setShowChangePwModal(false);
             setToast({ message: '✅ Password updated successfully.', type: 'success' });
-            await AuditService.log('SECURITY', 'UPDATE_SETTINGS', currentUser?.stationId || 'SYSTEM', 'User changed their account password.', 'INFO', {});
+            await AuditService.log('SECURITY', 'UPDATE_SETTINGS', currentUser?.stationId || 'SYSTEM', 'Security gate recalibrated: Account credential rotation verified', 'INFO', {});
         } catch (err: any) {
             setToast({ message: err.message || 'Failed to update password.', type: 'error' });
         } finally {
@@ -582,35 +581,17 @@ err.message
         return (            
 <div className="security-lock-overlay">
                 
-<div className="add-tank-modal-content security-lock-content modal-w-md">
-                    
-<div className="modal-header">
-                        
-<div className="header-text-container">
-                            
-<h2>
-Security Gate
-</h2>
-                            
-<p>
-Authentication required for system parameters
-</p>
-                        
-</div>
-                        
-<div className="modal-header-badges">
-                            
-<span className="modal-badge amber">
-LOCKED
-</span>
-                            
-<span className="modal-badge plum">
-ADMIN
-</span>
-                        
-</div>
-                    
-</div>
+                <div className="add-tank-modal-content security-lock-content modal-w-md">
+                    <div className="modal-header">
+                        <div className="header-text-container">
+                            <h2>Security Gate</h2>
+                            <p>Authentication required for system parameters</p>
+                            <div className="modal-header-badges">
+                                <span className="modal-badge cyan">LOCKED</span>
+                                <span className="modal-badge blue">ADMIN</span>
+                            </div>
+                        </div>
+                    </div>
                     
 <div className="security-modal-body">
                         
@@ -677,9 +658,9 @@ showLockPassword ?
 </button>
                                 
 </div>
-                                {
+                                                                {
 error && 
-<div className="text-red-500 text-xs mt-3 font-bold text-center">
+<div className="text-danger text-xs mt-3 font-bold text-center">
 ❌ {
 error
 }
@@ -688,31 +669,31 @@ error
 }                            
 </div>
                             
-<div className="form-actions border-t pt-6 security-form-mt">
-                                
-<button                                     type="button"                                    className="btn-danger"                                    onClick={
-handleDismissLock
-}                                    title="Cancel Authentication"                                >
-                                    Cancel                                
-</button>
-                                
-<button                                     type="submit"                                     className="btn-submit flex-1"                                    disabled={
-isVerifying || !password
-}                                    title="Unlock Secure Access"                                >
-                                    {
-isVerifying ? (                                        
-<FiRefreshCw className="animate-spin" />
-                                    ) : (                                        
-<>
-Unlock Access 
-<FiArrowRight className="ml-2" />
-
-</>
-                                    )
-}                                
-</button>
-                            
-</div>
+                            <div className="form-actions border-t pt-6 security-form-mt">
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={handleDismissLock}
+                                    title="Cancel Authentication"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn-primary flex-1"
+                                    disabled={isVerifying || !password}
+                                    title="Unlock Secure Access"
+                                >
+                                    {isVerifying ? (
+                                        <FiRefreshCw className="animate-spin" />
+                                    ) : (
+                                        <>
+                                            Unlock Access
+                                            <FiArrowRight className="ml-2" />
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         
 </form>
                     
@@ -744,38 +725,18 @@ showResetConfirmModal && createPortal(
                     
 <div className="add-tank-modal-content modal-w-md">
                         
-<div className="modal-header danger-zone-header">
-                            
-<div className="header-text-container">
-                                
-<h2>
-Danger Zone
-</h2>
-                                
-<p>
-Critical system operation
-</p>
-                            
-</div>
-                            
-<div className="modal-header-badges">
-                                
-<span className="modal-badge amber">
-Irreversible
-</span>
-                            
-</div>
-                            
-<button className="close-btn" onClick={
-() =>
- setShowResetConfirmModal(false)
-} title="Close Reset Modal" aria-label="Close">
-                                
-<FiX />
-                            
-</button>
-                        
-</div>
+                        <div className="modal-header danger-zone-header">
+                            <div className="header-text-container">
+                                <h2>Danger Zone</h2>
+                                <p>Critical system operation</p>
+                                <div className="modal-header-badges">
+                                    <span className="modal-badge slate">Irreversible</span>
+                                </div>
+                            </div>
+                            <button className="close-btn" onClick={() => setShowResetConfirmModal(false)} title="Close Reset Modal" aria-label="Close">
+                                <FiX />
+                            </button>
+                        </div>
                         
 <div className="security-modal-body">
                             
@@ -801,20 +762,13 @@ This will erase all station configuration and historical telemetry. This cannot 
                             
 <div className="form-actions">
                                 
-<button className="btn-cancel" onClick={
-() =>
- setShowResetConfirmModal(false)
-} title="Keep Current Configuration">
-No, Keep System
-</button>
-                                
-<button className="btn-submit !bg-red-600 !shadow-red-200" onClick={
-confirmSecureResetInitial
-} title="Proceed to Factory Reset">
-                                    Confirm Reset 
-<FiTrash2 className="ml-2" />
-                                
-</button>
+                                <button className="btn-secondary" onClick={() => setShowResetConfirmModal(false)} title="Keep Current Configuration">
+                                    No, Keep System
+                                </button>
+                                <button className="btn-danger" onClick={confirmSecureResetInitial} title="Proceed to Factory Reset">
+                                    Confirm Reset
+                                    <FiTrash2 className="ml-2" />
+                                </button>
                             
 </div>
                         
@@ -832,29 +786,15 @@ showResetAuthModal && createPortal(
                     
 <div className="add-tank-modal-content modal-w-md">
                         
-<div className="modal-header security-verify-header">
-                            
-<div className="header-text-container">
-                                
-<h2>
-Final Verification
-</h2>
-                                
-<p>
-Authorize global system reset
-</p>
-                            
-</div>
-                            
-<div className="modal-header-badges">
-                                
-<span className="modal-badge plums">
-SECURITY
-</span>
-                            
-</div>
-                        
-</div>
+                        <div className="modal-header security-verify-header">
+                            <div className="header-text-container">
+                                <h2>Final Verification</h2>
+                                <p>Authorize global system reset</p>
+                                <div className="modal-header-badges">
+                                    <span className="modal-badge slate">SECURITY</span>
+                                </div>
+                            </div>
+                        </div>
                         
 <div className="security-modal-body">
                             
@@ -879,18 +819,13 @@ e =>
                                 
 <div className="form-actions security-form-mt">
                                     
-<button type="button" className="btn-cancel" onClick={
-() =>
- setShowResetAuthModal(false)
-} title="Cancel Reset Authentication">
-Cancel
-</button>
-                                    
-<button type="submit" className="btn-submit !bg-red-600" title="Final Authorization for System Reset">
-                                        Authorize Global Reset 
-<FiZap className="ml-2" />
-                                    
-</button>
+                                    <button type="button" className="btn-secondary" onClick={() => setShowResetAuthModal(false)} title="Cancel Reset Authentication">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" className="btn-danger" title="Final Authorization for System Reset">
+                                        Authorize Global Reset
+                                        <FiZap className="ml-2" />
+                                    </button>
                                 
 </div>
                             
@@ -947,13 +882,10 @@ currentUser?.stationId?.slice(0, 8).toUpperCase() || 'OFFLINE'
                     
 </div>
                                         
-<button className="btn btn-outline !text-red-600 !border-red-200" onClick={
-handleSecureReset
-} title="Trigger Factory Reset Sequence">
-                        
-<FiRefreshCw className="mr-2" />
-                         Factory Reset                    
-</button>
+                    <button className="btn-factory-reset" onClick={handleSecureReset} title="Trigger Factory Reset Sequence">
+                        <FiRefreshCw size={14} />
+                        Factory Reset
+                    </button>
                 
 </header>
                 
@@ -1848,16 +1780,9 @@ cmd.device_id
 </div>
                                                     
 <div className="text-right flex flex-col items-end gap-1.5">
-                                                        
-<span className={
-`status-glow-pill ${
-cmd.status
-}`
-}>
-{
-cmd.status
-}
-</span>
+                                                        <span className={`status-glow-pill ${cmd.status}`}>
+                                                            {cmd.status === 'pending' && localPendingIds.includes(cmd.id) ? 'SIGNING...' : cmd.status}
+                                                        </span>
                                                         
 <div className="flex items-center gap-1.5 text-slate-400">
                                                             
@@ -1919,7 +1844,7 @@ Change your account login password
                             
 <div className="modal-header-badges">
                                 
-<span className="modal-badge amethyst">
+<span className="modal-badge cyan">
 Required
 </span>
                                 

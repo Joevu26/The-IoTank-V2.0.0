@@ -117,9 +117,14 @@ export const TeamManagement: React.FC = () => {
                 'TEAM',
                 'MEMBER_REMOVED',
                 currentUser?.stationId || '',
-                `Forensic record: Team member ${member?.full_name || member?.email} was removed from the station registry`,
+                `Security Access Revoked: Personnel [${member?.full_name || member?.email}] removed from station registry. All credentials invalidated.`,
                 'CRITICAL',
-                { memberId: id, memberEmail: member?.email }
+                { 
+                    memberId: id, 
+                    memberEmail: member?.email, 
+                    memberName: member?.full_name,
+                    revokedBy: currentUser?.email 
+                }
             );
             fetchData();
         } catch (error) {
@@ -180,9 +185,14 @@ export const TeamManagement: React.FC = () => {
                 'TEAM',
                 'INVITE_SENT',
                 currentUser?.stationId || '',
-                `Authority invite issued to ${formData.email} for role: ${formData.role}`,
+                `Security Clearance Issued: Authorization invite sent to [${formData.email}] for high-privilege role: ${formData.role.toUpperCase()}`,
                 'INFO',
-                { invitedEmail: formData.email, role: formData.role }
+                { 
+                    invitedEmail: formData.email, 
+                    invitedName: formData.full_name,
+                    role: formData.role,
+                    issuedBy: currentUser?.email 
+                }
             );
 
             setTimeout(() => {

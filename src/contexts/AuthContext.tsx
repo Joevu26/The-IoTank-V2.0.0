@@ -58,6 +58,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const enrichmentLockRef = useRef<boolean>(false);
     const handshakeInProgressRef = useRef(false);
     const isProvisionedRef = useRef<boolean>(false);
+    const isLoadingRef = useRef<boolean>(true);
+
+    const updateLoadingState = (val: boolean) => {
+        setLoading(val);
+        isLoadingRef.current = val;
+    };
 
     const mapToUnprovisionedUser = (sbUser: SupabaseUser): User => {
         return {
@@ -81,12 +87,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const now = Date.now();
         if (currentUserAuthIdRef.current === sbUser.id && (now - lastEnrichmentAttemptRef.current < 10000)) {
             console.log(`[DEBUG_LOG] Enrichment cooldown active for ${sbUser.id}. Skipping.`);
+            updateLoadingState(false);
             return false;
         }
 
         if (enrichmentLockRef.current) {
             // Always ensure loading clears even on skipped enrichment
-            setLoading(false);
+            updateLoadingState(false);
             return false; // Indicating skipped
         }
         
@@ -94,10 +101,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         try {
             console.log(`[DEBUG_LOG] PROFILE: Launching optimized identity bundle handshake...`);
+            let handshakeTimedOut = false;
             
-            // TIMEOUT PROTECTION: Force-fail if a query hangs more than 12s
+            // TIMEOUT PROTECTION: Force-fail if a query hangs more than 6s (Safe for slow 3G/cold starts)
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Supabase query timeout")), 12000)
+                setTimeout(() => {
+                    handshakeTimedOut = true;
+                    reject(new Error("Supabase query timeout"));
+                }, 6000)
             );
             
             const runQuery = async () => {
@@ -107,6 +118,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 if (error) {
                     console.error(`[DEBUG_LOG] FATAL: RPC Request failed for ${sbUser.email}:`, error);
+                    
+                    // Forensic Log for failed handshake
+                    await AuditService.log(
+                        'SECURITY',
+                        'IDENTITY_MUTATION_ATTEMPT',
+                        '',
+                        `Identity handshake failed for ${sbUser.email}: RPC Error`,
+                        'CRITICAL',
+                        { error: error.message, code: error.code }
+                    );
+
                     setCurrentUser(mapToUnprovisionedUser(sbUser)); 
                     setLoading(false);
                     return true;
@@ -114,10 +136,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 if (bundle?.identity_type === 'error') {
                     console.error(`[DEBUG_LOG] 400 ERROR DETAIL: Schema mismatch or recursive RLS detected.`);
-                    console.error(`Error string from DB: ${bundle.error_message} (${bundle.error_code})`);
+                    
+                    await AuditService.log(
+                        'SECURITY',
+                        'IDENTITY_MUTATION_ATTEMPT',
+                        '',
+                        `Identity handshake protocol error for ${sbUser.email}`,
+                        'CRITICAL',
+                        { error_message: bundle.error_message, error_code: bundle.error_code }
+                    );
+
                     // Set provisional to trigger ProvisioningGuard, which can show the DB error now.
                     const errorUser = mapToUnprovisionedUser(sbUser);
-                    // We attach the error string to companyName temporarily just so the UI can display it in the technical details panel.
                     errorUser.companyName = `DB_ERR: ${bundle.error_message}`; 
                     setCurrentUser(errorUser); 
                     setLoading(false);
@@ -135,6 +165,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 // 2. SECURITY: Check is_active
                 if (isSystemUser && !bundle.is_active) {
+                    await AuditService.log(
+                        'SECURITY',
+                        'UNAUTHORIZED_ACCESS_ATTEMPT',
+                        '',
+                        `Blocked login attempt for deactivated administrator: ${sbUser.email}`,
+                        'CRITICAL',
+                        { auth_id: sbUser.id }
+                    );
+                    
                     console.error("[DEBUG_LOG] SECURITY: Account is deactivated. Signing out.");
                     await supabase.auth.signOut();
                     setCurrentUser(null);
@@ -169,10 +208,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     console.warn('[DEBUG_LOG] Failed to cache user profile:', cacheErr);
                 }
             
-                console.log("[DEBUG_LOG] SUCCESS: Identity bundle applied.");
+                if (handshakeTimedOut) {
+                    console.warn("[DEBUG_LOG] RECOVERY: Identity applied after timeout window.");
+                } else {
+                    console.log("[DEBUG_LOG] SUCCESS: Identity bundle applied.");
+                }
                 isProvisionedRef.current = !!finalUser.stationId;
                 setCurrentUser(finalUser);
-                setLoading(false);
+                updateLoadingState(false);
                 return true;
             };
 
@@ -186,6 +229,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isProvisionedRef.current = false;
                 setCurrentUser(mapToUnprovisionedUser(sbUser));
             }
+            updateLoadingState(false);
             return false;
         } finally {
             isEnrichingRef.current = null;
@@ -204,15 +248,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         const isRecoveryFlow = window.location.pathname === '/reset-password';
 
-        // Safety Timeout: Force clear loading after 8 seconds to prevent permanent hang
+        // Safety Timeout: Force clear loading after 4 seconds to prevent permanent hang
         const safetyTimer = setTimeout(() => {
-            if (loading) {
+            if (isLoadingRef.current) {
                 console.warn("[DEBUG_LOG] BOOT: Safety timeout triggered. Unlocking UI.");
-                setLoading(false);
+                updateLoadingState(false);
                 isBootingRef.current = false;
                 handshakeInProgressRef.current = false;
             }
-        }, 8000);
+        }, 4000);
 
         const initializeAuth = async () => {
             if (handshakeInProgressRef.current) return;
@@ -247,7 +291,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                     // 2. BACKGROUND ENRICHMENT: Always verify against DB in background
                     if (!isRecoveryFlow) {
-                        await enrichUserFromSupabase(session.user);
+                        const enrichmentPromise = enrichUserFromSupabase(session.user);
+                        // If no cache hit, we MUST wait for the first enrichment to show anything
+                        if (!cachedData) {
+                            await enrichmentPromise;
+                        }
                     }
                 } else {
                     console.log("[DEBUG_LOG] BOOT: No active session. Public flight mode.");
@@ -311,6 +359,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
 
             if (session?.user) {
+                let unlockedByCache = false;
                 setLoading(true);
                 
                 // PROVISIONAL IDENTITY: Set unprovisioned user immediately so ProtectedRoute
@@ -326,6 +375,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                                 console.log("[DEBUG_LOG] AUTH_EVENT: Loading identity from cache.");
                                 setCurrentUser(parsed);
                                 setLoading(false);
+                                unlockedByCache = true;
                             } else {
                                 setCurrentUser(mapToUnprovisionedUser(session.user));
                             }
@@ -339,10 +389,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     currentUserAuthIdRef.current = session.user.id;
                 }
                 
-                await enrichUserFromSupabase(session.user);
+                const enrichmentPromise = enrichUserFromSupabase(session.user);
                 
-                // Always ensure loading is false after a sign-in event
-                setLoading(false);
+                // If we already unlocked the UI with a provisional/cached identity,
+                // do not block here. Let it finish in the background.
+                // We use unlockedByCache to bypass the potentially stale 'loading' state.
+                if (!unlockedByCache && loading) {
+                    await enrichmentPromise;
+                    setLoading(false);
+                }
             } else {
                 console.log("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
                 currentUserAuthIdRef.current = null;

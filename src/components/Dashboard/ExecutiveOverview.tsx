@@ -27,7 +27,22 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
         const reading = readings[tank.id];
         
         // Signal Quality (Fallback to tank integrity or 100 if completely mock)
-        totalSignal += reading?.signalQuality ?? (tank as any).telemetryIntegrity ?? 100;
+        // Convert text labels to numeric scores for calculation (Excellent=100, Good=75, Fair=50, Weak=25, Unusable=10)
+        const getSignalScore = (quality: string | number | undefined): number => {
+            if (typeof quality === 'number') return quality;
+            switch(quality) {
+                case 'Excellent': return 100;
+                case 'Good': return 75;
+                case 'Fair': return 50;
+                case 'Weak': return 25;
+                case 'Unusable': return 10;
+                case 'Offline': return 0;
+                case 'Connected': return 50;
+                default: return 100; // Fallback for legacy number fields
+            }
+        };
+
+        totalSignal += getSignalScore(reading?.signalQuality ?? (tank as any).telemetryIntegrity);
 
         if (reading) {
             // Check staleness (older than 4 hours is considered stale/attention needed)
@@ -123,10 +138,11 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                     ) : (
                         tanks.map(tank => {
                             if (!tank || !tank.id) return null;
-                            const rssi = readings[tank.id]?.signalQuality || 0;
-                            let rssiStatus = 'Weak';
+                            const readingScale = readings[tank.id]?.signalQuality || 'Offline';
+                            const rssiStatus = String(readingScale);
                             
-                            const rssiState = rssi >= -65 && rssi < 0 ? 'optimal' : (rssi >= -85 && rssi < 0 ? 'fair' : 'critical');
+                            const rssiState = (rssiStatus === 'Excellent' || rssiStatus === 'Good') ? 'optimal' : 
+                                            (rssiStatus === 'Fair' || rssiStatus === 'Weak') ? 'fair' : 'critical';
 
                             return (
                                 <div key={tank.id} className={`rssi-node-card state-${rssiState}`}>
@@ -135,14 +151,16 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                                         <span className="node-id">ESP: {tank.sensorId || 'N/A'}</span>
                                     </div>
                                     <div className="node-signal">
-                                        <div className="signal-bars">
-                                            {[1, 2, 3, 4].map(bar => (
-                                                <div 
-                                                    key={bar} 
-                                                    className={`bar bar-${bar} ${rssi >= (bar * 25) ? 'filled' : ''}`}
-                                                ></div>
-                                            ))}
-                                        </div>
+                                            {[1, 2, 3, 4].map(bar => {
+                                                const scoreMap: Record<string, number> = { 'Excellent': 4, 'Good': 3, 'Fair': 2, 'Weak': 1, 'Unusable': 0 };
+                                                const currentBars = typeof readingScale === 'number' ? Math.round(readingScale / 25) : (scoreMap[String(readingScale)] || 0);
+                                                return (
+                                                    <div 
+                                                        key={bar} 
+                                                        className={`bar bar-${bar} ${currentBars >= bar ? 'filled' : ''}`}
+                                                    ></div>
+                                                );
+                                            })}
                                         <span className="rssi-value">{rssiStatus}</span>
                                     </div>
                                 </div>

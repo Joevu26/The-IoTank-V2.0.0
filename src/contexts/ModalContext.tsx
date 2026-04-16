@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-type ModalType = 'shift-close' | 'shift-open' | 'delivery' | 'report' | 'support-setup' | 'support-docs' | 'support-diagnostics' | null;
+type ModalType = 'shift-close' | 'shift-open' | 'delivery' | 'order' | 'report' | 'support-setup' | 'support-docs' | 'support-diagnostics' | null;
 
 interface ModalContextType {
     activeModal: ModalType;

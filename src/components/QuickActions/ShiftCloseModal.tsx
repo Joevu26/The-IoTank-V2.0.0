@@ -105,9 +105,19 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 'SHIFT',
                 isCollusionSuspected ? 'SECURITY_COLLUSION_ALERT' : 'SHIFT_CLOSED',
                 currentUser?.stationId || '',
-                `Shift closed. Variance: Ksh ${deficit.toFixed(2)}`,
+                isCollusionSuspected 
+                    ? `FORENSIC ALERT: Critical discrepancy detected in shift reconciliation. Variance of Ksh ${deficit.toFixed(2)} exceeds authorized threshold. Collusion suspect verified.`
+                    : `Forensic Session Terminated: Reconciliation balanced for personnel [${currentUser?.displayName || currentUser?.email}]. Net variance: Ksh ${deficit.toFixed(2)}. Operations archived.`,
                 isCollusionSuspected ? 'CRITICAL' : 'INFO',
-                { variance: deficit, isCollusionSuspected, totalCollected, totalVolumetricSold, totalDispensedLiters, timestamp: nowString }
+                { 
+                    variance: deficit, 
+                    isCollusionSuspected, 
+                    totalCollected, 
+                    totalVolumetricSold, 
+                    totalDispensedLiters, 
+                    closedBy: currentUser?.email,
+                    timestamp: nowString 
+                }
             );
 
             NotificationService.show(
@@ -161,7 +171,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Shift Archived',
-                    message: `Forensic audit saved successfully.`,
+                    message: `Forensic audit saved successfully. Discrepancy: Ksh ${deficit.toFixed(2)}.`,
                     type: 'success',
                     attribution: 'ARCHIVE SERVICE'
                 }
@@ -185,7 +195,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
 
     const renderStep1 = () => (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-400">
-            <div className="atm-section amethyst">
+            <div className="atm-section">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiCreditCard size={14} /></div>
                     <span className="atm-section-title">Collections Per Storage</span>
@@ -196,7 +206,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     ) : tanks.map(tank => (
                         <div key={tank.id} className="pt-6 pb-8 px-8 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
                             <div className="font-black text-slate-900 text-[14px] mb-5 flex items-center gap-2 uppercase tracking-tight">
-                                <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+                                <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(0,212,255,0.5)]"></div>
                                 <span className="font-black">{tank.name}</span> <span className="text-slate-400 font-black ml-1">[{tank.fuelType}]</span>
                             </div>
                             <div className="grid grid-cols-4 gap-3">
@@ -223,7 +233,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 </div>
             </div>
 
-            <div className="atm-section violet mt-5">
+            <div className="atm-section mt-5">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiDollarSign size={14} /></div>
                     <span className="atm-section-title">Expenditure & Petty Cash</span>
@@ -253,7 +263,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
 
     const renderStep2 = () => (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-400">
-            <div className="atm-section plum">
+            <div className="atm-section">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiDroplet size={14} /></div>
                     <span className="atm-section-title">Volumetric Telemetry Overview</span>
@@ -271,7 +281,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                                     <div className="flex items-center gap-3">
                                         <div className="unit-indicator-glow"></div>
                                         <h4 className="text-[14px] font-black text-slate-900 uppercase tracking-tighter">
-                                            {tank.name} <span className="text-indigo-400 opacity-50 ml-1 font-medium">/{tank.fuelType}</span>
+                                            {tank.name} <span className="text-cyan-400 opacity-50 ml-1 font-medium">/{tank.fuelType}</span>
                                         </h4>
                                     </div>
                                     <div className="unit-status-pill">Telemetric Sync Active</div>
@@ -285,7 +295,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                                     </div>
                                     <div className="tm-disclosure-chip forensic">
                                         <span className="tm-chip-label">Closing Profile</span>
-                                        <span className="tm-chip-value text-indigo-600">{currentVol.toFixed(0)}<span className="unit-suffix">L</span></span>
+                                        <span className="tm-chip-value text-blue-600">{currentVol.toFixed(0)}<span className="unit-suffix">L</span></span>
                                         <div className="tm-chip-status ok">Real-time Sync</div>
                                     </div>
                                     <div className="tm-disclosure-chip forensic accent">
@@ -300,7 +310,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 </div>
             </div>
 
-            <div className="atm-section plum mt-8">
+            <div className="atm-section mt-8">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiActivity size={12} /></div>
                     <span className="atm-section-title">Authorized Market Pricing</span>
@@ -323,7 +333,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 </div>
             </div>
 
-            <div className="atm-section emerald mt-8">
+            <div className="atm-section mt-8">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiShield size={12} /></div>
                     <span className="atm-section-title">Forensic Metric Verification</span>
@@ -358,7 +368,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     const renderStep3 = () => (
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-400">
             <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-purple-600 border-2 border-purple-200">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-blue-600 border-2 border-blue-200">
                     <FiShield size={32} />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Final Reconciliation Audit</h3>
@@ -367,9 +377,9 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
 
             <div className="forensic-hud-grid grid grid-cols-2 gap-4">
                 {[
-                    { label: 'Volumetric Drawdown', value: `${totalDispensedLiters.toFixed(1)} L`, color: 'indigo', icon: <FiDroplet size={14} /> },
-                    { label: 'Expected Revenue', value: `Ksh ${totalVolumetricSold.toFixed(0)}`, color: 'violet', icon: <FiTrendingUp size={14} /> },
-                    { label: 'Cash Collated', value: `Ksh ${totalCollected.toFixed(0)}`, color: 'amethyst', icon: <FiCreditCard size={14} /> },
+                    { label: 'Volumetric Drawdown', value: `${totalDispensedLiters.toFixed(1)} L`, color: 'cyan', icon: <FiDroplet size={14} /> },
+                    { label: 'Expected Revenue', value: `Ksh ${totalVolumetricSold.toFixed(0)}`, color: 'blue', icon: <FiTrendingUp size={14} /> },
+                    { label: 'Cash Collated', value: `Ksh ${totalCollected.toFixed(0)}`, color: 'slate', icon: <FiCreditCard size={14} /> },
                     { label: 'Calculated Variance', value: `Ksh ${Math.abs(deficit).toFixed(0)}`, color: deficit > 0 ? 'rose' : 'emerald', icon: <FiAlertTriangle size={14} />, alert: deficit > 50 }
                 ].map((card, i) => (
                     <div key={i} className={`forensic-hud-card ${card.color} ${card.alert ? 'animate-pulse' : ''}`}>
@@ -382,7 +392,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 ))}
             </div>
 
-            <div className="atm-section plum mt-6">
+            <div className="atm-section mt-6">
                 <div className="atm-section-header">
                     <div className="atm-section-icon"><FiFileText size={14} /></div>
                     <span className="atm-section-title">Forensic Remarks</span>
@@ -415,8 +425,8 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                         <h2>Close Shift Archive</h2>
                         <p>Complete forensic reconciliation to finalize current operations</p>
                         <div className="modal-header-badges">
-                            <span className="modal-badge violet">RECONCILIATION</span>
-                            <span className="modal-badge plum">STATION: {currentUser?.stationId?.slice(0, 8)}</span>
+                            <span className="modal-badge blue">RECONCILIATION</span>
+                            <span className="modal-badge cyan">STATION: {currentUser?.stationId?.slice(0, 8)}</span>
                         </div>
                     </div>
                     <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose} title="Abort Audit">
@@ -429,7 +439,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                         {[1, 2, 3].map(s => (
                             <div 
                                 key={s} 
-                                className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-24 bg-[#a855f7]' : 'w-6 bg-slate-200 shadow-inner'}`} 
+                                className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-24 bg-cyan-500' : 'w-6 bg-slate-200 shadow-inner'}`} 
                             />
                         ))}
                     </div>

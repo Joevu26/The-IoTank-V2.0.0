@@ -477,6 +477,27 @@ export function useMarketNews(): UseMarketNewsReturn {
         }, 1000);
     }, []);
 
+    const getSafeAuthHeaders = async (): Promise<Record<string, string>> => {
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const headers: Record<string, string> = { 
+            'Content-Type': 'application/json',
+            'apikey': anonKey || ''
+        };
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            
+            if (isValidToken && session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        } catch (e) {
+            console.warn('[useMarketNews] Auth check failed, proceeding anonymously.');
+        }
+
+        return headers;
+    };
+
     const fetchFromSource = useCallback(async (source: NewsFeedSource): Promise<NewsArticle[]> => {
         const cacheKey = source.shortLabel;
         const cached = readCache(cacheKey);
@@ -489,11 +510,20 @@ export function useMarketNews(): UseMarketNewsReturn {
         if (source.url.startsWith('proxy:')) {
             try {
                 const proxyName = source.url.split(':')[1];
-                const { data: proxyData, error: proxyError } = await supabase.functions.invoke(`${proxyName}-proxy`, {
-                    body: proxyName === 'alpha-vantage' ? { symbol: 'NEWS_SENTIMENT' } : {}
+                const headers = await getSafeAuthHeaders();
+                
+                const response = await fetch(`https://suifvborodwergtrbjez.supabase.co/functions/v1/${proxyName}-proxy`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(proxyName === 'alpha-vantage' ? { symbol: 'NEWS_SENTIMENT' } : {})
                 });
 
-                if (proxyError) throw proxyError;
+                if (!response.ok) {
+                    const errorMsg = await response.text();
+                    throw new Error(`Proxy error: ${response.status} - ${errorMsg}`);
+                }
+
+                const proxyData = await response.json();
 
                 if (proxyName === 'eia' && proxyData?.data) {
                     const latest = proxyData.data[0];
@@ -575,11 +605,15 @@ export function useMarketNews(): UseMarketNewsReturn {
 
         // 1. Try Supabase Proxy (Bypasses CORS, most reliable if deployed)
         try {
-            const { data: proxyData, error: proxyError } = await supabase.functions.invoke('news-api-proxy', {
-                body: { url: source.url }
+            const headers = await getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ url: source.url })
             });
 
-            if (!proxyError && proxyData) {
+            if (response.ok) {
+                const proxyData = await response.json();
                 if (proxyData.contents) {
                     const articles = parseXMLToArticles(proxyData.contents, source);
                     if (articles.length > 0) {

@@ -303,6 +303,7 @@ export const ReportingPage: React.FC = () => {
             if (selectedTemplate.id === 'compliance-pack' && fmt === 'PDF') {
                 ExportService.generateCompliancePack(
                     currentUser?.companyName || 'IoTank Station',
+                    userName,
                     { start: customStart || '2026-01-01', end: customEnd || '2026-03-31' },
                     { totalThroughput: 145000, totalDeliveries: 12, averageVariancePct: 0.4, incidents: 2 },
                     [

@@ -31,6 +31,7 @@ export type EventType =
     | 'ALERT_RESOLVED'
     | 'THRESHOLD_UPDATED'
     | 'IDENTITY_MUTATION_ATTEMPT'
+    | 'UNAUTHORIZED_ACCESS_ATTEMPT'
     | 'DEVICE_COMMAND';
 
 export interface UnifiedEvent {

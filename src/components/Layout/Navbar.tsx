@@ -24,6 +24,7 @@ import { DeliveryModal } from '../QuickActions/DeliveryModal';
 import { ShiftCloseModal } from '../QuickActions/ShiftCloseModal';
 import { ShiftOpenModal } from '../QuickActions/ShiftOpenModal';
 import { ReportModal } from '../QuickActions/ReportModal';
+import { OrderModal } from '../QuickActions/OrderModal';
 import { Toast } from '../Common/Toast';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { ViewOnlyNoticeModal } from '../Common/ViewOnlyNoticeModal';
@@ -31,12 +32,14 @@ import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo } 
 import { NotificationService } from '@/services/NotificationService';
 import { DeviceCommandService } from '@/services/DeviceCommandService';
 import { FiActivity } from 'react-icons/fi';
+import tankIQRobot from '@/assets/tankiq-robot.png';
 
 interface NavbarProps {
     onToggleSidebar: () => void;
+    onToggleTankIQ: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ }) => {
     const { currentUser, signOut } = useAuth();
     const stationId = currentUser?.stationId || '';
     const navigate = useNavigate();
@@ -63,6 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     const isShiftCloseModalOpen = activeModal === 'shift-close';
     const isShiftOpenModalOpen = activeModal === 'shift-open';
     const isReportModalOpen = activeModal === 'report';
+    const isOrderModalOpen = activeModal === 'order';
 
     // Fetch alerts for the notification tray
     const { alerts } = useAlerts(stationId, false);
@@ -76,27 +80,77 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isOnline, setIsOnline] = useState(true);
     const [pendingCommandCount, setPendingCommandCount] = useState(0);
+    const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
 
     const handleResolve = async (e: React.MouseEvent, alertId: string) => {
         e.stopPropagation();
+        if (resolvingIds.has(alertId)) return;
+        
+        // Optimistic UI: Start animation immediately
+        setResolvingIds(prev => new Set(prev).add(alertId));
+        
         try {
             if (!currentUser) return;
-            await resolveAlert(alertId, currentUser.authUserId);
+            
+            // Fire and forget (almost) - handled by the timeout for animation
+            setTimeout(async () => {
+                try {
+                    await resolveAlert(alertId, currentUser.authUserId);
+                } catch (err) {
+                    console.error('Error resolving alert:', err);
+                    // Rollback on failure
+                    setResolvingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(alertId);
+                        return next;
+                    });
+                }
+            }, 300);
         } catch (err) {
-            console.error('Error resolving alert from navbar:', err);
+            console.error('Error in resolve handler:', err);
+            setResolvingIds(prev => {
+                const next = new Set(prev);
+                next.delete(alertId);
+                return next;
+            });
         }
     };
 
     const handleResolveEvent = async (e: React.MouseEvent, eventId: string) => {
         e.stopPropagation();
+        if (resolvingIds.has(eventId)) return;
+
+        // Optimistic UI: Start animation immediately
+        setResolvingIds(prev => new Set(prev).add(eventId));
+
         try {
-            await supabase
-                .from('unified_events')
-                .update({ is_resolved: true })
-                .eq('id', eventId);
-            setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
+            setTimeout(async () => {
+                try {
+                    const { error } = await supabase
+                        .from('unified_events')
+                        .update({ is_resolved: true })
+                        .eq('id', eventId);
+                    
+                    if (error) throw error;
+
+                    setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
+                } catch (err) {
+                    console.error('Error resolving event:', err);
+                    // Rollback on failure
+                    setResolvingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(eventId);
+                        return next;
+                    });
+                }
+            }, 300);
         } catch (err) {
-            console.error('Error resolving event:', err);
+            console.error('Outer error resolving event:', err);
+            setResolvingIds(prev => {
+                const next = new Set(prev);
+                next.delete(eventId);
+                return next;
+            });
         }
     };
 
@@ -219,7 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 </div>
             </div>
 
-        <div className="navbar-center flex items-center justify-center">
+            <div className="navbar-center flex items-center justify-center">
                 {isViewOnly && (
                     <div 
                         className="view-only-badge animate-pulse" 
@@ -242,7 +296,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                 <div className="navbar-item-relative system-health hidden lg:flex">
                     <div className={`health-badge ${!isOnline ? 'offline' : ''}`}>
                         <MdCircle className={isOnline ? "pulse-green-small" : "text-red-500"} />
-                        <span className="health-text">{isOnline ? 'System Online' : 'System Offline'}</span>
+                        <span className="health-text">{isOnline ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE'}</span>
+                        <span className="health-separator">|</span>
+                        <span className="health-time">{formattedTime}</span>
                         {pendingCommandCount > 0 && (
                             <div 
                                 className="pending-badge ml-2 flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
@@ -259,8 +315,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                 {pendingCommandCount} PENDING
                             </div>
                         )}
-                        <span className="sync-text">{formattedTime}</span>
                     </div>
+                </div>
+
+                <div className="navbar-item-relative">
+                    <button
+                        className="navbar-btn tankiq-toggle-btn group relative"
+                        onClick={onToggleTankIQ}
+                        title="Open TankIQ Assistant"
+                    >
+                        <img 
+                            src={tankIQRobot} 
+                            style={{ 
+                                width: '28px', 
+                                height: '28px', 
+                                minWidth: '28px', 
+                                minHeight: '28px',
+                                borderRadius: '50%',
+                                objectFit: 'cover'
+                            }} 
+                            className="group-hover:scale-110 transition-transform shadow-sm" 
+                            alt="TankIQ" 
+                        />
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                        </span>
+                    </button>
                 </div>
 
 
@@ -376,8 +457,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                         aria-label="Notifications"
                     >
                         <MdNotifications />
-                        {unreadAlerts.length > 0 && (
-                            <span className="notification-badge animate-pulse">{unreadAlerts.length}</span>
+                        {(unreadAlerts.length + unifiedEvents.length) > 0 && (
+                            <span className="notification-badge animate-pulse">{(unreadAlerts.length + unifiedEvents.length)}</span>
                         )}
                     </button>
 
@@ -385,7 +466,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                         <div className="dropdown-menu modern-dropdown notifications-dropdown">
                         <div className="dropdown-header notif-header">
                                 <h3>Notifications</h3>
-                                {unreadAlerts.length > 0 && <span className="pro-badge notif-badge-inline">{unreadAlerts.length} New</span>}
+                                {(unreadAlerts.length + unifiedEvents.length) > 0 && <span className="pro-badge notif-badge-inline">{(unreadAlerts.length + unifiedEvents.length)} New</span>}
                             </div>
                             <div className="dropdown-content custom-scrollbar overflow-y-auto max-h-[380px]">
                                 {unreadAlerts.length > 0 || unifiedEvents.length > 0 ? (
@@ -399,7 +480,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                         {unreadAlerts.map((alert: Alert) => (
                                             <div
                                                 key={alert.id}
-                                                className={`notification-item ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'}`}
+                                                className={`notification-item ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'} ${resolvingIds.has(alert.id) ? 'resolving-out' : ''}`}
                                                 onClick={() => {
                                                     navigate('/alerts');
                                                     setShowNotifications(false);
@@ -449,7 +530,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                                 return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
                                             };
                                             return (
-                                                <div key={event.id} className="mx-3 my-2 bg-white rounded-xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-100 p-3">
+                                                <div key={event.id} className={`mx-3 my-2 bg-white rounded-xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-100 p-3 transition-all duration-300 ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
                                                     <div className="flex items-center justify-between mb-2">
                                                         <div className="flex items-center gap-2 text-slate-500">
                                                             {event.event_category === 'SHIFT' ? <FiClock size={14} /> :
@@ -472,9 +553,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
                                                     <p className="text-[13px] text-[#1e1b4b] leading-relaxed mb-2 pl-[22px]">
                                                         {event.description}
                                                     </p>
-                                                    <div className="text-[13px] text-slate-600 pl-[22px]">
-                                                        By: {event.actor_name || (event.metadata as any)?.actor_name || event.actor_email?.split('@')[0] || 'system'}
-                                                    </div>
                                                 </div>
                                             );
                                         })}
@@ -569,6 +647,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             />
             <ReportModal
                 isOpen={isReportModalOpen}
+                onClose={closeModal}
+            />
+            <OrderModal
+                isOpen={isOrderModalOpen}
                 onClose={closeModal}
             />
 

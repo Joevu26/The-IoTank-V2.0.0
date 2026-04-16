@@ -4,24 +4,25 @@ Cloud-native Industrial IoT fuel tank monitoring dashboard with AI analytics, de
 
 ## 🚀 Features
 
-- **Real-Time Monitoring**: Live fuel level and temperature tracking with sub-second updates
-- **AI-Driven Analytics**: Google Gemini-powered predictive forecasting, anomaly detection, and procurement recommendations
-- **Thermal Expansion Correction**: Automatic volume standardization to 15.5°C using fuel-specific coefficients
-- **3D Visualization**: Interactive tank models with Three.js
-- **Market Intelligence**: Real-time fuel pricing and strategic procurement advice
-- **Multi-Site Management**: Scale to hundreds of tanks across multiple locations
-- **Enterprise Security**: RBAC, MFA, audit logs, and compliance-ready features
-- **Accessibility**: WCAG 2.1 AA compliant with colorblind modes
-- **Internationalization**: Support for EN, ES, FR, DE, SW with locale-aware formatting
+- **Real-Time Monitoring**: Live fuel level and temperature tracking with sub-second updates using Supabase Real-time.
+- **AI-Driven Analytics**: Google Gemini-powered predictive forecasting, anomaly detection, and procurement recommendations via Supabase Edge Functions.
+- **Thermal Expansion Correction**: Automatic volume standardization to 15.5°C using fuel-specific coefficients.
+- **3D Visualization**: Interactive tank models with Three.js.
+- **Market Intelligence**: Real-time fuel pricing and strategic procurement advice.
+- **Multi-Site Management**: Scale to hundreds of tanks across multiple locations.
+- **Enterprise Security**: RBAC, identity-locked row-level security (RLS), and forensic audit logs.
+- **Accessibility**: WCAG 2.1 AA compliant with colorblind modes.
+- **Internationalization**: Support for EN, ES, FR, DE, SW with locale-aware formatting.
 
 ## 📋 Prerequisites
 
 - Node.js 18+ and npm
-- Firebase project with:
-  - Firestore database enabled
+- [Supabase](https://supabase.com/) project with:
+  - PostgreSQL database enabled
   - Authentication configured (Email/Password + Google OAuth)
-  - Cloud Functions enabled
-- Google Cloud project with Gemini API access (optional for AI features)
+  - Edge Functions enabled
+- [Firebase](https://firebase.google.com/) project for Hosting
+- Google Cloud project with Gemini API access (configured via Supabase secrets)
 
 ## 🛠️ Installation
 
@@ -35,9 +36,10 @@ Cloud-native Industrial IoT fuel tank monitoring dashboard with AI analytics, de
    cp .env.example .env
    ```
    
-   Edit `.env` and add your Firebase configuration:
-   - Get your Firebase config from Firebase Console → Project Settings
-   - Add your project credentials to the `.env` file
+   Edit `.env` and add your **Supabase** configuration:
+   - `VITE_SUPABASE_URL`: Your Supabase Project URL
+   - `VITE_SUPABASE_ANON_KEY`: Your Supabase Anonymous Key
+   - `VITE_FIREBASE_CONFIG`: (Optional) Firebase config for hosting-specific features
 
 3. **Run development server:**
    ```bash
@@ -50,17 +52,14 @@ Cloud-native Industrial IoT fuel tank monitoring dashboard with AI analytics, de
 
 ```
 src/
-├── components/        # React components
-│   ├── Auth/         # Authentication (Login, ProtectedRoute)
-│   ├── Dashboard/    # Main dashboard, TankCard, TankGrid
-│   ├── Alerts/       # Alert banners and notifications
-│   └── ...
-├── contexts/         # React contexts (Theme, Auth)
-├── hooks/            # Custom hooks (useFirestore, etc.)
-├── utils/            # Utility functions (thermal correction, formatting)
-├── config/           # Firebase configuration
-├── types/            # TypeScript interfaces
-└── styles/           # Global CSS and theme
+├── components/        # React components (Dashboard, TankCard, etc.)
+├── contexts/         # React contexts (AuthContext, ThemeContext)
+├── hooks/            # Custom hooks (useSupabase, etc.)
+├── services/         # Business logic (AlertDetectionEngine, MarketIntelligence)
+├── config/           # App configuration (Supabase, i18n)
+├── types/            # TypeScript interfaces (index.ts)
+├── utils/            # Shared utilities (math, formatting)
+└── styles/           # Global CSS and Design System
 ```
 
 ## 🛠️ Troubleshooting Common Issues
@@ -69,7 +68,7 @@ src/
 If you receive a `Provisioning Failed: Unauthorized (401)` error in the Super Admin dashboard when approving registrations, it means your Supabase Edge Functions do not have the correct secrets to validate your session token.
 
 **Fix:**
-1. Ensure your `.env` file has `SUPABASE_SERVICE_ROLE_KEY` (copy it from Supabase Dashboard → Settings → API).
+1. Ensure your `.env` file has `SUPABASE_SERVICE_ROLE_KEY`.
 2. Run the secret synchronization script:
    ```powershell
    .\scripts\sync-supabase-secrets.ps1
@@ -78,20 +77,14 @@ If you receive a `Provisioning Failed: Unauthorized (401)` error in the Super Ad
 
 ## 🎨 Theme Customization
 
-The app supports light/dark modes with industrial aesthetics. Modify `src/styles/theme.css` to customize:
-- Color palette (primary, accent, status colors)
-- Typography (fonts, sizes, weights)
-- Spacing scale
-- Border radius and shadows
-
-Theme auto-detects system preference but can be manually toggled. Preference is stored in Firestore per user.
+The app supports light/dark modes with industrial aesthetics. Modify `src/styles/theme.css` to customize the design system tokens. Theme preference is persisted in the user's Supabase profile.
 
 ## 🔒 Security
 
-- All Firebase API keys are public-facing (safe for client-side use with Firestore security rules)
-- Sensitive operations (Gemini API calls, market data fetching) are proxied through Cloud Functions
-- NEVER expose Cloud Function API keys or service account credentials client-side
-- Firestore security rules enforce row-level access control
+- **Row Level Security (RLS)**: Core data (tanks, readings, alerts) is protected at the database level using organization-bound policies.
+- **JWT Authentication**: All requests are authenticated via Supabase JWTs.
+- **Edge Security**: Sensitive operations (Gemini API, Market Data) are proxied through Supabase Edge Functions with secret management.
+- **Audit Logging**: All critical actions are recorded in an immutable `audit_logs` table.
 
 ## 🧪 Testing
 
@@ -109,102 +102,59 @@ npm run test:e2e
 npm run build
 ```
 
-This creates an optimized build in the `dist/` directory with:
-- Code splitting for faster loads
-- Tree shaking to remove unused code
-- Asset optimization (minification, compression)
-- PWA service worker for offline support
+This creates an optimized build in the `dist/` directory.
 
 ## 🚀 Deployment
 
-### Firebase Hosting (Recommended)
+The frontend is deployed to **Firebase Hosting** for high-availability edge delivery.
 
 1. Install Firebase CLI:
    ```bash
    npm install -g firebase-tools
    ```
 
-2. Login to Firebase:
+2. Login and Deploy:
    ```bash
    firebase login
-   ```
-
-3. Initialize Firebase Hosting:
-   ```bash
-   firebase init hosting
-   ```
-   - Select your Firebase project
-   - Set public directory to `dist`
-   - Configure as single-page app: Yes
-   - Don't overwrite index.html
-
-4. Deploy:
-   ```bash
    npm run build
    firebase deploy --only hosting
    ```
 
 ## 🌍 Internationalization
 
-Add new languages by creating translation files in `src/locales/`:
-- `en.json` (English - default)
-- `es.json` (Spanish)
-- `fr.json` (French)
-- `de.json` (German)
-- `sw.json` (Swahili)
-
-Users can switch languages in Settings. Preference is stored in Firestore.
+Add or modify translations in `src/locales/`. Supports English, Spanish, French, German, and Swahili.
 
 ## 📊 Data Structure
 
-### Firestore Collections
+### Core PostgreSQL Tables (Supabase)
 
-```
-/organizations/{orgId}
-  /tanks/{tankId}
-    /readings/{readingId}
-  /alerts/{alertId}
-  /sites/{siteId}
-  /reports/{reportId}
-  
-/users/{userId}
-/userPreferences/{userId}
-/marketData/{dataId}
-```
+```sql
+-- Profiles: User identity and organization binding
+profiles (id, auth_user_id, client_id, role, display_name)
 
-### Sample Tank Reading
+-- Tanks: Physical tank configuration
+tanks (id, client_id, site_id, name, capacity, fuel_type)
 
-```json
-{
-  "tankId": "tank-001",
-  "timestamp": 1704722400000,
-  "rawDistance": 120.5,
-  "temperature": 22.3,
-  "fuelLevel": 75.2,
-  "volumeMeasured": 15230.5,
-  "volumeCorrected": 15187.3,
-  "signalQuality": 95,
-  "deviceId": "esp32-abc123",
-  "processingLocation": "edge"
-}
+-- Sensor Readings: Time-series telemetry
+sensor_readings (id, tank_id, fuel_level, temperature, volume_corrected, created_at)
+
+-- Alerts: System and AI-generated notifications
+alerts (id, tank_id, severity, message, status)
 ```
 
 ## 🤖 AI Integration
 
-The system uses Google Gemini API for:
-- Time-to-Empty forecasting
-- Anomaly detection (leaks, unusual patterns)
-- Procurement recommendations
-- Predictive maintenance alerts
-
-All AI insights are labeled as "Advisory Only" and require human verification for critical actions.
+The system uses **Supabase Edge Functions** to interface with Google Gemini for:
+- **Time-to-Empty forecasting**
+- **Anomaly detection** (leaks, theft, unusual consumption)
+- **Strategic procurement** advice based on market trends
 
 ## 🆘 Support
 
 For issues or questions:
-1. Check the implementation plan in `brain/implementation_plan.md`
-2. Review Firebase Console for backend errors
-3. Check browser console for client-side issues
+1. Check the project documentation in the repository.
+2. Review Supabase logs for Edge Function or Database errors.
+3. Check browser console for client-side issues.
 
 ## 📄 License
 
@@ -212,4 +162,4 @@ For issues or questions:
 
 ---
 
-**Built with:** React 18, TypeScript, Firebase, Google Gemini AI, Three.js, Recharts
+**Built with:** React 18, TypeScript, Supabase, Google Gemini AI, Three.js, Recharts, Firebase Hosting

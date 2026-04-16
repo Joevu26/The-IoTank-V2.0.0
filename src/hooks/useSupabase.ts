@@ -105,8 +105,17 @@ const mapReading = (row: any): TankReading => ({
     volume: safeNum(row.volume || row.ambient_volume),
     fuelLevel: safeNum(row.fill_percentage),
     volumeCorrected: safeNum(row.standard_volume || row.volume || row.ambient_volume),
-    signalQuality: row.reading_quality === 'excellent' ? 100 : (row.reading_quality === 'good' ? 75 : (row.reading_quality === 'fair' ? 50 : (row.reading_quality === 'poor' ? 25 : 0))),
-    rssi: safeNum(row.rssi || row.signal_strength || (row.metadata?.rssi)),
+    signalQuality: (() => {
+        const rssiVal = Math.abs(row.rssi || row.signal_strength || (row.metadata?.rssi) || 0);
+        if (rssiVal === 0) return 'Offline';
+        if (rssiVal >= 30 && rssiVal <= 50) return 'Excellent';
+        if (rssiVal >= 51 && rssiVal <= 65) return 'Good';
+        if (rssiVal >= 66 && rssiVal <= 75) return 'Fair';
+        if (rssiVal >= 76 && rssiVal <= 85) return 'Weak';
+        if (rssiVal > 90) return 'Unusable';
+        return 'Connected';
+    })(),
+    rssi: safeNum(Math.abs(row.rssi || row.signal_strength || (row.metadata?.rssi))),
     deviceId: row.device_id || '',
     processingLocation: (row.processing_location || 'cloud') as 'edge' | 'cloud',
     metadata: row.metadata || {}

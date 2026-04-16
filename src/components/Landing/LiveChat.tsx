@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FiX, FiSend, FiUser, FiInfo, FiSmartphone, FiAtSign, FiPlus, FiChevronLeft, FiTrash2, FiPhoneCall } from 'react-icons/fi';
 import { FaWhatsapp } from 'react-icons/fa';
 import './LiveChat.css';
-import { ChatAIService } from '../../services/ChatAIService';
+import { ChatAIService, RateLimitError } from '../../services/ChatAIService';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Message {
@@ -46,6 +46,8 @@ export const LiveChat: React.FC = () => {
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null);
+    const [secondsRemaining, setSecondsRemaining] = useState(0);
     const [newLead, setNewLead] = useState<LeadData>({ name: '', email: '', phone: '', subject: '' });
     const [hoverRating, setHoverRating] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -55,6 +57,22 @@ export const LiveChat: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('iotank_chat_sessions', JSON.stringify(sessions));
     }, [sessions]);
+
+    // Rate limit countdown logic
+    useEffect(() => {
+        if (!rateLimitResetAt) return;
+
+        const interval = setInterval(() => {
+            const remaining = Math.max(0, Math.ceil((rateLimitResetAt - Date.now()) / 1000));
+            setSecondsRemaining(remaining);
+            if (remaining <= 0) {
+                setRateLimitResetAt(null);
+                setSecondsRemaining(0);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [rateLimitResetAt]);
 
     // Auto-view logic on open
     useEffect(() => {
@@ -166,8 +184,22 @@ export const LiveChat: React.FC = () => {
                     }
                     : s
             ));
-        } catch (error) {
+        } catch (error: any) {
             console.error('Chat error:', error);
+            if (error instanceof RateLimitError) {
+                setRateLimitResetAt(new Date(error.resetAt).getTime());
+                setSecondsRemaining(Math.max(0, Math.ceil((new Date(error.resetAt).getTime() - Date.now()) / 1000)));
+            } else {
+                const errorMsg: Message = {
+                    id: `err-${timestamp}`,
+                    sender: 'ai',
+                    text: "I am having trouble connecting. Please try again or contact us directly.",
+                    timestamp: Date.now()
+                };
+                setSessions(prev => prev.map(s =>
+                    s.id === currentSessionId ? { ...s, messages: [...s.messages, errorMsg] } : s
+                ));
+            }
         } finally {
             setIsTyping(false);
         }
@@ -377,27 +409,36 @@ Submitted via Landing Page AI Assistant
                                     <div ref={messagesEndRef} />
                                 </div>
                                 {currentSession.status === 'active' && (
-                                    <div className="chat-input-area">
-                                        <textarea
-                                            className="chat-input"
-                                            placeholder="Type your question..."
-                                            rows={1}
-                                            value={inputValue}
-                                            onChange={e => setInputValue(e.target.value)}
-                                            onKeyDown={e => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleSendMessage();
-                                                }
-                                            }}
-                                        />
-                                        <button
-                                            className="send-btn"
-                                            onClick={handleSendMessage}
-                                            disabled={!inputValue.trim()}
-                                        >
-                                            <FiSend size={18} />
-                                        </button>
+                                    <div className="chat-input-area-wrapper">
+                                        {secondsRemaining > 0 && (
+                                            <div className="rate-limit-notice">
+                                                <FiInfo size={14} />
+                                                <span>Public rate limit hit. Resuming in <strong>{secondsRemaining}s</strong></span>
+                                            </div>
+                                        )}
+                                        <div className={`chat-input-area ${secondsRemaining > 0 ? 'disabled' : ''}`}>
+                                            <textarea
+                                                className="chat-input"
+                                                placeholder={secondsRemaining > 0 ? "Rate limit reached..." : "Type your question..."}
+                                                rows={1}
+                                                value={inputValue}
+                                                disabled={secondsRemaining > 0}
+                                                onChange={e => setInputValue(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && !e.shiftKey && secondsRemaining <= 0) {
+                                                        e.preventDefault();
+                                                        handleSendMessage();
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                className="send-btn"
+                                                onClick={handleSendMessage}
+                                                disabled={!inputValue.trim() || secondsRemaining > 0}
+                                            >
+                                                <FiSend size={18} />
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </>

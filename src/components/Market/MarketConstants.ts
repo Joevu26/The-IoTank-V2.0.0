@@ -31,7 +31,7 @@ export const ACTIVE_FEEDS = [
 export const IMPLICATION_META: Record<string, { color: string; bg: string; label: string }> = {
     'Price': { color: 'text-red-500', bg: 'bg-red-500/10 border-red-500/20', label: 'Price Impact' },
     'Supply': { color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Supply Chain' },
-    'Compliance': { color: 'text-purple-500', bg: 'bg-purple-500/10 border-purple-500/20', label: 'Compliance' },
+    'Compliance': { color: 'text-cyan-500', bg: 'bg-cyan-500/10 border-cyan-500/20', label: 'Compliance' },
     'Logistics': { color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', label: 'Logistics' },
     'General': { color: 'text-slate-500', bg: 'bg-slate-500/10 border-slate-500/20', label: 'General Intel' },
 };

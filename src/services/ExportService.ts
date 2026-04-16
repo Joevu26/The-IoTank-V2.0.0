@@ -143,6 +143,7 @@ export class ExportService {
      */
     public static generateCompliancePack(
         orgName: string,
+        userName: string,
         period: { start: string; end: string },
         summaryMetrics: {
             totalThroughput: number;
@@ -158,6 +159,10 @@ export class ExportService {
         doc.setFontSize(24);
         doc.setTextColor(30, 58, 138); // Deep blue
         doc.text('EPRA Compliance Pack', 14, 25);
+
+        doc.setFontSize(10);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Digital Witness: ${userName}`, 14, 30);
 
         doc.setFontSize(12);
         doc.setTextColor(71, 85, 105);
@@ -201,15 +206,25 @@ export class ExportService {
         doc.text('Daily Operations Log', 14, logStartY);
 
         if (dailyLogs.length > 0) {
-            const headers = ['Date', 'Opening (L)', 'Closing (L)', 'Deliveries (L)', 'Sales (L)', 'Variance (L)'];
-            const rows = dailyLogs.map(log => [
-                log.date,
-                log.opening.toFixed(0),
-                log.closing.toFixed(0),
-                log.deliveries.toFixed(0),
-                log.sales.toFixed(0),
-                log.variance.toFixed(1)
-            ]);
+            const headers = ['Date', 'Opening', 'Refills', 'Sales', 'Theoretical', 'Actual', 'Var (L)', 'Var (%)'];
+            const rows = dailyLogs.map(log => {
+                const theoretical = (log.opening || 0) + (log.deliveries || 0) - (log.sales || 0);
+                const actual = log.closing || 0;
+                const variance = actual - theoretical;
+                const totalThroughput = (log.sales || 0) + (log.deliveries || 0);
+                const variancePct = totalThroughput > 0 ? (variance / totalThroughput) * 100 : 0;
+
+                return [
+                    log.date,
+                    (log.opening || 0).toFixed(0),
+                    (log.deliveries || 0).toFixed(0),
+                    (log.sales || 0).toFixed(0),
+                    theoretical.toFixed(0),
+                    actual.toFixed(0),
+                    variance.toFixed(1),
+                    variancePct.toFixed(2) + '%'
+                ];
+            });
 
             autoTable(doc, {
                 startY: logStartY + 5,
@@ -252,6 +267,7 @@ export class ExportService {
             if (reportName.includes('Compliance')) {
                 this.generateCompliancePack(
                     orgName,
+                    data.generated_by || 'FORENSIC_RECON',
                     { start: data.window?.split(' → ')[0] || 'Unknown', end: data.window?.split(' → ')[1] || 'Unknown' },
                     { 
                         totalThroughput: data.metrics?.tank_count ? (data.metrics.tank_count * 15000) : 0, 

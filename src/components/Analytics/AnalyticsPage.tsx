@@ -10,6 +10,7 @@ import { PageHeader } from '../Common/PageHeader';
 import { WetstockReconciliation } from './WetstockReconciliation';
 import { ShrinkageHeatmap } from './ShrinkageHeatmap';
 import { ShiftAnalyticsTable } from './ShiftAnalyticsTable';
+import { LazyComponent } from '../Common/LazyComponent';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useTankAnalytics30d } from '@/hooks/useSupabase';
@@ -159,11 +160,13 @@ export const AnalyticsPage: React.FC = () => {
                         </div>
 
                         {/* Wetstock Reconciliation Section */}
-                        <WetstockReconciliation
-                            tanks={tanks}
-                            transactions={transactions}
-                            currency="Ksh"
-                        />
+                        <LazyComponent minHeight="400px">
+                            <WetstockReconciliation
+                                tanks={tanks}
+                                transactions={transactions}
+                                currency="Ksh"
+                            />
+                        </LazyComponent>
 
                         <div className="acp-two-col">
                             {/* Revenue Intelligence */}
@@ -272,29 +275,33 @@ export const AnalyticsPage: React.FC = () => {
                         </div>
 
                         <div className="acp-chart-wrap">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={displayData}>
-                                    <defs>
-                                        <linearGradient id="gradForecast" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.15} />
-                                            <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }} />
-                                    <RechartsTooltip
-                                        contentStyle={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
-                                        itemStyle={{ color: '#3b82f6' }}
-                                    />
-                                    <Area type="monotone" dataKey="sales" stroke="#7c3aed" strokeWidth={2.5} fillOpacity={1} fill="url(#gradForecast)" animationDuration={1500} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            <LazyComponent minHeight="300px">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={displayData}>
+                                        <defs>
+                                            <linearGradient id="gradForecast" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.15} />
+                                                <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--color-text-secondary)', fontSize: 10 }} />
+                                        <RechartsTooltip
+                                            contentStyle={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
+                                            itemStyle={{ color: '#3b82f6' }}
+                                        />
+                                        <Area type="monotone" dataKey="sales" stroke="#7c3aed" strokeWidth={2.5} fillOpacity={1} fill="url(#gradForecast)" animationDuration={1500} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </LazyComponent>
                         </div>
                     </div>
 
                     {/* Forensic Heatmap Section */}
-                    <ShrinkageHeatmap />
+                    <LazyComponent minHeight="500px">
+                        <ShrinkageHeatmap />
+                    </LazyComponent>
 
                     {/* Risk & Variance Analysis */}
                     <div className="acp-card">
@@ -375,10 +382,12 @@ export const AnalyticsPage: React.FC = () => {
                                 </h3>
                                 <div className="acp-card-meta">Data window: 30 days baseline</div>
 
-                                <PredictivePanel 
-                                    stationId={stationId} 
-                                    tankId={tanks[0]?.id} 
-                                />
+                                <LazyComponent minHeight="150px">
+                                    <PredictivePanel 
+                                        stationId={stationId} 
+                                        tankId={tanks[0]?.id} 
+                                    />
+                                </LazyComponent>
 
                                 <div className="acp-dark-outputs">
                                     <div className="acp-dark-outputs-label">Calculated Projections</div>
@@ -484,7 +493,9 @@ export const AnalyticsPage: React.FC = () => {
 
             {/* Shift Archive: Absolute Bottom Strategy */}
             <div className="mt-8 mb-12">
-                <ShiftAnalyticsTable />
+                <LazyComponent minHeight="600px">
+                    <ShiftAnalyticsTable />
+                </LazyComponent>
             </div>
 
         </div>

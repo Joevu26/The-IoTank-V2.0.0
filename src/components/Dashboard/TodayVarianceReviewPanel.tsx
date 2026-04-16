@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FiX, FiInfo, FiUploadCloud, FiCheckCircle } from 'react-icons/fi';
+import { useAuth } from '@/hooks/useAuth';
+import { AuditService } from '@/services/AuditService';
 import { LossReview } from '../../types';
 
 interface TodayVarianceReviewPanelProps {
@@ -21,6 +23,7 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
     const [category, setCategory] = useState<LossReview['selectedCause'] | ''>('');
     const [explanation, setExplanation] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { currentUser } = useAuth();
 
     // If difference is greater than 50L (math abs), require explanation
     const requiresExplanation = Math.abs(varianceData.difference) > 50;
@@ -44,12 +47,26 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
         // Dispatch global success feedback
         window.dispatchEvent(new CustomEvent('system-toast', {
             detail: {
-                title: 'Review Complete',
-                message: `Variance of ${varianceData.difference.toFixed(1)}L categorized as ${category}.`,
+                title: 'Forensic Logic Verified',
+                message: `Variance intelligence archived: ${varianceData.difference.toFixed(1)}L attributed to "${category}". Financial value adjusted.`,
                 type: 'success',
                 attribution: 'LOSS RADAR'
             }
         }));
+
+        await AuditService.log(
+            'CALIBRATION',
+            'SETTINGS_CHANGED',
+            currentUser?.stationId || 'SYSTEM',
+            `Variance review finalized: ${varianceData.difference.toFixed(1)}L categorized as "${category}". Explanation: ${explanation || 'None provided.'}`,
+            action === 'escalated' ? 'WARNING' : 'INFO',
+            { 
+                variance: varianceData.difference, 
+                category, 
+                action,
+                explanation
+            }
+        ).catch(() => {});
 
         setIsSubmitting(false);
         onClose();

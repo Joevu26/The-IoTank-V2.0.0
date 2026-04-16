@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     FiTruck, FiDownload, FiSearch, 
     FiCheckCircle, FiAlertCircle, 
@@ -14,6 +14,7 @@ import { DeliveryDocument } from '@/types';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { useModals } from '@/contexts/ModalContext';
 import { Toast } from '../Common/Toast';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import '../Common/DesignSystemCards.css';
 import './DeliveriesPage.css';
 
@@ -38,8 +39,16 @@ export const DeliveriesPage: React.FC = () => {
 
     // State
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'VERIFIED' | 'NEEDS_REVIEW' | 'DISPUTED'>('ALL');
     const [selectedDelivery, setSelectedDelivery] = useState<DeliveryDocument | null>(null);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(handler);
+    }, [searchQuery]);
 
     // Data Hooks
     const { deliveries, loading, error } = useDeliveries(stationId);
@@ -53,6 +62,9 @@ export const DeliveriesPage: React.FC = () => {
         onAction?: () => void
     } | null>(null);
 
+    const parentRef = React.useRef<HTMLDivElement>(null);
+    
+
     // Derived Data
     const tankNames = useMemo(() => {
         const m: Record<string, string> = {};
@@ -63,12 +75,21 @@ export const DeliveriesPage: React.FC = () => {
     const filteredDeliveries = useMemo(() => {
         return deliveries.filter(d => {
             const matchesSearch = 
-                d.invoiceNo?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                d.supplier?.toLowerCase().includes(searchQuery.toLowerCase());
+                d.invoiceNo?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                d.supplier?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
             const matchesStatus = statusFilter === 'ALL' || d.status === statusFilter;
             return matchesSearch && matchesStatus;
         });
-    }, [deliveries, searchQuery, statusFilter]);
+    }, [deliveries, debouncedSearchQuery, statusFilter]);
+
+    // eslint-disable-next-line react-compiler/react-compiler
+    const rowVirtualizer = useVirtualizer({
+        count: filteredDeliveries.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 50,
+        overscan: 5,
+    });
+
 
     const stats = useMemo(() => {
         const totalInvoiced = deliveries.reduce((acc, d) => acc + (d.invoiceLiters || 0), 0);
@@ -183,7 +204,17 @@ export const DeliveriesPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="ds-card dp-table-card">
+                    <div 
+                        className="ds-card dp-table-card custom-scrollbar" 
+                        ref={(el) => {
+                            if (el) {
+                                el.style.height = '600px';
+                                el.style.overflow = 'auto';
+                            }
+                            // @ts-ignore: assignment to readonly RefObject.current
+                            parentRef.current = el;
+                        }}
+                    >
                         <table className="dp-table">
                             <thead>
                                 <tr>
@@ -209,50 +240,83 @@ export const DeliveriesPage: React.FC = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredDeliveries.map(d => (
-                                        <tr 
-                                            key={d.id} 
-                                            className={selectedDelivery?.id === d.id ? 'active' : ''}
-                                            onClick={() => setSelectedDelivery(d)}
-                                        >
-                                            <td>
-                                                <div className="dp-td-datetime">
-                                                    <span className="dp-td-date">{format(new Date(d.ts), 'dd MMM yyyy')}</span>
-                                                    <span className="dp-td-time">{format(new Date(d.ts), 'HH:mm')}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="dp-td-id">
-                                                    <strong>{d.invoiceNo || 'N/A'}</strong>
-                                                    <span>{d.supplier || 'Direct Terminal'}</span>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div className="dp-td-tank">
-                                                    <strong>{tankNames[d.tankId] || 'Unit Alpha'}</strong>
-                                                    <span>{d.product || 'Diesel'}</span>
-                                                </div>
-                                            </td>
-                                            <td className={Math.abs(d.variance?.liters || 0) > 50 ? 'text-rose-500' : 'text-slate-500'}>
-                                                <strong>{d.variance?.liters || 0} L</strong>
-                                            </td>
-                                            <td>
-                                                <span className={`dp-status-badge dp-status-badge--${d.status?.toLowerCase()}`}>
-                                                    {d.status === 'VERIFIED' ? <FiCheckCircle size={10} /> : <FiClock size={10} />}
-                                                    {d.status}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <button 
-                                                    className="dp-action-btn"
-                                                    title="Download Delivery PDF Report"
-                                                    onClick={(e) => { e.stopPropagation(); handleExportPDF(d); }}
+                                    <>
+                                        {rowVirtualizer.getVirtualItems().length > 0 && (
+                                            <tr>
+                                                <td 
+                                                    colSpan={6} 
+                                                    ref={(el) => {
+                                                        if (el) {
+                                                            el.style.padding = '0';
+                                                            el.style.height = `${rowVirtualizer.getVirtualItems()[0].start}px`;
+                                                        }
+                                                    }} 
+                                                />
+                                            </tr>
+                                        )}
+                                        {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                                            const d = filteredDeliveries[virtualRow.index];
+                                            return (
+                                                <tr 
+                                                    key={d.id} 
+                                                    className={selectedDelivery?.id === d.id ? 'active' : ''}
+                                                    onClick={() => setSelectedDelivery(d)}
+                                                    ref={rowVirtualizer.measureElement}
+                                                    data-index={virtualRow.index}
                                                 >
-                                                    <FiFileText size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
+                                                    <td>
+                                                        <div className="dp-td-datetime">
+                                                            <span className="dp-td-date">{format(new Date(d.ts), 'dd MMM yyyy')}</span>
+                                                            <span className="dp-td-time">{format(new Date(d.ts), 'HH:mm')}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div className="dp-td-id">
+                                                            <strong>{d.invoiceNo || 'N/A'}</strong>
+                                                            <span>{d.supplier || 'Direct Terminal'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div className="dp-td-tank">
+                                                            <strong>{tankNames[d.tankId] || 'Unit Alpha'}</strong>
+                                                            <span>{d.product || 'Diesel'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className={Math.abs(d.variance?.liters || 0) > 50 ? 'text-rose-500' : 'text-slate-500'}>
+                                                        <strong>{d.variance?.liters || 0} L</strong>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`dp-status-badge dp-status-badge--${d.status?.toLowerCase()}`}>
+                                                            {d.status === 'VERIFIED' ? <FiCheckCircle size={10} /> : <FiClock size={10} />}
+                                                            {d.status}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <button 
+                                                            className="dp-action-btn"
+                                                            title="Download Delivery PDF Report"
+                                                            onClick={(e) => { e.stopPropagation(); handleExportPDF(d); }}
+                                                        >
+                                                            <FiFileText size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {rowVirtualizer.getVirtualItems().length > 0 && (
+                                            <tr>
+                                                <td 
+                                                    colSpan={6} 
+                                                    ref={(el) => {
+                                                        if (el) {
+                                                            el.style.padding = '0';
+                                                            el.style.height = `${rowVirtualizer.getTotalSize() - rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1].end}px`;
+                                                        }
+                                                    }} 
+                                                />
+                                            </tr>
+                                        )}
+                                    </>
                                 )}
                             </tbody>
                         </table>
@@ -332,8 +396,7 @@ export const DeliveriesPage: React.FC = () => {
                                     onAction: () => openModal('shift-open')
                                 });
                             } else {
-                                // Logic to add new order
-                                alert('Order creation modal would go here');
+                                openModal('order');
                             }
                         }}>
                             <div className="plus-icon"><FiPlus /></div>

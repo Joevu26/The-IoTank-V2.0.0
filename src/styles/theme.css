@@ -65,10 +65,10 @@
   --color-border-light: #F4F5FF;
   --color-divider: rgba(122, 122, 149, 0.1);
 
-  /* Shadows - Soft & Colored */
-  --color-shadow: rgba(180, 140, 255, 0.08);
-  --color-shadow-medium: rgba(180, 140, 255, 0.15);
-  --color-shadow-strong: rgba(43, 43, 58, 0.1);
+  /* Shadows - Soft & Industrial */
+  --color-shadow: rgba(0, 212, 255, 0.08);
+  --color-shadow-medium: rgba(0, 153, 238, 0.12);
+  --color-shadow-strong: rgba(50, 50, 100, 0.15);
 
   /* Chart colors - Pastel harmony */
   --chart-fuel-level: #00D4FF;

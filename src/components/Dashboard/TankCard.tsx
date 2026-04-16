@@ -8,6 +8,7 @@ import { getFuelStatus } from '@/utils/dashboardUtils';
 import { FiMapPin, FiClock, FiRefreshCw, FiActivity, FiThermometer, FiAlertCircle } from 'react-icons/fi';
 
 import { useNavigate } from 'react-router-dom';
+import { AuditService } from '@/services/AuditService';
 import '../Common/DesignSystemCards.css';
 import './TankCard.css';
 
@@ -45,8 +46,28 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
     const handleSync = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsSyncing(true);
-        setShowDetailedAnalytics(true); // Enable live updates and history on manual sync
-        setTimeout(() => setIsSyncing(false), 1000);
+        setShowDetailedAnalytics(true);
+        
+        setTimeout(async () => {
+            setIsSyncing(false);
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Telemetry Sync',
+                    message: `Real-time synchronization established for ${tank.name}. Monitoring active.`,
+                    type: 'success',
+                    attribution: 'DATA CORE'
+                }
+            }));
+            
+            await AuditService.log(
+                'SYSTEM', 
+                'DEVICE_COMMAND', 
+                stationId, 
+                `Manual telemetry handshake established: ${tank.name} [ID: ${tank.id}] synchronized with cloud logic.`,
+                'INFO',
+                { tankId: tank.id, tankName: tank.name }
+            ).catch(() => {});
+        }, 1000);
     };
 
     const handleCardClick = () => {
@@ -62,7 +83,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
 
     // Determine status based on fuel level
     const isGhost = tank.id === 'ghost-tank';
-    const status = reading ? getFuelStatus(calculatedPercentage, tank) : 
+    const status = reading ? getFuelStatus(calculatedPercentage) : 
                   isGhost ? { label: 'Pending Hardware', className: 'status-offline', severity: 'info' as const } :
                   { label: 'Offline', className: 'status-offline', severity: 'ok' as const };
 
@@ -155,11 +176,15 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                                     d="M 20 100 A 80 80 0 0 1 180 100"
                                     fill="none"
                                     stroke={
-                                        calculatedPercentage <= tank.criticalLevelThreshold
-                                            ? '#ef4444'
-                                            : calculatedPercentage <= tank.lowLevelThreshold
-                                                ? '#f59e0b'
-                                                : '#10b981'
+                                        calculatedPercentage >= 98
+                                            ? '#ef4444' // Danger (Overfill)
+                                            : calculatedPercentage >= 95
+                                                ? '#f97316' // Warning (High)
+                                                : calculatedPercentage <= 5
+                                                    ? '#be123c' // Critical (Low-Low)
+                                                    : calculatedPercentage <= 20
+                                                        ? '#f59e0b' // Caution (Reorder)
+                                                        : '#3b82f6' // Info (Nominal)
                                     }
                                     strokeWidth="10"
                                     strokeLinecap="round"
@@ -172,14 +197,16 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                             </text>
                         </svg>
                         
-                        <button 
-                            className="volume-action-btn"
-                            onClick={handleCardClick}
-                            disabled={isGhost}
-                            title="Click to view detailed analytics"
-                        >
-                            {reading ? formatVolume(reading.volumeCorrected || reading.volume || 0) : (isGhost ? '0 L' : '0 L')}
-                        </button>
+                        <div className="volume-placeholder-frame">
+                            <button 
+                                className={`volume-action-btn status-sync-${status.className}`}
+                                onClick={handleCardClick}
+                                disabled={isGhost}
+                                title="Click to view detailed analytics"
+                            >
+                                {reading ? formatVolume(reading.volumeCorrected || reading.volume || 0) : (isGhost ? '0 L' : '0 L')}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="metrics-grid">
@@ -255,12 +282,12 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
 
                     <div className="flex items-center gap-3">
                         <button 
-                            className="view-hint-glass"
+                            className="view-details-btn-premium"
                             onClick={handleCardClick}
                             disabled={isGhost}
                             title="Interactive Analytics"
                         >
-                            <FiActivity size={12} />
+                            <FiActivity size={14} />
                             View Details
                         </button>
 

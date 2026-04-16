@@ -14,27 +14,38 @@ import '@/styles/modules.css';
 import '@/styles/mobile.css';
 import '@/styles/tour.css';
 
-const LandingPage = lazy(() => import('@/components/Landing/LandingPage').then(module => ({ default: module.LandingPage })));
-const LoginForm = lazy(() => import('@/components/Auth/LoginForm').then(module => ({ default: module.LoginForm })));
+export const LandingPageFactory = () => import('@/components/Landing/LandingPage').then(module => ({ default: module.LandingPage }));
+const LandingPage = lazy(LandingPageFactory);
+export const LoginFormFactory = () => import('@/components/Auth/LoginForm').then(module => ({ default: module.LoginForm }));
+const LoginForm = lazy(LoginFormFactory);
 const ForgotPasswordForm = lazy(() => import('@/components/Auth/ForgotPasswordForm').then(module => ({ default: module.ForgotPasswordForm })));
 const ResetPasswordForm = lazy(() => import('@/components/Auth/ResetPasswordForm').then(module => ({ default: module.ResetPasswordForm })));
-import { Dashboard } from '@/components/Dashboard/Dashboard';
-const InventoryPage = lazy(() => import('@/components/Inventory/InventoryPage').then(module => ({ default: module.InventoryPage })));
-const AnalyticsPage = lazy(() => import('@/components/Analytics/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })));
+export const DashboardFactory = () => import('@/components/Dashboard/Dashboard').then(module => ({ default: module.Dashboard }));
+const Dashboard = lazy(DashboardFactory);
+export const InventoryPageFactory = () => import('@/components/Inventory/InventoryPage').then(module => ({ default: module.InventoryPage }));
+const InventoryPage = lazy(InventoryPageFactory);
+export const AnalyticsPageFactory = () => import('@/components/Analytics/AnalyticsPage').then(module => ({ default: module.AnalyticsPage }));
+const AnalyticsPage = lazy(AnalyticsPageFactory);
 
-const MarketPage = lazy(() => import('@/components/Market/MarketPage').then(module => ({ default: module.MarketPage })));
-const AlertsCenter = lazy(() => import('@/components/Alerts/AlertsCenter').then(module => ({ default: module.AlertsCenter })));
-const ReportingPage = lazy(() => import('@/components/Reporting/ReportingPage').then(module => ({ default: module.ReportingPage })));
+export const MarketPageFactory = () => import('@/components/Market/MarketPage').then(module => ({ default: module.MarketPage }));
+const MarketPage = lazy(MarketPageFactory);
+export const AlertsCenterFactory = () => import('@/components/Alerts/AlertsCenter').then(module => ({ default: module.AlertsCenter }));
+const AlertsCenter = lazy(AlertsCenterFactory);
+export const ReportingPageFactory = () => import('@/components/Reporting/ReportingPage').then(module => ({ default: module.ReportingPage }));
+const ReportingPage = lazy(ReportingPageFactory);
 const AIGovernancePage = lazy(() => import('@/components/Governance/AIGovernancePage').then(module => ({ default: module.AIGovernancePage })));
-const SettingsPage = lazy(() => import('@/components/Settings/SettingsPage').then(module => ({ default: module.SettingsPage })));
-const HelpPage = lazy(() => import('@/components/Help/HelpPage').then(module => ({ default: module.HelpPage })));
-const EventLogPage = lazy(() => import('@/components/History/EventLogPage').then(module => ({ default: module.EventLogPage })));
+export const SettingsPageFactory = () => import('@/components/Settings/SettingsPage').then(module => ({ default: module.SettingsPage }));
+const SettingsPage = lazy(SettingsPageFactory);
+export const HelpPageFactory = () => import('@/components/Help/HelpPage').then(module => ({ default: module.HelpPage }));
+const HelpPage = lazy(HelpPageFactory);
+export const EventLogPageFactory = () => import('@/components/History/EventLogPage').then(module => ({ default: module.EventLogPage }));
+const EventLogPage = lazy(EventLogPageFactory);
 const BillingPage = lazy(() => import('@/components/Billing/BillingPage').then(module => ({ default: module.BillingPage })));
-const TeamManagement = lazy(() => import('@/components/Users/TeamManagement').then(module => ({ default: module.TeamManagement })));
-const DeliveriesPage = lazy(() => import('@/components/Deliveries/DeliveriesPage').then(module => ({ default: module.DeliveriesPage })));
+export const TeamManagementFactory = () => import('@/components/Users/TeamManagement').then(module => ({ default: module.TeamManagement }));
+const TeamManagement = lazy(TeamManagementFactory);
+export const DeliveriesPageFactory = () => import('@/components/Deliveries/DeliveriesPage').then(module => ({ default: module.DeliveriesPage }));
+const DeliveriesPage = lazy(DeliveriesPageFactory);
 const InadequateClearancePage = lazy(() => import('@/components/Auth/InadequateClearancePage').then(module => ({ default: module.InadequateClearancePage })));
-const AnalysisPage = lazy(() => import('@/components/Analysis/AnalysisPage'));
-const SecurityPage = lazy(() => import('@/components/Dashboard/SecurityPage'));
 
 
 
@@ -96,8 +107,6 @@ function App() {
                                         <Route path="inventory/transactions" element={<Suspense fallback={<PublicLoader />}><DeliveriesPage /></Suspense>} />
                                         <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                         <Route path="event-log" element={<Suspense fallback={<PublicLoader />}><EventLogPage /></Suspense>} />
-                                        <Route path="analysis" element={<Suspense fallback={<PublicLoader />}><AnalysisPage /></Suspense>} />
-                                        <Route path="security" element={<Suspense fallback={<PublicLoader />}><SecurityPage /></Suspense>} />
                                     </Route>
 
                                     {/* Protected Application Routes - Level 5 (Admin) */}

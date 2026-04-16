@@ -1809,16 +1809,22 @@ section[id="pricing"] .p-8 {
     position: relative;
     width: 100%;
     max-width: 1300px;
-    /* Wider horizontal length */
     height: 100%;
     min-height: 520px;
-    /* ensuring it fits 100vh perfectly */
     border-radius: 32px 32px 0 0;
-    /* Reverted: "beautiful edges" on top, flat on bottom for edge-to-edge touch */
     overflow: hidden;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
     background: #000;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background 1s ease;
+}
+
+.hero-video-container.video-failed {
+    background: radial-gradient(circle at center, #2e1065 0%, #1b0a2e 100%);
+}
+
+.hero-video-container.video-failed video {
+    opacity: 0;
 }
 
 @media (max-width: 768px) {

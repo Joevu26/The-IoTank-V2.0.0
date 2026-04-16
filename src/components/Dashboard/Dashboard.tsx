@@ -18,6 +18,7 @@ import { ExecutiveOverview } from './ExecutiveOverview';
 import { PageHeader } from '../Common/PageHeader';
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { SkeletonDashboard } from '../Common/SkeletonLoader';
+import { LazyComponent } from '../Common/LazyComponent';
 import '../Common/DesignSystemCards.css';
 import './Dashboard.css';
 
@@ -163,15 +164,17 @@ export const Dashboard: React.FC = () => {
 
                     {/* Integrated Operational Statistics */}
                     <div className="mt-8">
-                        <TelemetryErrorBoundary
-                            fallback={<div className="h-32 bg-slate-50 rounded animate-pulse" />}
-                        >
-                            <DashboardStats
-                                tanks={displayTanks}
-                                stationId={stationId}
-                                alerts={alerts}
-                            />
-                        </TelemetryErrorBoundary>
+                        <LazyComponent minHeight="200px">
+                            <TelemetryErrorBoundary
+                                fallback={<div className="h-32 bg-slate-50 rounded animate-pulse" />}
+                            >
+                                <DashboardStats
+                                    tanks={displayTanks}
+                                    stationId={stationId}
+                                    alerts={alerts}
+                                />
+                            </TelemetryErrorBoundary>
+                        </LazyComponent>
                     </div>
 
 
@@ -196,13 +199,17 @@ export const Dashboard: React.FC = () => {
                         <ActionQueue />
                     </TelemetryErrorBoundary>
 
-                    <TelemetryErrorBoundary>
-                        <MarketLens stationId={stationId} />
-                    </TelemetryErrorBoundary>
+                    <LazyComponent minHeight="300px">
+                        <TelemetryErrorBoundary>
+                            <MarketLens stationId={stationId} />
+                        </TelemetryErrorBoundary>
+                    </LazyComponent>
 
-                    <TelemetryErrorBoundary>
-                        <SystemIntegrityCard stationId={stationId} />
-                    </TelemetryErrorBoundary>
+                    <LazyComponent minHeight="300px">
+                        <TelemetryErrorBoundary>
+                            <SystemIntegrityCard stationId={stationId} />
+                        </TelemetryErrorBoundary>
+                    </LazyComponent>
                 </aside>
             </div>
 

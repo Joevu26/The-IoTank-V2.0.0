@@ -164,9 +164,17 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                 'DELIVERY',
                 'DELIVERY_RECORDED',
                 stationId,
-                `Delivery recorded from ${formData.supplier}: ${formData.expectedVolume}L to ${selectedTank?.name}. Variance: ${variance}L.`,
+                `Forensic Intake Verified: Stock replenishment recorded from [${formData.supplier}]. Waybill Vol: ${formData.expectedVolume}L to Tank [${selectedTank?.name}]. Reconciliation Variance: ${variance}L.`,
                 Math.abs(variance) > 50 ? 'WARNING' : 'INFO',
-                { deliveryId: deliveryData?.id, tankId: formData.tankId, variance }
+                { 
+                    deliveryId: deliveryData?.id, 
+                    tankId: formData.tankId, 
+                    supplier: formData.supplier,
+                    expectedVolume: formData.expectedVolume,
+                    actualVolume: formData.totalVolume,
+                    variance,
+                    capturedBy: currentUser?.email 
+                }
             );
 
             alert('Delivery logged successfully and stored as a forensic report.');
@@ -219,8 +227,8 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                         <h2>New Fuel Delivery {selectedTank && `- ${selectedTank.name}`}</h2>
                         <p>Log incoming fuel stock for inventory reconciliation.</p>
                         <div className="modal-header-badges">
-                            <span className="modal-badge plum">Delivery</span>
-                            <span className="modal-badge amethyst">INCOMING</span>
+                            <span className="modal-badge blue">Delivery</span>
+                            <span className="modal-badge cyan">INCOMING</span>
                         </div>
                     </div>
                     <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose} title="Close Modal" aria-label="Close Modal"><FiX size={18} /></button>
@@ -229,7 +237,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                 <form onSubmit={step === 1 ? handleNextStep : executeSubmission} className="add-tank-form">
                     {step === 1 ? (
                         <div className="max-h-[70vh] overflow-y-auto px-1 pr-3">
-                            <div className="atm-section violet">
+                            <div className="atm-section">
                                 <div className="atm-section-header">
                                     <div className="atm-section-icon"><FiInfo size={14} /></div>
                                     <span className="atm-section-title">Logistics & Identity</span>
@@ -277,7 +285,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                                 </div>
                             </div>
 
-                            <div className="atm-section plum">
+                            <div className="atm-section">
                                 <div className="atm-section-header">
                                     <div className="atm-section-icon"><FiDroplet size={14} /></div>
                                     <span className="atm-section-title">Quantities & Timing</span>
@@ -307,10 +315,10 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                             </div>
 
                             {/* New Quality & Testing Section */}
-                            <div className="atm-section emerald">
+                            <div className="atm-section">
                                 <div className="atm-section-header">
-                                    <div className="atm-section-icon bg-emerald-500 text-white"><FiActivity size={14} /></div>
-                                    <span className="atm-section-title text-emerald-700">Quality & Testing Control</span>
+                                    <div className="atm-section-icon bg-blue-500 text-white"><FiActivity size={14} /></div>
+                                    <span className="atm-section-title text-blue-700">Quality & Testing Control</span>
                                 </div>
 
                                 <div className="atm-section-body atm-grid atm-grid-2">
@@ -382,10 +390,10 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
 
 
                             {/* Invoice Upload Section */}
-                            <div className="atm-section indigo mb-4">
+                            <div className="atm-section mb-4">
                                 <div className="atm-section-header">
-                                    <div className="atm-section-icon bg-indigo-500 text-white"><FiFileText size={14} /></div>
-                                    <span className="atm-section-title text-indigo-700">Digital Documentation</span>
+                                    <div className="atm-section-icon bg-cyan-500 text-white"><FiFileText size={14} /></div>
+                                    <span className="atm-section-title text-cyan-700">Digital Documentation</span>
                                 </div>
                                 <div className="atm-section-body">
                                     <div

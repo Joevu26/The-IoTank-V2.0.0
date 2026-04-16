@@ -4,6 +4,8 @@ import {
     FiLayers, FiTerminal
 } from 'react-icons/fi';
 import { useModals } from '@/contexts/ModalContext';
+import { motion } from 'framer-motion';
+import './HelpModals.css';
 
 export const HelpModals: React.FC = () => {
     const { activeModal, closeModal } = useModals();
@@ -33,7 +35,7 @@ const SetupWizard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <h2 className="text-2xl font-black text-slate-800">Configuration Wizard</h2>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Step {step} of 3: Infrastructure Mapping</p>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><FiX size={20} /></button>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors" title="Close" aria-label="Close modal"><FiX size={20} /></button>
             </header>
 
             <div className="space-y-6 min-h-[300px]">
@@ -48,8 +50,12 @@ const SetupWizard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                             <input type="text" className="w-full p-4 bg-slate-50 border-none rounded-xl font-bold" placeholder="Region / Station Name" />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase">Operational Tier</label>
-                            <select className="w-full p-4 bg-slate-50 border-none rounded-xl font-bold">
+                            <label htmlFor="operational-tier" className="text-[10px] font-black text-slate-400 uppercase">Operational Tier</label>
+                            <select 
+                                id="operational-tier"
+                                className="w-full p-4 bg-slate-50 border-none rounded-xl font-bold"
+                                title="Select Operational Tier"
+                            >
                                 <option>Retail Forecourt</option>
                                 <option>Industrial Depot</option>
                                 <option>Logistics Hub</option>
@@ -67,31 +73,35 @@ const SetupWizard: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                         </div>
                     </div>
                 )}
-                {step === 3 && (
+                 {step === 3 && (
                     <div className="animate-in fade-in slide-in-from-right-4 text-center py-10">
                         <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <FiCheck size={32} />
                         </div>
-                        <h3 className="text-xl font-black">Ready for Integration</h3>
-                        <p className="text-slate-400 mt-2">Station 'Nairobi Hub' is configured with 2 active nodes.</p>
+                        <h3 className="text-xl font-black">Provisioning Complete</h3>
+                        <p className="text-slate-400 mt-2">Station physical layer mapped successfully and linked to security telemetry.</p>
                     </div>
                 )}
             </div>
 
             <footer className="flex justify-between mt-8 pt-6 border-t border-slate-100">
-                <button
+                <motion.button
+                    whileHover={{ scale: step === 1 ? 1 : 1.05 }}
+                    whileTap={{ scale: step === 1 ? 1 : 0.95 }}
                     onClick={() => setStep(s => Math.max(1, s - 1))}
                     className="px-6 py-2 font-bold text-slate-400 hover:text-slate-600 transition-colors"
                     disabled={step === 1}
                 >
                     Back
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => step < 3 ? setStep(s => s + 1) : onClose()}
                     className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-accent transition-all shadow-lg shadow-slate-200"
                 >
                     {step === 3 ? 'Finalize' : 'Continue'}
-                </button>
+                </motion.button>
             </footer>
         </div>
     );
@@ -125,7 +135,7 @@ const SystemDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <div className="p-2 bg-slate-100 text-slate-600 rounded-lg"><FiSettings size={20} /></div>
                     <h2 className="text-2xl font-black text-slate-800">System Probe</h2>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><FiX size={20} /></button>
+                <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors" title="Close" aria-label="Close modal"><FiX size={20} /></button>
             </header>
 
             <div className="min-h-[250px] flex flex-col justify-center">
@@ -138,8 +148,12 @@ const SystemDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 <span>Scanning Edge Network</span>
                                 <span>{progress}%</span>
                             </div>
-                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-accent transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                            <div className="diagnostic-progress-container h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="diagnostic-progress-bar h-full bg-accent transition-all duration-300" 
+                                    ref={(el) => { if (el) el.style.width = `${progress}%`; }}
+                                    title={`Scan Progress: ${progress}%`}
+                                ></div>
                             </div>
                         </div>
                     </div>
@@ -164,12 +178,14 @@ const SystemDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                                 </div>
                             ))}
                         </div>
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             onClick={onClose}
                             className="w-full mt-8 py-4 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-accent transition-all"
                         >
                             Report Analyzed - Close
-                        </button>
+                        </motion.button>
                     </div>
                 )}
             </div>

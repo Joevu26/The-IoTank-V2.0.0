@@ -104,7 +104,7 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                 'DELIVERY',
                 'CREATE_TANK',
                 stationId,
-                `Provisioned new tank: ${formData.name} (${formData.fuelType}) with hardware ${formData.espId}`,
+                `Terminal node provisioned: ${formData.name} (${formData.fuelType}) initialized with hardware serial ${formData.espId}`,
                 'INFO',
                 { tankId: newTank.id, siteId: formData.siteId }
             );
@@ -125,8 +125,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                         <h2>Register New Tank Node</h2>
                         <p>Initialize a new ESP32 telemetry point on your network</p>
                         <div className="modal-header-badges">
-                            <span className="modal-badge amethyst">Telemetry Point</span>
-                            <span className="modal-badge violet">SECURE</span>
+                            <span className="modal-badge cyan">Telemetry Point</span>
+                            <span className="modal-badge blue">SECURE</span>
                         </div>
                     </div>
                     <button className="close-btn" onClick={onClose} title="Dismiss Provisioning Modal">
@@ -181,8 +181,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                 ) : (
                     <form onSubmit={handleSubmit} className="add-tank-form">
                         
-                        {/* SECTION 1: TANK IDENTIFICATION */}
-                        <div className="atm-section amethyst">
+                                                {/* SECTION 1: TANK IDENTIFICATION */}
+                        <div className="atm-section cyan">
                             <div className="atm-section-header">
                                 <div className="atm-section-icon"><FiInfo size={14} /></div>
                                 <span className="atm-section-title">Tank Identification</span>
@@ -271,8 +271,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                             </div>
                         </div>
 
-                        {/* SECTION 2: TANK GEOMETRY */}
-                        <div className="atm-section violet">
+                                                {/* SECTION 2: TANK GEOMETRY */}
+                        <div className="atm-section blue">
                             <div className="atm-section-header">
                                 <div className="atm-section-icon"><FiInfo size={14} /></div>
                                 <span className="atm-section-title">Tank Geometry</span>
@@ -351,8 +351,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                             </div>
                         </div>
 
-                        {/* SECTION 3: SENSOR CONFIGURATION */}
-                        <div className="atm-section plum">
+                                                {/* SECTION 3: SENSOR CONFIGURATION */}
+                        <div className="atm-section slate">
                             <div className="atm-section-header">
                                 <div className="atm-section-icon"><FiInfo size={14} /></div>
                                 <span className="atm-section-title">Sensor Calibration</span>

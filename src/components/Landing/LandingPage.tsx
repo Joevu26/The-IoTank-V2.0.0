@@ -42,6 +42,7 @@ export const LandingPage: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isLossCalcOpen, setIsLossCalcOpen] = useState(false); // Renamed state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   // Scroll Animations
   const { elementRef: problemRef, isVisible: problemVisible } = useScrollAnimation();
@@ -52,17 +53,10 @@ export const LandingPage: React.FC = () => {
   const { elementRef: newsletterRef, isVisible: newsletterVisible } = useScrollAnimation();
   const { elementRef: finalCTARef, isVisible: finalCTAVisible } = useScrollAnimation();
 
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const videos: string[] = [
-    'https://assets.mixkit.co/videos/preview/mixkit-digital-animation-of-a-network-of-data-42750-large.mp4',
-    'https://assets.mixkit.co/videos/preview/mixkit-data-center-server-room-9932-large.mp4'
-  ];
+  const videos: string[] = ['/IoTank animation demo.mp4'];
 
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const handleVideoEnded = () => {
-    setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % videos.length);
-  };
 
   const handleRef = useRef<HTMLDivElement>(null);
   const scrollRafRef = useRef<number | null>(null);
@@ -87,7 +81,7 @@ export const LandingPage: React.FC = () => {
 
     observer.observe(videoElement);
     return () => observer.disconnect();
-  }, [currentVideoIndex]);
+  }, []);
 
   useEffect(() => {
     const updateHandlePosition = () => {
@@ -246,25 +240,20 @@ export const LandingPage: React.FC = () => {
 
 
            <div className="hero-visual-inner" style={{ transform: `translateY(${parallaxY}px)` }}>
-            <div className="hero-video-container">
+            <div className={`hero-video-container ${videoFailed ? 'video-failed' : ''}`}>
               <video
                 ref={videoRef}
-                key={currentVideoIndex}
                 className="hero-video-bg"
-                src={videos[currentVideoIndex]}
+                src={videoFailed ? undefined : videos[0]}
 
-                autoPlay
+                autoPlay={!videoFailed}
+                loop
                 muted
                 playsInline
                 preload="none"
-                onEnded={handleVideoEnded}
                 onError={(e) => {
-                  console.error("Video failed to load:", videos[currentVideoIndex], e);
-                  // Robust fallback: if current video fails, try the other one.
-                  // If we've already tried all, stop to avoid infinite loops.
-                  if (currentVideoIndex < videos.length - 1) {
-                    handleVideoEnded();
-                  }
+                  console.error("Local video failed to load:", videos[0], e);
+                  setVideoFailed(true);
                 }}
                 poster={brandMark}
                 title="Modern Data Flow Animation"
@@ -289,7 +278,13 @@ export const LandingPage: React.FC = () => {
                   <button
                     className="btn-secondary"
                     style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', backdropFilter: 'blur(5px)' }}
-                    onClick={() => setCurrentVideoIndex(0)}
+                    onClick={() => {
+                        const video = videoRef.current;
+                        if (video) {
+                           video.currentTime = 0;
+                           video.play();
+                        }
+                    }}
                   >
                     View Demo
                   </button>

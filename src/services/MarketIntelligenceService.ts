@@ -12,8 +12,28 @@ export interface MarketIntelligenceConfig {
 export class MarketIntelligenceService {
     constructor(_config?: MarketIntelligenceConfig) { }
 
-    async fetchGlobalNews(): Promise<MarketSignal[]> {
+    private async getSafeAuthHeaders(): Promise<Record<string, string>> {
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const headers: Record<string, string> = { 
+            'Content-Type': 'application/json',
+            'apikey': anonKey || ''
+        };
 
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            
+            if (isValidToken && session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        } catch (e) {
+            console.warn('[MarketIntelligenceService] Auth check failed, proceeding anonymously.');
+        }
+
+        return headers;
+    }
+
+    async fetchGlobalNews(): Promise<MarketSignal[]> {
         const domains = [
             'nation.africa',
             'businessdailyafrica.com',
@@ -39,27 +59,42 @@ export class MarketIntelligenceService {
         const allArticles: any[] = [];
 
         try {
+            const headers = await this.getSafeAuthHeaders();
+
             for (const q of queries) {
                 const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&domains=${domains}&language=en&sortBy=publishedAt&pageSize=15&from=${fromDate}`;
-                const { data, error } = await supabase.functions.invoke('news-api-proxy', {
-                    body: { url }
+                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ url })
                 });
-                if (error) throw error;
-                if (data.status === 'ok' && data.articles) {
-                    allArticles.push(...data.articles);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'ok' && data.articles) {
+                        allArticles.push(...data.articles);
+                    }
                 }
             }
+            
             if (allArticles.length === 0) {
                 const headlinesUrl = `https://newsapi.org/v2/top-headlines?category=business&q=fuel&language=en&pageSize=10`;
-                const { data: headlinesData, error: headlinesError } = await supabase.functions.invoke('news-api-proxy', {
-                    body: { url: headlinesUrl }
+                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ url: headlinesUrl })
                 });
-                if (headlinesError) throw headlinesError;
-                if (headlinesData.status === 'ok' && headlinesData.articles) {
-                    allArticles.push(...headlinesData.articles);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'ok' && data.articles) {
+                        allArticles.push(...data.articles);
+                    }
                 }
             }
+
             if (allArticles.length === 0) return this.getFallbackNews();
+            
             const uniqueArticles = Array.from(new Map(allArticles.map(a => [a.url, a])).values());
             return uniqueArticles.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()).map((article: any) => {
                 const title = article.title.toLowerCase();
@@ -98,8 +133,14 @@ export class MarketIntelligenceService {
 
     async fetchEIAPrices(): Promise<any> {
         try {
-            const { data, error } = await supabase.functions.invoke('eia-proxy');
-            if (error) throw error;
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/eia-proxy', {
+                method: 'POST',
+                headers
+            });
+
+            if (!response.ok) throw new Error(`EIA error: ${response.statusText}`);
+            const data = await response.json();
             return data.response?.data || [];
         } catch (error) {
             console.error('Error fetching EIA:', error);
@@ -112,12 +153,19 @@ export class MarketIntelligenceService {
         const results = [];
 
         try {
+            const headers = await this.getSafeAuthHeaders();
+
             for (const symbol of benchmarks) {
-                const { data, error } = await supabase.functions.invoke('alpha-vantage-proxy', {
-                    body: { symbol }
+                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/alpha-vantage-proxy', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ symbol })
                 });
-                if (error) throw error;
-                if (data.data) results.push({ symbol, data: data.data[0] });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data) results.push({ symbol, data: data.data[0] });
+                }
             }
         } catch (error) {
             console.error(`Error fetching benchmarks from proxy:`, error);
@@ -147,11 +195,11 @@ export class MarketIntelligenceService {
             try {
                 await supabase.from('alerts').insert({
                     station_id: stationId,
-                    alert_type: 'system_error', // Map generic alerts to system for now
+                    alert_type: 'system_error',
                     severity,
                     title: type === 'market-news' ? '💡 Price Review Trigger' : '📜 Regulatory Advisory',
                     message,
-                    auth_user_id: 'system', // Indicates system-generated
+                    auth_user_id: 'system',
                     alert_data: { detectionMethod: 'ai-assisted' },
                     is_read: false,
                     is_acknowledged: false,

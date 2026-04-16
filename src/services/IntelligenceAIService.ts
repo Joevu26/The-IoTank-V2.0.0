@@ -1,6 +1,14 @@
 import { MarketSignal, SupplyRisk, RegulatoryNotice, GeminiInsight } from '@/types';
 import { supabase } from '@/config/supabase';
 
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system' | 'tool';
+    content: string;
+    tool_calls?: any[];
+    tool_call_id?: string;
+    name?: string;
+}
+
 export interface AIProviderConfig {
     gemini?: { apiKey: string };
     groq?: { apiKey: string };
@@ -10,6 +18,27 @@ export interface AIProviderConfig {
 export class IntelligenceAIService {
     constructor(_config?: AIProviderConfig) {
         // AI proxy securely handles configuration now
+    }
+
+    private async getSafeAuthHeaders(): Promise<Record<string, string>> {
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const headers: Record<string, string> = { 
+            'Content-Type': 'application/json',
+            'apikey': anonKey || ''
+        };
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            
+            if (isValidToken && session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+        } catch (e) {
+            console.warn('[IntelligenceAIService] Auth check failed, proceeding anonymously.');
+        }
+
+        return headers;
     }
 
     async generateInsight(
@@ -26,7 +55,7 @@ export class IntelligenceAIService {
             try {
                 const response = await this.callProvider(provider, context);
                 if (response) {
-                    return this.parseResponse(response, promptLog, provider, signals, risks, tankId);
+                    return this.parseResponse(provider as any, response, promptLog, provider, signals, risks, tankId);
                 }
             } catch (error) {
                 console.warn(`IntelligenceAIService: ${provider} failed, trying next...`, error);
@@ -37,7 +66,43 @@ export class IntelligenceAIService {
         throw new Error('All AI providers failed to generate insights.');
     }
 
+    /**
+     * Generic chat interface with tool support
+     */
+    async chat(
+        provider: keyof AIProviderConfig,
+        messages: ChatMessage[],
+        tools?: any[]
+    ): Promise<any> {
+        try {
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch(`https://suifvborodwergtrbjez.supabase.co/functions/v1/${provider}-proxy`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    action: 'chat',
+                    body: {
+                        messages,
+                        tools,
+                        tool_choice: tools ? 'auto' : undefined
+                    }
+                })
+            });
 
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                if (response.status === 401) {
+                    console.error(`[IntelligenceAIService] 401 Unauthorized for ${provider}. Token handling might be out of sync.`);
+                }
+                throw new Error(`${provider} error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error(`IntelligenceAIService Chat Error (${provider}):`, error);
+            throw error;
+        }
+    }
 
     private async callProvider(provider: keyof AIProviderConfig, context: any): Promise<string | null> {
         switch (provider) {
@@ -54,17 +119,26 @@ export class IntelligenceAIService {
 
     private async callGemini(context: any): Promise<string> {
         try {
-            const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-                body: {
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/gemini-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
                     action: 'intelligence',
                     context,
                     endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
                         generationConfig: { temperature: 0.7, responseMimeType: 'application/json' },
                     }
-                }
+                })
             });
-            if (error) throw error;
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(`Gemini error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
+
+            const data = await response.json();
             return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         } catch (error) {
             console.error('Gemini error:', error);
@@ -74,17 +148,26 @@ export class IntelligenceAIService {
 
     private async callGroq(context: any): Promise<string> {
         try {
-            const { data, error } = await supabase.functions.invoke('groq-proxy', {
-                body: {
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/groq-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
                     action: 'intelligence',
                     context,
                     body: {
                         model: 'llama-3.3-70b-versatile',
                         response_format: { type: 'json_object' }
                     }
-                }
+                })
             });
-            if (error) throw error;
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(`Groq error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
+
+            const data = await response.json();
             return data.choices?.[0]?.message?.content || '';
         } catch (error) {
             console.error('Groq error:', error);
@@ -94,17 +177,30 @@ export class IntelligenceAIService {
 
     private async callDeepSeek(context: any): Promise<string> {
         try {
-            const { data, error } = await supabase.functions.invoke('deepseek-proxy', {
-                body: {
-                    action: 'intelligence',
-                    context,
+            const headers = await this.getSafeAuthHeaders();
+            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/deepseek-proxy', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    action: 'chat',
                     body: {
                         model: 'deepseek-chat',
+                        messages: [
+                            { role: 'system', content: 'Extract intelligence markers from the provided context in JSON format.' },
+                            { role: 'user', content: JSON.stringify(context) }
+                        ],
+                        temperature: 0.7,
                         response_format: { type: 'json_object' }
                     }
-                }
+                })
             });
-            if (error) throw error;
+
+            if (!response.ok) {
+                const errorBody = await response.json().catch(() => ({}));
+                throw new Error(`DeepSeek error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+            }
+
+            const data = await response.json();
             return data.choices?.[0]?.message?.content || '';
         } catch (error) {
             console.error('DeepSeek error:', error);
@@ -113,6 +209,7 @@ export class IntelligenceAIService {
     }
 
     private parseResponse(
+        _unused: any,
         text: string,
         prompt: string,
         provider: string,
@@ -121,10 +218,7 @@ export class IntelligenceAIService {
         tankId: string
     ): GeminiInsight {
         try {
-            // Robust JSON Extraction: 
-            // 1. Try direct parse first
-            // 2. Try to find the first '{' and last '}'
-            // 3. Clean common markdown bloat
+            // Robust JSON Extraction
             let cleanedText = text.trim();
             if (cleanedText.startsWith('```json')) {
                 cleanedText = cleanedText.replace(/^```json/, '').replace(/```$/, '').trim();

@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    FiCheck, FiSearch, FiCheckCircle, FiArrowRight,
-    FiZap, FiActivity, FiShield, FiAlertTriangle, FiInfo, FiSliders, FiAlertOctagon, FiSettings, FiMail, FiBell
+import { 
+    FiSettings, FiCheckCircle, FiInfo, 
+    FiShield, FiActivity, FiCheck, FiZap, FiAlertTriangle, FiAlertOctagon, FiSliders, FiBell, FiMail
 } from 'react-icons/fi';
 import './AlertsCenter.css';
 import { useAlerts, resolveAlert, useTanks, updateTank } from '@/hooks/useSupabase';
@@ -118,57 +118,6 @@ const EscalationLadder: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts })
     );
 };
 
-interface AlertRowProps {
-    alert: Alert;
-    onResolve: (id: string) => void;
-    onInvestigate: (alert: Alert) => void;
-}
-const AlertRow: React.FC<AlertRowProps> = ({ alert, onResolve, onInvestigate }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const label = getAlertSeverityLabel(alert);
-    const cssClass = getSeverityClass(label);
-    const age = getAlertAge(alert.timestamp);
-    const score = alert.score ?? 0;
-
-    return (
-        <div className={`alert-item-modern ${cssClass} ${label === 'CRITICAL' ? 'premium-glow-critical' : ''}`}>
-            <div className="alert-icon-box">
-                {label === 'CRITICAL' ? <FiAlertOctagon size={24} /> : label === 'HIGH' ? <FiAlertTriangle size={24} /> : <FiInfo size={24} />}
-            </div>
-            
-            <div className="alert-content-main" onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="alert-header-row">
-                    <span className="alert-type-label">{alert.type.replace(/-/g, ' ')}</span>
-                    <span className="alert-time-stamp">{age} ago</span>
-                </div>
-                <h4 className="alert-main-title">{alert.title ?? alert.message}</h4>
-                <div className="alert-badge-row">
-                    <span className={`severity-pill ${cssClass}`}>
-                        {score > 0 && <span className="score-inset">{score}</span>}
-                        {label}
-                    </span>
-                    {alert.isComposite && <span className="ai-logic-pill">AI ANALYZED</span>}
-                </div>
-
-                {isExpanded && (
-                    <div className="alert-expanded-details animate-in fade-in slide-in-from-top-2">
-                        <p className="detail-text">{alert.description || alert.message || 'No additional telemetry data available.'}</p>
-                    </div>
-                )}
-            </div>
-
-            <div className="alert-content-actions">
-                <button className="action-btn-pill investigate" onClick={(e) => { e.stopPropagation(); onInvestigate(alert); }} title="Investigate Root Cause">
-                    <FiZap />
-                </button>
-                <button className="action-btn-pill resolve" onClick={(e) => { e.stopPropagation(); onResolve(alert.id); }} title="Resolve Vector">
-                    <FiCheck />
-                </button>
-            </div>
-        </div>
-    );
-};
-
 // ── Main Component ────────────────────────────────────────────────────────────
 export const AlertsCenter: React.FC = () => {
     const navigate = useNavigate();
@@ -176,12 +125,9 @@ export const AlertsCenter: React.FC = () => {
     const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ALL');
     const [isLoading, setIsLoading] = useState(true);
 
-    // History filters
-    const [historySearch, setHistorySearch] = useState('');
 
-    // Global Calibration State (Restored)
-    const [telemetryGap, setTelemetryGap] = useState(15);
-    const [deliveryVariance, setDeliveryVariance] = useState(2);
+
+
 
     // Preference states
     const [emailEnabled, setEmailEnabled] = useState(true);
@@ -191,38 +137,19 @@ export const AlertsCenter: React.FC = () => {
     const stationId = currentUser?.stationId || '';
 
     const { alerts: rawActiveAlerts, loading: activeLoading } = useAlerts(stationId, false);
-    const { alerts: alertHistory } = useAlerts(stationId, true);
     const { tanks, loading: tanksLoading } = useTanks(stationId);
 
     useEffect(() => {
         setIsLoading(true);
         const timer = setTimeout(() => setIsLoading(false), 800);
         return () => clearTimeout(timer);
-    }, [activeTab]);
-
-    const [localThresholds, setLocalThresholds] = useState<Record<string, {critical: number, low: number}>>({});
-
-    useEffect(() => {
-        if (!tanksLoading && tanks.length > 0) {
-            const init: any = {};
-            tanks.forEach(t => {
-                init[t.id] = { critical: t.criticalLevelThreshold || 0, low: t.lowLevelThreshold || 0 };
-            });
-            setLocalThresholds(init);
-        }
     }, [tanks, tanksLoading]);
+    
 
-    const handleLocalThresholdChange = (tankId: string, type: 'critical' | 'low', val: number) => {
-        setLocalThresholds(prev => ({
-            ...prev,
-            [tankId]: { ...(prev[tankId] || {critical: 0, low: 0}), [type]: val }
-        }));
-    };
 
-    const commitThresholdUpdate = (tankId: string, type: 'critical' | 'low') => {
-        const val = localThresholds[tankId]?.[type];
-        if (val !== undefined) handleThresholdUpdate(tankId, type, val);
-    };
+
+
+
 
     const activeAlerts = useMemo(() => {
         return rawActiveAlerts.map(a => ({
@@ -236,17 +163,11 @@ export const AlertsCenter: React.FC = () => {
         return activeAlerts.filter(a => getAlertSeverityLabel(a) === severityFilter);
     }, [activeAlerts, severityFilter]);
 
-    const filteredHistory = useMemo(() => {
-        return alertHistory.filter(a => {
-            const matchSearch = !historySearch || (a.title ?? a.message).toLowerCase().includes(historySearch.toLowerCase());
-            return matchSearch;
-        });
-    }, [alertHistory, historySearch]);
+    // Removed filteredHistory as it's not used in current tabs
 
     const handleResolve = async (id: string) => { 
         await resolveAlert(id, currentUser?.authUserId || 'SYSTEM'); 
         
-        // 🟢 Forensic Log
         const alert = activeAlerts.find(a => a.id === id);
         await AuditService.log(
             'SYSTEM',
@@ -275,7 +196,6 @@ export const AlertsCenter: React.FC = () => {
                 : { criticalLevelThreshold: value };
             await updateTank(tankId, updates);
 
-            // 🟢 Forensic Log
             const tank = tanks.find(t => t.id === tankId);
             await AuditService.log(
                 'SYSTEM',
@@ -293,7 +213,6 @@ export const AlertsCenter: React.FC = () => {
 
     return (
         <div className="alerts-hud-container">
-            {/* ── Side HUD: Neural Status ── */}
             <aside className="hud-neural-sidebar">
                 <div className="hud-brand-stack">
                     <h1 className="hud-brand-title">
@@ -328,7 +247,6 @@ export const AlertsCenter: React.FC = () => {
                 </div>
             </aside>
 
-            {/* ── Main Pane: Forensic Logic ── */}
             <main className="hud-content-area">
                 <header className="hud-top-navigation">
                     <nav className="tactical-tabs">
@@ -336,6 +254,7 @@ export const AlertsCenter: React.FC = () => {
                             <FiActivity /> Mission Control
                             {rawActiveAlerts.length > 0 && <span className="tab-count">{rawActiveAlerts.length}</span>}
                         </button>
+
                         <button className={`tactical-tab ${activeTab === 'thresholds' ? 'active' : ''}`} onClick={() => setActiveTab('thresholds')}>
                             <FiSliders /> Calibration
                         </button>
@@ -348,11 +267,6 @@ export const AlertsCenter: React.FC = () => {
                         {activeTab === 'thresholds' && (
                             <button className="tactical-btn-primary btn-sm" title="Propagate threshold logic to all tanks" aria-label="Propagate Logic">
                                 <FiCheckCircle /> Propagate Logic
-                            </button>
-                        )}
-                        {activeTab === 'preferences' && (
-                            <button className="tactical-btn-primary btn-sm" title="Commit orchestration preferences" aria-label="Commit Orchestration">
-                                <FiCheckCircle /> Commit Orchestration
                             </button>
                         )}
                     </div>
@@ -368,7 +282,6 @@ export const AlertsCenter: React.FC = () => {
                             {activeTab === 'mission' && (
                                 <div className="mission-dashboard-container animate-hud-in">
                                     <div className="mission-scroll-area scrollable-hud">
-                                        {/* SECTION 1: ACTIONABLE VECTORS */}
                                         <section className="dashboard-section">
                                             <div className="section-header-compact">
                                                 <h3 className="section-title">Active Vectors <span className="dim">/ Intelligence Stream</span></h3>
@@ -388,75 +301,65 @@ export const AlertsCenter: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            <div className="vectors-grid">
-                                                {filteredActive.length === 0 ? (
-                                                    <div className="empty-tactical-state unified">
-                                                        <FiShield size={48} className="empty-icon-glow" />
-                                                        <p>Zero immediate threats detected.</p>
-                                                    </div>
-                                                ) : (
-                                                    filteredActive.map(a => <AlertRow key={a.id} alert={a} onResolve={handleResolve} onInvestigate={handleInvestigate} />)
-                                                )}
-                                            </div>
-                                        </section>
-
-                                        <div className="dashboard-separator" />
-
-                                        {/* SECTION 2: FORENSIC LOG */}
-                                        <section className="dashboard-section pb-20">
-                                            <div className="section-header-compact">
-                                                <h3 className="section-title">Forensic Pulse <span className="dim">/ Historical Audit</span></h3>
-                                                <div className="input-group-tactical max-w-xs">
-                                                    <FiSearch className="input-icon" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Query log history..."
-                                                        value={historySearch}
-                                                        onChange={e => setHistorySearch(e.target.value)}
-                                                        title="Search forensic audit log"
-                                                        aria-label="Search forensic audit log"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="tactical-table-overflow">
-                                                <table className="forensic-table">
+                                            <div className="intelligence-table-wrapper">
+                                                <table className="intelligence-stream-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Telemetry Event</th>
-                                                            <th>Signature</th>
+                                                            <th>Threat Vector</th>
+                                                            <th>Intelligence Signature</th>
                                                             <th>Severity</th>
-                                                            <th>Timestamp</th>
-                                                            <th>Action</th>
+                                                            <th>Age</th>
+                                                            <th>Actions</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {filteredHistory.length === 0 ? (
+                                                        {filteredActive.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={5} className="empty-table-row">End of relevant log history.</td>
-                                                            </tr>
-                                                        ) : filteredHistory.map(item => (
-                                                            <tr key={item.id} className="forensic-row">
-                                                                <td>
-                                                                    <div className="event-identity">
-                                                                        <div className={`status-orb ${getSeverityClass(getAlertSeverityLabel(item))}`} />
-                                                                        <span className="event-title">{item.title ?? item.message}</span>
+                                                                <td colSpan={5} className="empty-stream-state">
+                                                                    <div className="empty-tactical-state unified">
+                                                                        <FiShield size={48} className="empty-icon-glow" />
+                                                                        <p>Zero immediate threats detected.</p>
                                                                     </div>
                                                                 </td>
-                                                                <td><span className="signature-tag">{item.type.replace(/-/g, ' ')}</span></td>
-                                                                <td>
-                                                                    <span className={`severity-tag ${getSeverityClass(getAlertSeverityLabel(item))}`}>
-                                                                        {getAlertSeverityLabel(item)}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="timestamp-cell">{new Date(item.timestamp).toLocaleDateString()}</td>
-                                                                <td>
-                                                                    <button className="row-action-btn" onClick={() => handleInvestigate(item)} title="Investigate alert root cause" aria-label="Audit alert">
-                                                                        Audit <FiArrowRight size={12} />
-                                                                    </button>
-                                                                </td>
                                                             </tr>
-                                                        ))}
+                                                        ) : (
+                                                            filteredActive.map(alert => {
+                                                                const label = alert.severityLabel ?? getAlertSeverityLabel(alert);
+                                                                const cssClass = getSeverityClass(label);
+                                                                const age = getAlertAge(alert.timestamp);
+                                                                
+                                                                return (
+                                                                    <tr key={alert.id} className={`stream-row ${cssClass} ${label === 'CRITICAL' ? 'premium-glow-critical' : ''}`}>
+                                                                        <td>
+                                                                            <div className="vector-identity">
+                                                                                <div className="vector-icon-slot">
+                                                                                    {label === 'CRITICAL' ? <FiAlertOctagon /> : label === 'HIGH' ? <FiAlertTriangle /> : <FiInfo />}
+                                                                                </div>
+                                                                                <span className="vector-title">{alert.title ?? alert.message}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td><span className="signature-pill">{alert.type.replace(/-/g, ' ')}</span></td>
+                                                                        <td>
+                                                                            <span className={`severity-tag ${cssClass}`}>
+                                                                                {alert.score != null && <span className="score-hint">{alert.score}</span>}
+                                                                                {label}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="age-cell">{age} ago</td>
+                                                                        <td>
+                                                                            <div className="stream-action-group">
+                                                                                <button className="stream-btn investigate" onClick={() => handleInvestigate(alert)} title="Investigate Root Cause">
+                                                                                    <FiZap />
+                                                                                </button>
+                                                                                <button className="stream-btn resolve" onClick={() => handleResolve(alert.id)} title="Resolve Vector">
+                                                                                    <FiCheck />
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        )}
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -465,136 +368,90 @@ export const AlertsCenter: React.FC = () => {
                                 </div>
                             )}
 
+
+
                             {activeTab === 'thresholds' && (
                                 <div className="view-pane flex-column animate-hud-in scrollable-hud">
                                     <div className="hud-glass-card-compact border-none">
                                         <header className="pane-header-compact">
-                                            <div className="header-text">
-                                                <h2 className="card-title">Calibration Engine</h2>
-                                                <span className="card-subtitle">Local & Global Operational Policy [STABLE]</span>
+                                            <div className="calibration-header-ui">
+                                                <div className="heading-accent-line" />
+                                                <h2 className="card-title">Neural Detection Calibration</h2>
+                                                <div className="subtitle-wrapper">
+                                                    <span className="card-subtitle">Safety Compliance & Engine Policies</span>
+                                                    <span className="stable-lock-pill">STABLE / HARDCODED</span>
+                                                </div>
                                             </div>
                                         </header>
 
-                                        {/* SECTION 1: GLOBAL NEURAL POLICY */}
-                                        <div className="system-intelligence-grid mb-10">
-                                            <div className="calibration-module full-width">
-                                                <h4 className="module-title"><FiActivity /> System Resilience</h4>
-                                                <div className="logic-control-stack-horizontal">
-                                                    <div className="logic-control">
-                                                        <div className="control-meta">
-                                                            <label>Sensor Dropout Tolerance</label>
-                                                            <span className="control-value">{telemetryGap}m</span>
-                                                        </div>
-                                                        <input 
-                                                            type="range" min="5" max="120" value={telemetryGap} 
-                                                            onChange={e => setTelemetryGap(Number(e.target.value))} 
-                                                            className="tactical-range" 
-                                                            title="Sensor Dropout Tolerance Range"
-                                                        />
-                                                        <p className="control-hint">Allowed neural disconnect before critical integrity alerts.</p>
-                                                    </div>
-                                                    <div className="logic-control">
-                                                        <div className="control-meta">
-                                                            <label>Delivery Audit Variance</label>
-                                                            <span className="control-value">{deliveryVariance}%</span>
-                                                        </div>
-                                                        <input 
-                                                            type="range" min="1" max="25" value={deliveryVariance} 
-                                                            onChange={e => setDeliveryVariance(Number(e.target.value))} 
-                                                            className="tactical-range" 
-                                                            title="Delivery Audit Variance Tolerance"
-                                                        />
-                                                        <p className="control-hint">Maximum neural discrepancy allowed in fuel audit reconciliation.</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+
 
                                         <div className="dashboard-separator" />
 
-                                        {/* SECTION 2: PER-TANK THRESHOLDS */}
-                                        <div className="calibration-module-header mt-6">
-                                            <h4 className="module-title"><FiShield /> Volume Alerts [Per Tank]</h4>
-                                        </div>
-
-                                        {/* STANDARDIZED THRESHOLDS REFERENCE CARD */}
-                                        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 mb-8 flex items-start gap-5 animate-in fade-in slide-in-from-top-4 duration-500">
-                                            <div className="w-12 h-12 bg-blue-600/10 text-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <FiInfo size={24} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="text-blue-900 font-extrabold text-sm uppercase tracking-widest mb-3">Standardized Detection Engine Thresholds</h4>
-                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                                    {[
-                                                        { label: 'High-High', val: '98%', status: 'Critical Overfill' },
-                                                        { label: 'High', val: '95%', status: 'Operator Warning' },
-                                                        { label: 'Info', val: '50%', status: 'Mid-point Check' },
-                                                        { label: 'Low', val: '20%', status: 'Reorder' },
-                                                        { label: 'Critical Low', val: '5%', status: 'Emergency Stop' },
-                                                    ].map((t, i) => (
-                                                        <div key={i} className="bg-white/80 p-3 rounded-xl border border-blue-100 shadow-sm">
-                                                            <div className="flex justify-between items-start mb-1">
-                                                                <span className="text-[10px] font-black text-blue-500 uppercase">{t.label}</span>
-                                                                <span className="text-xs font-black text-blue-800">{t.val}</span>
-                                                            </div>
-                                                            <p className="text-[9px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">{t.status}</p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <p className="text-[10px] text-blue-500/70 font-bold mt-4 italic">
-                                                    * These thresholds are deterministic and hardcoded into the detection neural matrix to ensure safety compliance.
-                                                </p>
-                                            </div>
+                                        {/* SECTION 1: STANDARDIZED THRESHOLD CALCULATIONS */}
+                                        <div className="calibration-module-header mt-4">
+                                            <h4 className="module-title"><FiShield /> Standardized Detection Engine Thresholds</h4>
+                                            <p className="policy-disclaimer mb-6">
+                                                * These thresholds are deterministic and hardcoded into the detection neural matrix to ensure safety compliance. 
+                                                Automated alerts are triggered based on the specific holographic volume calculations shown below.
+                                            </p>
                                         </div>
 
                                         <div className="calibration-scroller-grid">
                                             {tanksLoading ? <SkeletonTable /> : (
-                                                tanks.map(tank => (
-                                                    <div key={tank.id} className="tank-logic-card">
-                                                        <div className="tank-card-meta">
-                                                            <h4 className="tank-name">{tank.name}</h4>
-                                                            <span className="fuel-tag">{tank.fuelType}</span>
-                                                        </div>
-                                                        <div className="logic-stack">
-                                                            <div className="logic-control">
-                                                                <div className="control-meta">
-                                                                    <label>Critical Fuel Volume</label>
-                                                                    <span className="control-value">{localThresholds[tank.id]?.critical ?? tank.criticalLevelThreshold}L</span>
-                                                                </div>
-                                                                <input 
-                                                                    type="range" 
-                                                                    min="0" 
-                                                                    max={tank.capacity || 1000} 
-                                                                    value={localThresholds[tank.id]?.critical ?? tank.criticalLevelThreshold} 
-                                                                    onChange={e => handleLocalThresholdChange(tank.id, 'critical', Number(e.target.value))} 
-                                                                    onMouseUp={() => commitThresholdUpdate(tank.id, 'critical')}
-                                                                    onTouchEnd={() => commitThresholdUpdate(tank.id, 'critical')}
-                                                                    className="tactical-range"
-                                                                    title={`Critical fuel volume for ${tank.name}`}
-                                                                    aria-label={`Critical fuel volume threshold for ${tank.name}`}
-                                                                />
+                                                tanks.map(tank => {
+                                                    const capacity = tank.capacity || 0;
+                                                    return (
+                                                        <div key={tank.id} className="tank-logic-card">
+                                                            <div className="tank-card-meta">
+                                                                <h4 className="tank-name">{tank.name}</h4>
+                                                                <span className="fuel-tag">{tank.fuelType.toUpperCase()} ({capacity}L)</span>
                                                             </div>
-                                                            <div className="logic-control">
-                                                                <div className="control-meta">
-                                                                    <label>Low Fuel Volume</label>
-                                                                    <span className="control-value">{localThresholds[tank.id]?.low ?? tank.lowLevelThreshold}L</span>
+                                                            
+                                                            <div className="standard-threshold-grid">
+                                                                <div className="threshold-row-item critical">
+                                                                    <div className="level-info">
+                                                                        <label>High-High / 98%</label>
+                                                                        <span className="tier-name">Critical Overfill</span>
+                                                                    </div>
+                                                                    <span className="vol-value">{Math.round(capacity * 0.98).toLocaleString()}L</span>
                                                                 </div>
-                                                                <input 
-                                                                    type="range" 
-                                                                    min="0" 
-                                                                    max={tank.capacity || 1000} 
-                                                                    value={localThresholds[tank.id]?.low ?? tank.lowLevelThreshold} 
-                                                                    onChange={e => handleLocalThresholdChange(tank.id, 'low', Number(e.target.value))} 
-                                                                    onMouseUp={() => commitThresholdUpdate(tank.id, 'low')}
-                                                                    onTouchEnd={() => commitThresholdUpdate(tank.id, 'low')}
-                                                                    className="tactical-range"
-                                                                    title={`Low fuel volume for ${tank.name}`}
-                                                                    aria-label={`Low fuel volume threshold for ${tank.name}`}
-                                                                />
+
+                                                                <div className="threshold-row-item high">
+                                                                    <div className="level-info">
+                                                                        <label>High / 95%</label>
+                                                                        <span className="tier-name">Operator Warning</span>
+                                                                    </div>
+                                                                    <span className="vol-value">{Math.round(capacity * 0.95).toLocaleString()}L</span>
+                                                                </div>
+
+                                                                <div className="threshold-row-item info">
+                                                                    <div className="level-info">
+                                                                        <label>Info / 50%</label>
+                                                                        <span className="tier-name">Mid-point Check</span>
+                                                                    </div>
+                                                                    <span className="vol-value">{Math.round(capacity * 0.50).toLocaleString()}L</span>
+                                                                </div>
+
+                                                                <div className="threshold-row-item low">
+                                                                    <div className="level-info">
+                                                                        <label>Low / 20%</label>
+                                                                        <span className="tier-name">Reorder</span>
+                                                                    </div>
+                                                                    <span className="vol-value">{Math.round(capacity * 0.20).toLocaleString()}L</span>
+                                                                </div>
+
+                                                                <div className="threshold-row-item critical-low">
+                                                                    <div className="level-info">
+                                                                        <label>Critical Low / 5%</label>
+                                                                        <span className="tier-name">Emergency Stop</span>
+                                                                    </div>
+                                                                    <span className="vol-value">{Math.round(capacity * 0.05).toLocaleString()}L</span>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))
+                                                    );
+                                                })
                                             )}
                                         </div>
                                     </div>

@@ -203,7 +203,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     }
 
     // ── 4. SENSOR FAILURE ─────────────────────────────────────────────────────
-    if (latestReading && latestReading.signalQuality < 30) {
+    const isQualityFailing = (quality: string | number) => {
+        if (typeof quality === 'number') return quality < 30;
+        return quality === 'Weak' || quality === 'Unusable' || quality === 'Offline';
+    };
+
+    if (latestReading && isQualityFailing(latestReading.signalQuality)) {
         const { score, label } = scoreByType('sensor-failure', 0.78);
         drafts.push({
             tankId: tank.id,

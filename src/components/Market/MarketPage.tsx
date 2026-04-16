@@ -324,13 +324,6 @@ export const MarketPage: React.FC = () => {
     });
 
     const [bannerDismissed, setBannerDismissed] = useState(false);
-    const [currentTime, setCurrentTime] = useState(new Date());
-
-    // Live clock for header
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -495,7 +488,7 @@ export const MarketPage: React.FC = () => {
                                     Market <span className="font-normal text-[#7A7A95]">intelligence</span>
                                 </h1>
                                 <p className="text-[8px] text-[#7A7A95] font-medium uppercase tracking-widest mt-1 opacity-70">
-                                    Operational Status: {newsStatus === 'ok' ? 'Online' : 'Intermittent Signal'} · {currentTime.toLocaleTimeString()}
+                                    Operational Status: {newsStatus === 'ok' ? 'Online' : 'Intermittent Signal'}
                                     {newsStatus === 'loading' && <FiRefreshCw className="inline ml-2 animate-spin text-accent" size={6} />}
                                 </p>
                             </div>
@@ -601,10 +594,6 @@ export const MarketPage: React.FC = () => {
                                         {p === 'all' ? 'All Priority' : p === 'high' ? 'High' : 'Medium'}
                                     </button>
                                 ))}
-                                <div className="mi-chip-divider" />
-                                <div className="text-[10px] font-bold text-[#7A7A95] uppercase">
-                                    {currentDisplayList.length} {activeTab === 'archive' ? 'historical' : 'current'} signals
-                                </div>
                             </div>
                             
                             {activeTab === 'archive' && (
@@ -773,7 +762,7 @@ export const MarketPage: React.FC = () => {
                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                          {STRATEGIC_CAPABILITIES.map((c, i) => (
                                              <div key={i} className="p-3 border border-[#E8E9F5] rounded-xl flex items-center gap-2">
-                                                 <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
                                                  <span className="text-[10px] font-bold text-[#7A7A95]">{c}</span>
                                              </div>
                                          ))}
