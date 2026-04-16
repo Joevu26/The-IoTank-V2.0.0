@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/config/supabase';
 import { MarketSignal } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ export const NEWS_SOURCES: NewsFeedSource[] = [
         label: 'EPRA — Petroleum Pricing',
         shortLabel: 'EPRA',
         region: 'Kenya',
-        url: GN_RSS('EPRA Kenya fuel petroleum price petroleum regulatory authority'),
+        url: GN_RSS('EPRA Kenya fuel petroleum price regulatory authority energy'),
         type: 'Regulatory',
         cacheTTL: CACHE_TTL_MS,
     },
@@ -450,8 +451,10 @@ export function useMarketNews(): UseMarketNewsReturn {
     const [activeSource, setActiveSource] = useState('all');
     const [activeRegion, setActiveRegion] = useState<'all' | 'Kenya' | 'Global'>('all');
 
+    const { loading: authLoading } = useAuth();
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const apiCooldowns = useRef<Record<string, number>>({}); // Tracks API -> expiration timestamp
+    const initialFetchAttempted = useRef(false);
 
     // Adaptive backoff check
     const isApiAvailable = (api: string) => {
@@ -626,7 +629,9 @@ export function useMarketNews(): UseMarketNewsReturn {
         }
 
         setIsRefreshing(true);
-        setStatus('loading');
+        if (allArticles.length === 0) {
+            setStatus('loading');
+        }
 
         try {
             // Sequential Fetching with Staggered Delays (Prevents 429 floods)
@@ -653,28 +658,44 @@ export function useMarketNews(): UseMarketNewsReturn {
                 await new Promise(resolve => setTimeout(resolve, 150));
             }
 
-            if (collected.length === 0) {
-                setAllArticles([]);
-                setStatus('no-signal');
-            } else {
+            if (collected.length > 0) {
                 // Deduplicate by URL or unique ID
                 const seen = new Set<string>();
-                const deduped = collected.filter(a => {
+                
+                // Merge new articles with existing ones (Priority: new)
+                const merged = [...collected, ...allArticles].filter(a => {
                     const ident = a.externalUrl || a.id;
                     if (seen.has(ident)) return false;
                     seen.add(ident);
                     return true;
                 });
+
                 // Sort by newest first
-                deduped.sort((a, b) => b.timestamp - a.timestamp);
+                merged.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // Cap history to prevent storage bloat (e.g., 200 items)
+                const capped = merged.slice(0, 200);
                 
                 // Final Pass: Corroboration
-                const corroborated = corroborateArticles(deduped);
+                const corroborated = corroborateArticles(capped);
                 
                 setAllArticles(corroborated);
+                
+                // Persist the Master History
+                try {
+                    localStorage.setItem('mi:master_history', JSON.stringify({
+                        articles: corroborated,
+                        lastSync: Date.now()
+                    }));
+                } catch (e) { /* silent storage fail */ }
+
                 setStatus(anyFromCache && !anySuccess ? 'cached-stale' : 'ok');
                 setLastUpdated(new Date());
                 setCacheAge(anyFromCache ? Date.now() - (getLastRefreshTime() - REFRESH_COOLDOWN_MS) : null);
+            } else if (allArticles.length === 0) {
+                setStatus('no-signal');
+            } else {
+                setStatus('ok'); // Still ok if we have old articles
             }
         } catch {
             setStatus('no-signal');
@@ -683,29 +704,29 @@ export function useMarketNews(): UseMarketNewsReturn {
         }
     }, [fetchFromSource, startCooldown]);
 
-    // Initial fetch on mount
+    // Initial fetch on mount / Auth ready
     useEffect(() => {
-        // On mount: load from cache instantly, then try to refresh if TTL expired
-        const cachedArticles: NewsArticle[] = [];
-        let hasAnyCached = false;
-        NEWS_SOURCES.forEach(src => {
-            const c = readCache(src.shortLabel);
-            if (c) {
-                cachedArticles.push(...c.articles);
-                hasAnyCached = true;
+        // 1. Initial Load: Try master history instantly for 0-second UI pop
+        try {
+            const rawHistory = localStorage.getItem('mi:master_history');
+            if (rawHistory) {
+                const history = JSON.parse(rawHistory);
+                if (history.articles && history.articles.length > 0) {
+                    setAllArticles(history.articles);
+                    setStatus('ok');
+                    setLastUpdated(new Date(history.lastSync || Date.now()));
+                }
             }
-        });
+        } catch (e) { /* fallback to fetch */ }
 
-        if (hasAnyCached) {
-            const deduped = Array.from(new Map(cachedArticles.map(a => [a.externalUrl || a.id, a])).values());
-            deduped.sort((a, b) => b.timestamp - a.timestamp);
-            setAllArticles(deduped);
-            setStatus('ok');
-            setIsRefreshing(false);
+        // 2. Background Refresh: Wait until Auth is ready OR we have a session to avoid 401s
+        if (!authLoading && !initialFetchAttempted.current) {
+            initialFetchAttempted.current = true;
+            // Add a small safety delay to ensure the session is fully applied to the adapter
+            setTimeout(() => {
+                fetchAll(false);
+            }, 500);
         }
-
-        // Still fetch in background to refresh if needed
-        fetchAll(false);
 
         // Restore cooldown timer if still active
         startCooldown();
@@ -713,7 +734,7 @@ export function useMarketNews(): UseMarketNewsReturn {
         return () => {
             if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
         };
-    }, []);
+    }, [authLoading]);
 
     const refresh = useCallback(async () => {
         if (!canRefresh) return;
