@@ -636,6 +636,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             <DeliveryModal
                 isOpen={isDeliveryModalOpen}
                 onClose={closeModal}
+                onSuccess={(msg) => setToast({ message: msg, type: 'success' })}
             />
             <ShiftCloseModal
                 isOpen={isShiftCloseModalOpen}
@@ -652,6 +653,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             <OrderModal
                 isOpen={isOrderModalOpen}
                 onClose={closeModal}
+                onSuccess={(msg) => setToast({ message: msg, type: 'success' })}
             />
 
             {toast && (

@@ -49,75 +49,108 @@ export interface SecurityIncident {
 
 export const adminAuditService = {
     async getAuditLogs(filters?: any): Promise<AuditEntry[]> {
-        return [
-            {
-                id: '1',
-                timestamp: new Date().toISOString(),
-                user_name: 'Joseph O.',
-                user_email: 'joseph@iotank.co.ke',
-                user_role: 'Super Admin',
-                action_category: 'Financial',
-                action_type: 'Debt Adjustment',
-                description: 'Adjusted debt for Pearl Station by KES 5,000',
-                resource_id: 'TX-99812',
-                ip_address: '192.168.1.42',
-                user_agent: 'Mozilla/5.0...',
-                result: 'success',
-                changes: { before: { balance: 12000 }, after: { balance: 7000 } }
-            },
-            {
-                id: '2',
-                timestamp: new Date(Date.now() - 3600000).toISOString(),
-                user_name: 'System Bot',
-                user_email: 'service@iotank.co.ke',
-                user_role: 'System',
-                action_category: 'Security',
-                action_type: 'Brute Force Blocked',
-                description: 'Blocked IP 185.22.11.4 after 10 failed login attempts',
-                ip_address: '185.22.11.4',
-                user_agent: 'Unknown',
-                result: 'success'
-            }
-        ];
+        let query = supabase
+            .from('unified_events')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (filters?.category && filters.category !== 'All') {
+            query = query.eq('event_category', filters.category);
+        }
+
+        const { data, error } = await query.limit(100);
+        
+        if (error) {
+            console.error('Error fetching audit logs:', error);
+            return [];
+        }
+
+        return (data || []).map(row => ({
+            id: row.id,
+            timestamp: row.created_at,
+            user_name: row.metadata?.actor_name || 'System',
+            user_email: row.actor_email || '',
+            user_role: row.metadata?.user_role || 'Operator',
+            action_category: row.event_category as any,
+            action_type: row.event_type,
+            description: row.description,
+            resource_id: row.metadata?.resource_id,
+            ip_address: row.metadata?.ip_address || 'Internal',
+            user_agent: row.metadata?.user_agent || 'System',
+            result: (row.metadata?.result || 'success') as any,
+            changes: row.metadata?.changes
+        }));
     },
 
     async getFinancialTrail(): Promise<FinancialTrail[]> {
-        return [
-            {
-                id: 'FT-1001',
-                timestamp: '2026-03-22 10:45:12',
-                type: 'Payment',
-                client_name: 'Nairobi West Station',
-                amount: 45000,
-                prev_balance: 62000,
-                new_balance: 17000,
-                initiated_by: 'M-Pesa Gateway',
-                reference: 'RKG79Y2X9S',
-                status: 'completed'
-            }
-        ];
+        const { data, error } = await supabase
+            .from('unified_events')
+            .select('*')
+            .eq('event_category', 'FINANCIAL')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) {
+            console.error('Error fetching financial trail:', error);
+            return [];
+        }
+
+        return (data || []).map(row => ({
+            id: row.id,
+            timestamp: new Date(row.created_at).toLocaleString(),
+            type: (row.metadata?.type || 'Adjustment') as any,
+            client_name: row.metadata?.station_name || 'Global',
+            amount: row.metadata?.amount || 0,
+            prev_balance: row.metadata?.prev_balance || 0,
+            new_balance: row.metadata?.new_balance || 0,
+            initiated_by: row.metadata?.actor_name || 'System',
+            reference: row.metadata?.reference || row.id.substring(0, 8),
+            status: 'completed'
+        }));
     },
 
     async getComplianceOverview(): Promise<ComplianceStatus[]> {
-        return [
-            { id: '1', name: 'EPRA Operating License', category: 'EPRA', status: 'compliant', expiry_date: '2026-12-31', last_audit: '2026-01-15' },
-            { id: '2', name: 'NEMA Effluent Discharge', category: 'NEMA', status: 'warning', expiry_date: '2026-04-10', last_audit: '2025-10-20' },
-            { id: '3', name: 'VAT Remittance Q1', category: 'KRA', status: 'compliant', last_audit: '2026-03-20' }
-        ];
+        // CLEANUP: Removed prescriptive mock rows for EPRA/KRA until compliance_registry table is active
+        return [];
     },
 
     async getSecurityIncidents(): Promise<SecurityIncident[]> {
-        return [
-            { id: '1', timestamp: '2026-03-22 08:30:00', type: 'Brute Force', severity: 'high', source_ip: '185.22.11.4', status: 'blocked' }
-        ];
+        const { data, error } = await supabase
+            .from('unified_events')
+            .select('*')
+            .in('severity', ['WARNING', 'CRITICAL'])
+            .in('event_category', ['SECURITY', 'AUTH'])
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error) return [];
+
+        return (data || []).map(row => ({
+            id: row.id,
+            timestamp: new Date(row.created_at).toLocaleString(),
+            type: row.event_type as any,
+            severity: (row.severity?.toLowerCase() || 'medium') as any,
+            source_ip: row.metadata?.ip_address || 'Unknown',
+            status: 'flagged'
+        }));
     },
 
     async getAdminRiskMetrics() {
+        const { data: criticalEvents } = await supabase
+            .from('unified_events')
+            .select('id')
+            .eq('severity', 'CRITICAL');
+
+        const { data: securityEvents } = await supabase
+            .from('unified_events')
+            .select('id')
+            .eq('event_category', 'SECURITY');
+
         return {
-            highRiskActions: 12,
-            suspiciousLogins: 4,
-            unauthorizedAttempt: 2,
-            avgResolutionTime: '1.2h'
+            highRiskActions: criticalEvents?.length || 0,
+            suspiciousLogins: securityEvents?.length || 0,
+            unauthorizedAttempt: securityEvents?.length || 0,
+            avgResolutionTime: '0h'
         };
     }
 };

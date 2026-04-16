@@ -103,12 +103,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log(`[DEBUG_LOG] PROFILE: Launching optimized identity bundle handshake...`);
             let handshakeTimedOut = false;
             
-            // TIMEOUT PROTECTION: Force-fail if a query hangs more than 6s (Safe for slow 3G/cold starts)
+            // TIMEOUT PROTECTION: Force-fail if a query hangs more than 15s (Safe for slow DB cold starts)
             const timeoutPromise = new Promise((_, reject) => 
                 setTimeout(() => {
                     handshakeTimedOut = true;
                     reject(new Error("Supabase query timeout"));
-                }, 6000)
+                }, 15000)
             );
             
             const runQuery = async () => {
@@ -248,7 +248,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     useEffect(() => {
         const isRecoveryFlow = window.location.pathname === '/reset-password';
 
-        // Safety Timeout: Force clear loading after 4 seconds to prevent permanent hang
+        // Safety Timeout: Force clear loading after 12 seconds to prevent permanent hang
+        // Increased from 4s to 12s to prevent race conditions during DB cold-starts
         const safetyTimer = setTimeout(() => {
             if (isLoadingRef.current) {
                 console.warn("[DEBUG_LOG] BOOT: Safety timeout triggered. Unlocking UI.");
@@ -256,7 +257,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 isBootingRef.current = false;
                 handshakeInProgressRef.current = false;
             }
-        }, 4000);
+        }, 12000);
 
         const initializeAuth = async () => {
             if (handshakeInProgressRef.current) return;

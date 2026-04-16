@@ -1,7 +1,7 @@
 // supabase/functions/groq-proxy/index.ts
 
 import { getCorsHeaders } from '../_shared/cors.ts'
-import { enforceDurableRateLimit, requireProxyScope } from '../_shared/auth.ts'
+import { enforceDurableRateLimit, getOptionalProxyScope } from '../_shared/auth.ts'
 import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt } from '../_shared/prompts.ts'
 declare const Deno: any;
 
@@ -14,10 +14,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authz = await requireProxyScope(req, corsHeaders);
+    const authz = await getOptionalProxyScope(req, corsHeaders);
     if ('response' in authz) return authz.response;
-
-    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'groq-proxy', MAX_PER_WINDOW);
+    
+    const maxRequests = authz.context.user.id === 'anonymous' ? 5 : MAX_PER_WINDOW;
+    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'groq-proxy', maxRequests);
     if ('response' in limit) return limit.response;
 
     const payload = await req.json()

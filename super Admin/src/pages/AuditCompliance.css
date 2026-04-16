@@ -107,3 +107,18 @@
     border-color: #ef4444;
     background: rgba(239, 68, 68, 0.05);
 }
+
+/* Dynamic Risk and Percentage Bars */
+.risk-meter {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+
+.risk-level {
+    height: 100%;
+    background: var(--color-warning);
+    transition: width 0.5s ease-out;
+}

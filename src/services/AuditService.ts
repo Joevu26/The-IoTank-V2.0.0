@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
 
-export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'AUTH' | 'SYSTEM' | 'CALIBRATION' | 'SECURITY';
+export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'AUTH' | 'SYSTEM' | 'CALIBRATION' | 'SECURITY' | 'ORDER';
 
 export type EventType =
     | 'LOGIN'
@@ -32,7 +32,9 @@ export type EventType =
     | 'THRESHOLD_UPDATED'
     | 'IDENTITY_MUTATION_ATTEMPT'
     | 'UNAUTHORIZED_ACCESS_ATTEMPT'
-    | 'DEVICE_COMMAND';
+    | 'DEVICE_COMMAND'
+    | 'ORDER_REQUESTED'
+    | 'ORDER_CANCELLED';
 
 export interface UnifiedEvent {
     category: EventCategory;
@@ -55,13 +57,16 @@ export class AuditService {
         severity: 'INFO' | 'WARNING' | 'CRITICAL' = 'INFO',
         metadata: any = {}
     ) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
-
-        if (!user) return;
-
         try {
-            await supabase.from('unified_events').insert({
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
+
+            if (!user) {
+                console.warn('[AuditService] No active session found, skipping log.');
+                return;
+            }
+
+            const { error } = await supabase.from('unified_events').insert({
                 station_id: stationId || null,
                 actor_id: user.id,
                 actor_email: user.email,
@@ -75,8 +80,12 @@ export class AuditService {
                 },
                 created_at: new Date().toISOString()
             });
+
+            if (error) {
+                console.error('[AuditService] Database rejected log:', error.message);
+            }
         } catch (error) {
-            console.error('Failed to write unified event log:', error);
+            console.error('[AuditService] Critical failure during logging:', error);
         }
     }
 

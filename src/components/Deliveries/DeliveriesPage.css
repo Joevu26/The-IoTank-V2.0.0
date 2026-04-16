@@ -39,20 +39,20 @@
 }
 
 .dp-header h1 {
-    font-size: 1.375rem;
+    font-size: 2.25rem;
     font-weight: 900;
     color: var(--color-text-primary);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.05em;
     margin: 0;
 }
 
 .dp-subtitle {
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     color: var(--color-text-secondary);
-    font-weight: 600;
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    margin: 0.25rem 0 0 0;
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .dp-header-actions {
@@ -170,6 +170,90 @@
     margin-top: 0.25rem;
 }
 
+/* ── Premium Stat Cards (Glassmorphism) ── */
+.dp-premium-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+}
+
+.dp-premium-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.dp-premium-stat-card.card-blue::before { background: #6366f1; }
+.dp-premium-stat-card.card-emerald::before { background: #10b981; }
+.dp-premium-stat-card.card-rose::before { background: #f43f5e; }
+.dp-premium-stat-card.card-amber::before { background: #f59e0b; }
+
+.dp-premium-stat-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 16px 40px rgba(99, 102, 241, 0.12);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.dp-stat-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dp-stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.dp-stat-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    color: var(--color-text-primary);
+    line-height: 1.1;
+}
+
+.dp-stat-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.15rem;
+}
+
+/* ── Table Height Constraints ── */
+.max-h-15-rows {
+    max-height: 750px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.max-h-15-rows::-webkit-scrollbar {
+    width: 6px;
+}
+
+.max-h-15-rows::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
 /* ── Main Layout ─────────────────────────────── */
 .dp-main-layout {
     display: grid;
@@ -195,37 +279,41 @@
     flex-wrap: wrap;
 }
 
-.dp-search-box {
+.header-search-box {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    padding: 0.5rem 0.9rem;
-    flex: 1;
-    max-width: 340px;
-    transition: border-color 0.2s;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.4rem 1rem;
+    width: 320px;
+    transition: all 0.2s;
 }
 
-.dp-search-box:focus-within {
+.header-search-box:focus-within {
     border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
 }
 
-.dp-search-icon {
-    color: var(--color-text-secondary);
-    flex-shrink: 0;
+.header-search-box .search-icon {
+    color: #94a3b8;
+    font-size: 1.1rem;
 }
 
-.dp-search-box input {
+.header-search-box input {
     border: none;
     outline: none;
     background: transparent;
-    font-size: 0.8125rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--color-text-primary);
+    color: #1e293b;
     width: 100%;
+}
+
+.header-search-box input::placeholder {
+    color: #94a3b8;
 }
 
 .dp-filter-pills {

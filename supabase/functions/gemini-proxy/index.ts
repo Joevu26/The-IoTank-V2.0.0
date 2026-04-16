@@ -1,7 +1,7 @@
 // supabase/functions/gemini-proxy/index.ts
 
 import { getCorsHeaders } from '../_shared/cors.ts'
-import { enforceDurableRateLimit, requireProxyScope } from '../_shared/auth.ts'
+import { enforceDurableRateLimit, getOptionalProxyScope } from '../_shared/auth.ts'
 import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt } from '../_shared/prompts.ts'
 declare const Deno: any;
 
@@ -19,10 +19,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authz = await requireProxyScope(req, corsHeaders);
+    const authz = await getOptionalProxyScope(req, corsHeaders);
     if ('response' in authz) return authz.response;
 
-    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'gemini-proxy', MAX_PER_WINDOW);
+    const maxRequests = authz.context.user.id === 'anonymous' ? 5 : MAX_PER_WINDOW;
+    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'gemini-proxy', maxRequests);
     if ('response' in limit) return limit.response;
 
     const payload = await req.json()
@@ -30,11 +31,43 @@ Deno.serve(async (req) => {
     let body = payload.body || {};
     
     if (action === 'chat') {
-       body.contents = [
-          { role: 'user', parts: [{ text: CHAT_PROJECT_CONTEXT }] },
-          { role: 'model', parts: [{ text: "Understood. I am the IoTank Assistant. How can I help you today?" }] },
-          ...(body.contents || [])
-       ];
+        const openaiMessages = body.messages || [];
+        const geminiTools = body.tools ? [{
+           function_declarations: body.tools.map((t: any) => ({
+              name: t.function.name,
+              description: t.function.description,
+              parameters: t.function.parameters
+           }))
+        }] : undefined;
+
+        // Convert OpenAI messages to Gemini contents
+        const geminiContents = openaiMessages.map((m: any) => ({
+           role: m.role === 'assistant' ? 'model' : 'user',
+           parts: m.tool_calls ? [
+              ...m.parts || [],
+              ...m.tool_calls.map((tc: any) => ({
+                 functionCall: {
+                    name: tc.function.name,
+                    args: JSON.parse(tc.function.arguments)
+                 }
+              }))
+           ] : m.role === 'tool' ? [{
+              functionResponse: {
+                 name: m.name || m.tool_call_id,
+                 response: { content: m.content }
+              }
+           }] : [{ text: m.content }]
+        }));
+
+        body = {
+           contents: [
+              { role: 'user', parts: [{ text: CHAT_PROJECT_CONTEXT }] },
+              { role: 'model', parts: [{ text: "Understood. I am the IoTank Assistant. How can I help you today?" }] },
+              ...geminiContents
+           ],
+           tools: geminiTools,
+           generationConfig: body.generationConfig || { temperature: 0.7 }
+        };
     } else if (action === 'intelligence') {
        const systemPrompt = buildIntelligencePrompt(context?.signals || [], context?.risks || [], context?.notices || []);
        body.contents = [{ parts: [{ text: systemPrompt }] }];

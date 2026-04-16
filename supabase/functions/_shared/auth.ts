@@ -17,7 +17,7 @@ type ProxyScopeContext = {
 };
 
 export async function requireAuthenticatedUser(req: Request, corsHeaders: CorsHeaders) {
-  const SUPABASE_URL = 'https://suifvborodwergtrbjez.supabase.co';
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://suifvborodwergtrbjez.supabase.co';
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -84,7 +84,8 @@ export async function requireAuthenticatedUser(req: Request, corsHeaders: CorsHe
       message: error.message,
       status: error.status,
       tokenPrefix: token.substring(0, 15) + '...',
-      url: SUPABASE_URL
+      url: SUPABASE_URL,
+      isServiceKeyPresent: !!SUPABASE_SERVICE_ROLE_KEY
     });
     
     const isExpired = error.message?.toLowerCase().includes('expired');
@@ -286,6 +287,52 @@ export async function requireProxyScope(req: Request, corsHeaders: CorsHeaders) 
   };
 }
 
+/**
+ * Allows unauthenticated access but returns a public scope restricted by IP
+ */
+export async function getOptionalProxyScope(req: Request, corsHeaders: CorsHeaders) {
+  const authHeader = req.headers.get('Authorization');
+  
+  // If we have a token, try to use it
+  if (authHeader?.startsWith('Bearer ')) {
+    const auth = await requireProxyScope(req, corsHeaders);
+    if ('context' in auth) return auth;
+    
+    // If auth failed with 401 (Unauthorized), we log it and proceed to anonymous fallback
+    // rather than blocking the "Launch Pad" experience.
+    if ('response' in auth) {
+      if ((auth.response as Response).status === 401) {
+        console.warn('[auth-optional] Token present but invalid/expired. Falling back to anonymous scope.');
+      } else {
+        // For other errors (403 Forbidden, 500 Error), we respect the failure.
+        return auth;
+      }
+    }
+  }
+
+  // Otherwise, provide a restricted anonymous scope based on IP
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'https://suifvborodwergtrbjez.supabase.co';
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+     return { response: new Response('Config error', { status: 500, headers: corsHeaders }) };
+  }
+
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const clientIp = req.headers.get('x-real-ip') || req.headers.get('cf-connecting-ip') || 'anonymous';
+  
+  const ctx: ProxyScopeContext = {
+    user: { id: 'anonymous' },
+    supabaseAdmin,
+    authLevel: 99,
+    role: 'public',
+    stationId: null,
+    scopeKey: `ip:${clientIp}`,
+  };
+
+  return { context: ctx };
+}
+
 export async function enforceDurableRateLimit(
   context: ProxyScopeContext,
   corsHeaders: CorsHeaders,
@@ -326,6 +373,7 @@ export async function enforceDurableRateLimit(
 
   const result = Array.isArray(data) ? data[0] : data;
   if (!result?.allowed) {
+    const resetAt = result?.reset_at || new Date(Date.now() + 60000).toISOString();
     await emitSecurityTelemetry(context.supabaseAdmin, {
       eventType: 'proxy_rate_limit_exceeded',
       severity: 'warning',
@@ -341,7 +389,7 @@ export async function enforceDurableRateLimit(
       reason: 'rate_limit_exceeded',
       details: {
         remaining: 0,
-        resetAt: result?.reset_at || null,
+        resetAt: resetAt,
         configuredMaxPerWindow: maxPerWindow,
         configuredWindowSeconds: windowSeconds,
       },
@@ -351,7 +399,7 @@ export async function enforceDurableRateLimit(
         success: false,
         error: 'Rate limit exceeded',
         remaining: 0,
-        resetAt: result?.reset_at || null,
+        resetAt: resetAt,
       }), {
         status: 429,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

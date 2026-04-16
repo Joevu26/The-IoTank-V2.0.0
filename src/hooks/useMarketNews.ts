@@ -20,12 +20,18 @@ import { MarketSignal } from '@/types';
 const CACHE_TTL_MS = 15 * 60 * 1000;       // 15 minutes — standard news sources
 const CACHE_TTL_SLOW_MS = 60 * 60 * 1000;  // 60 minutes — regulatory/forex (low frequency)
 const REFRESH_COOLDOWN_MS = 30 * 1000;     // 30 seconds
-const RSS2JSON_BASE = 'https://api.rss2json.com/v1/api.json?rss_url=';
 
-// Google News RSS — free, no key, CORS-safe via rss2json, works for sites without direct RSS
-// Filtered to Kenya-relevant domain/topic queries
+// ─── Proxies ──────────────────────────────────────────────────────────────────
+const PROXY_BASE = 'https://suifvborodwergtrbjez.supabase.co/functions/v1';
+const RSS_PARSER = `${PROXY_BASE}/rss-parser`;
+const GNEWS_PROXY = `${PROXY_BASE}/gnews-proxy`;
+const NEWSDATA_PROXY = `${PROXY_BASE}/newsdata-proxy`;
+const CURRENTS_PROXY = `${PROXY_BASE}/currents-proxy`;
+
+// Google News RSS fallback queries
 const GN_RSS = (query: string) =>
     `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-KE&gl=KE&ceid=KE:en`;
+
 
 // ─── Source Credibility Mapping ──────────────────────────────────────────────
 
@@ -61,7 +67,7 @@ export const NEWS_SOURCES: NewsFeedSource[] = [
         label: 'EPRA — Petroleum Pricing',
         shortLabel: 'EPRA',
         region: 'Kenya',
-        url: GN_RSS('EPRA Kenya fuel price petroleum'),
+        url: GN_RSS('EPRA Kenya fuel petroleum price petroleum regulatory authority'),
         type: 'Regulatory',
         cacheTTL: CACHE_TTL_MS,
     },
@@ -159,11 +165,15 @@ export interface NewsArticle extends MarketSignal {
     imageUrl?: string;
     
     // ─── Verification Metadata ───
-    validationStatus?: 'plausible' | 'flagged' | 'unverifiable';
+    confidenceScore: number;   // 0-1.0
+    verificationStatus: 'verified' | 'unverified' | 'disputed' | 'flagged';
     validationLabel?: string;
     isCorroborated?: boolean;
+    corroborationCount?: number;
     isUnhighlighted?: boolean; // If hidden/auto-hide
+    isOfficial?: boolean;      // EPRA / Official Kenyan Agency
 }
+
 
 interface CachePayload {
     articles: NewsArticle[];
@@ -202,7 +212,7 @@ function computeRelevanceScore(title: string, summary: string, sourceType: strin
     if (text.includes('fuel') || text.includes('petroleum') || text.includes('diesel') || text.includes('petrol')) score += 0.15;
     if (text.includes('kenya') || text.includes('nairobi')) score += 0.05;
     if (text.includes('price')) score += 0.1;
-    if (sourceType === 'Regulatory') score += 0.15;
+    if (sourceType === 'Regulatory') score += 0.2; // Substantial boost, but not pinned to 100%
     if (sourceType === 'Commodity') score += 0.1;
 
     // Apply Source Credibility Multiplier
@@ -263,32 +273,57 @@ function calculateSimilarity(str1: string, str2: string): number {
     return intersection.size / union.size;
 }
 
+function calculateConfidenceScore(article: NewsArticle, corroborationCount: number): number {
+    let score = article.confidenceScore;
+
+    // + Boost for high-authority sources
+    const domain = article.externalUrl ? new URL(article.externalUrl).hostname.replace('www.', '') : '';
+    if (SOURCE_CREDIBILITY[domain] >= 0.9) score += 0.15;
+    
+    // + Boost for corroboration
+    score += (corroborationCount * 0.1);
+
+    // - Penalty for single-source high-impact claims
+    const isHighImpact = HIGH_IMPACT_KEYWORDS.some(kw => 
+        (article.title + ' ' + article.summary).toLowerCase().includes(kw)
+    );
+    if (isHighImpact && corroborationCount === 0) score -= 0.1;
+
+    return Math.min(score, 1.0);
+}
+
 function corroborateArticles(articles: NewsArticle[]): NewsArticle[] {
     return articles.map(item => {
-        const needsCorroboration = HIGH_IMPACT_KEYWORDS.some(kw => 
-            (item.title + ' ' + item.summary).toLowerCase().includes(kw)
-        );
-        
-        if (!needsCorroboration) return item;
-
         const others = articles.filter(n => 
             n.id !== item.id && 
-            calculateSimilarity(n.title, item.title) > 0.4 // Adjusted threshold for broader matching
+            calculateSimilarity(n.title, item.title) > 0.35
         );
 
-        const isCorroborated = others.length >= 1;
+        const corroborationCount = others.length;
+        const score = calculateConfidenceScore(item, corroborationCount);
+        
+        // Final Status Determination
+        let status: NewsArticle['verificationStatus'] = 'unverified';
+        if (score > 0.85) status = 'verified';
+        if (score < 0.4 && corroborationCount === 0) status = 'unverified';
         
         return {
             ...item,
-            isCorroborated,
-            validationLabel: !isCorroborated ? '🔍 Unconfirmed — single source' : undefined
+            corroborationCount,
+            isCorroborated: corroborationCount > 0,
+            confidenceScore: score,
+            verificationStatus: status,
+            validationLabel: status === 'unverified' && corroborationCount === 0 ? '🔍 Unconfirmed — single source' : 
+                             status === 'verified' ? '✅ Verified Market Signal' : undefined
         };
     });
 }
 
+
 function buildBriefingSummary(title: string, description: string, implication: string): string {
-    const snippet = description ? description.replace(/<[^>]*>/g, '').substring(0, 200) : title.substring(0, 200);
-    return `${snippet.trim()}… | Key implication: ${implication} impact`;
+    const cleanDesc = description.replace(title, '').replace(/<[^>]*>/g, '').trim();
+    const snippet = cleanDesc.length > 20 ? cleanDesc.substring(0, 300) : description.substring(0, 300);
+    return `${snippet || title} | Strategic Context: This ${implication.toLowerCase()} signal suggests immediate monitoring of operational margins.`;
 }
 
 function buildSignalFromArticle(
@@ -299,21 +334,16 @@ function buildSignalFromArticle(
     const description = (article.description || article.content || '').replace(/<[^>]*>/g, '');
     const topicTags = computeTopicTags(title, description);
     const implicationCategory = computeImplication(title, description);
-    const link = article.link || article.guid || undefined;
+    const link = article.link || article.url || article.guid || undefined;
     const relevanceScore = computeRelevanceScore(title, description, source.type, link);
     
-    // Ensure pubDate is parsed as UTC if it's from rss2json
     let publishedAt = Date.now();
-    if (article.pubDate) {
+    if (article.pubDate || article.publishedAt || article.published_at) {
         try {
-            // rss2json usually returns 'YYYY-MM-DD HH:MM:SS' in UTC
-            const dateStr = article.pubDate.includes(' ') && !article.pubDate.includes('Z') && !article.pubDate.includes('GMT')
-                ? `${article.pubDate} UTC`
-                : article.pubDate;
+            const dateStr = article.pubDate || article.publishedAt || article.published_at;
             publishedAt = new Date(dateStr).getTime();
             if (isNaN(publishedAt)) publishedAt = Date.now();
-        } catch (e) {
-            console.warn('[useMarketNews] Date parse failed:', article.pubDate, e);
+        } catch {
             publishedAt = Date.now();
         }
     }
@@ -321,57 +351,26 @@ function buildSignalFromArticle(
     const signalSourceType = source.type === 'Logistics' ? 'Operational Alert' : source.type;
 
     return {
-        id: `live-${source.shortLabel.replace(/\s/g, '_')}-${publishedAt}`,
+        id: `int-${source.shortLabel.replace(/\s/g, '_')}-${publishedAt}-${Math.random().toString(36).substring(7)}`,
         type: source.type === 'Regulatory' ? 'regulatory' : source.type === 'Commodity' ? 'market' : source.type === 'Logistics' ? 'logistics' : 'market',
         source: source.label,
         sourceType: signalSourceType,
         title,
-        summary: description.substring(0, 300) || title,
+        summary: (description.replace(title, '').trim() || description || title).substring(0, 500),
         timestamp: publishedAt,
         relevanceScore,
-        confidenceScore: 0.88,
-        externalUrl: article.link || article.guid || undefined,
+        confidenceScore: source.type === 'Regulatory' ? 0.95 : 0.7,
+        verificationStatus: 'unverified',
+        externalUrl: link,
         attribution: source.shortLabel,
         region: source.region,
         topicTags,
         implicationCategory,
         briefingSummary: buildBriefingSummary(title, description, implicationCategory),
         feedSource: source.shortLabel,
-        imageUrl: article.thumbnail || article.enclosure?.link || undefined,
+        isOfficial: source.type === 'Regulatory',
+        imageUrl: article.thumbnail || article.urlToImage || article.image || article.enclosure?.link || undefined,
     };
-}
-
-function parseXMLToArticles(xmlString: string, source: NewsFeedSource): NewsArticle[] {
-    try {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlString, "text/xml");
-        const items = xmlDoc.querySelectorAll("item, entry");
-        
-        return Array.from(items).slice(0, 15).map(item => {
-            const title = item.querySelector("title")?.textContent || "Untitled";
-            // Check for link in various formats (RSS 2.0 <link>, Atom <link href="...">)
-            const linkTag = item.querySelector("link");
-            const link = linkTag?.getAttribute("href") || linkTag?.textContent || item.querySelector("guid")?.textContent || "";
-            
-            const description = item.querySelector("description")?.textContent || 
-                              item.querySelector("summary")?.textContent || 
-                              item.querySelector("content")?.textContent || "";
-            
-            const pubDate = item.querySelector("pubDate")?.textContent || 
-                           item.querySelector("published")?.textContent || 
-                           item.querySelector("updated")?.textContent || "";
-            
-            return buildSignalFromArticle({
-                title,
-                link,
-                description,
-                pubDate,
-            }, source);
-        });
-    } catch (e) {
-        console.warn('[useMarketNews] XML Parse Error:', e);
-        return [];
-    }
 }
 
 
@@ -385,7 +384,7 @@ function readCache(sourceLabel: string): { articles: NewsArticle[]; age: number 
     try {
         const raw = localStorage.getItem(getCacheKey(sourceLabel));
         if (!raw) return null;
-        const payload: CachePayload = JSON.parse(raw);
+        const payload: any = JSON.parse(raw);
         const age = Date.now() - payload.fetchedAt;
         if (age > CACHE_TTL_MS * 2) {
             // Purge very old cache
@@ -397,6 +396,7 @@ function readCache(sourceLabel: string): { articles: NewsArticle[]; age: number 
         return null;
     }
 }
+
 
 function writeCache(sourceLabel: string, articles: NewsArticle[]): void {
     try {
@@ -451,6 +451,23 @@ export function useMarketNews(): UseMarketNewsReturn {
     const [activeRegion, setActiveRegion] = useState<'all' | 'Kenya' | 'Global'>('all');
 
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const apiCooldowns = useRef<Record<string, number>>({}); // Tracks API -> expiration timestamp
+
+    // Adaptive backoff check
+    const isApiAvailable = (api: string) => {
+        const cooldown = apiCooldowns.current[api];
+        if (!cooldown) return true;
+        if (Date.now() > cooldown) {
+            delete apiCooldowns.current[api];
+            return true;
+        }
+        return false;
+    };
+
+    const markApiLimited = (api: string) => {
+        console.warn(`[useMarketNews] API ${api} rate-limited. Backing off for 2 minutes.`);
+        apiCooldowns.current[api] = Date.now() + 120000; // 2 minute cooldown
+    };
 
     // Can refresh is computed from countdown
     const canRefresh = countdown === 0;
@@ -501,189 +518,101 @@ export function useMarketNews(): UseMarketNewsReturn {
     const fetchFromSource = useCallback(async (source: NewsFeedSource): Promise<NewsArticle[]> => {
         const cacheKey = source.shortLabel;
         const cached = readCache(cacheKey);
-        const ttl = source.cacheTTL ?? CACHE_TTL_MS;   // respect per-source TTL
+        const ttl = source.cacheTTL ?? CACHE_TTL_MS;
         if (cached && cached.age < ttl) {
-            return cached.articles;  // Fresh cache — use it
+            return cached.articles;
         }
 
-        // 0. Handle Internal Intelligence Proxies
-        if (source.url.startsWith('proxy:')) {
+        const headers = await getSafeAuthHeaders();
+        const collected: NewsArticle[] = [];
+
+        // 1. Try Primary: GNews API Proxy
+        if (isApiAvailable('GNEWS')) {
             try {
-                const proxyName = source.url.split(':')[1];
-                const headers = await getSafeAuthHeaders();
-                
-                const response = await fetch(`https://suifvborodwergtrbjez.supabase.co/functions/v1/${proxyName}-proxy`, {
+                const response = await fetch(GNEWS_PROXY, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify(proxyName === 'alpha-vantage' ? { symbol: 'NEWS_SENTIMENT' } : {})
+                    body: JSON.stringify({ query: source.shortLabel + ' fuel petroleum Kenya', max: 5 })
                 });
-
-                if (!response.ok) {
-                    const errorMsg = await response.text();
-                    throw new Error(`Proxy error: ${response.status} - ${errorMsg}`);
+                
+                if (response.status === 429) {
+                    markApiLimited('GNEWS');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    if (data.articles) {
+                        const articles = data.articles.map((a: any) => buildSignalFromArticle(a, source));
+                        collected.push(...articles);
+                    }
                 }
+            } catch (e) { /* silent fail to fallback */ }
+        }
 
-                const proxyData = await response.json();
-
-                if (proxyName === 'eia' && proxyData?.data) {
-                    const latest = proxyData.data[0];
-                    if (!latest) return [];
-                    const articles = [{
-                        id: `eia-${latest.period || Date.now()}`,
-                        type: 'market',
-                        source: 'EIA Petroleum Intelligence',
-                        sourceType: 'API',
-                        title: `WTI Crude Spot Price: $${latest.value || 'N/A'} per barrel`,
-                        summary: `Latest petroleum data from EIA indicates a spot price of $${latest.value || 'N/A'}. Period: ${latest.period || 'Recent'}.`,
-                        timestamp: latest.period ? new Date(latest.period).getTime() : Date.now(),
-                        relevanceScore: 0.95,
-                        confidenceScore: 1.0,
-                        attribution: 'EIA',
-                        region: 'Global',
-                        topicTags: ['PriceAlert', 'CrudeOil'],
-                        implicationCategory: 'Price',
-                        briefingSummary: `WTI Crude at $${latest.value} | Key implication: Global price pressure`,
-                        feedSource: 'EIA'
-                    } as NewsArticle];
-                    writeCache(cacheKey, articles);
-                    return articles;
+        // 2. Try Secondary Redundancy (only if primary failed or returned nothing)
+        if (collected.length === 0 && isApiAvailable('NEWSDATA')) {
+            try {
+                const response = await fetch(NEWSDATA_PROXY, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ query: source.shortLabel + ' energy Kenya' })
+                });
+                
+                if (response.status === 429) {
+                    markApiLimited('NEWSDATA');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    if (data.results) {
+                        const articles = data.results.map((a: any) => buildSignalFromArticle(a, source));
+                        collected.push(...articles);
+                    }
                 }
-
-                if (proxyName === 'exchange-rate' && proxyData?.success) {
-                    const articles = [{
-                        id: `fx-${proxyData.timestamp}`,
-                        type: 'regulatory',
-                        source: 'Global Exchange Parity',
-                        sourceType: 'API',
-                        title: `USD/KES Exchange Rate: ${proxyData.rate}`,
-                        summary: `Current market rate for USD to KES is ${proxyData.rate}. Base currency: ${proxyData.base}.`,
-                        timestamp: proxyData.timestamp * 1000,
-                        relevanceScore: 0.9,
-                        confidenceScore: 0.98,
-                        attribution: 'Forex',
-                        region: 'Global',
-                        topicTags: ['Forex', 'PriceAlert'],
-                        implicationCategory: 'Price',
-                        briefingSummary: `USD/KES at ${proxyData.rate} | Key implication: Import cost volatility`,
-                        feedSource: 'Forex'
-                    } as NewsArticle];
-                    writeCache(cacheKey, articles);
-                    return articles;
-                }
-
-                if (proxyName === 'alpha-vantage' && Array.isArray(proxyData?.feed)) {
-                    const articles = proxyData.feed.slice(0, 5).map((item: any) => ({
-                        id: `av-${item.url || Math.random().toString()}`,
-                        type: 'market',
-                        source: 'Alpha Vantage Sentiment',
-                        sourceType: 'API',
-                        title: item.title || 'Market Intelligence Update',
-                        summary: item.summary || 'No summary available.',
-                        timestamp: item.time_published 
-                            ? new Date(item.time_published.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6Z')).getTime() 
-                            : Date.now(),
-                        relevanceScore: parseFloat(item.overall_sentiment_score) || 0.8,
-                        confidenceScore: 0.85,
-                        externalUrl: item.url,
-                        attribution: 'AlphaV',
-                        region: 'Global',
-                        topicTags: item.topics?.map((t: any) => t.topic) || ['General'],
-                        implicationCategory: 'General',
-                        briefingSummary: `${item.title.substring(0, 100)}... | Sentiment: ${item.overall_sentiment_label}`,
-                        feedSource: 'AlphaV',
-                        imageUrl: item.banner_image
-                    } as NewsArticle));
-                    writeCache(cacheKey, articles);
-                    return articles;
-                }
-                return [];
             } catch (e) {
-                console.warn(`[useMarketNews] Internal Proxy failed for ${source.shortLabel}`, e);
-                return [];
-            }
-        }
-
-        // 1. Try Supabase Proxy (Bypasses CORS, most reliable if deployed)
-        try {
-            const headers = await getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ url: source.url })
-            });
-
-            if (response.ok) {
-                const proxyData = await response.json();
-                if (proxyData.contents) {
-                    const articles = parseXMLToArticles(proxyData.contents, source);
-                    if (articles.length > 0) {
-                        writeCache(cacheKey, articles);
-                        return articles;
-                    }
-                } else if (Array.isArray(proxyData.items)) {
-                    const articles = proxyData.items.map((item: any) => buildSignalFromArticle(item, source));
-                    writeCache(cacheKey, articles);
-                    return articles;
+                // Failover to Currents Proxy
+                if (isApiAvailable('CURRENTS')) {
+                    try {
+                        const response = await fetch(CURRENTS_PROXY, {
+                            method: 'POST',
+                            headers,
+                            body: JSON.stringify({ query: source.shortLabel })
+                        });
+                        if (response.status === 429) {
+                            markApiLimited('CURRENTS');
+                        } else if (response.ok) {
+                            const data = await response.json();
+                            if (data.news) {
+                                const articles = data.news.map((a: any) => buildSignalFromArticle(a, source));
+                                collected.push(...articles);
+                            }
+                        }
+                    } catch (ce) { /* exhaust proxies */ }
                 }
             }
-        } catch (e) {
-            console.warn(`[useMarketNews] Supabase Proxy failed for ${source.shortLabel}`);
         }
 
-        // 2. Try RSS2JSON (Standard RSS converter)
-        try {
-            const url = `${RSS2JSON_BASE}${encodeURIComponent(source.url)}`;
-            const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
-                    const articles = data.items.map((item: any) => buildSignalFromArticle(item, source));
-                    writeCache(cacheKey, articles);
-                    return articles;
-                }
-            }
-        } catch (e) {
-            console.warn(`[useMarketNews] RSS2JSON failed for ${source.shortLabel}`);
-        }
-
-        // 3. Try AllOrigins Proxy (Public CORS bypass)
-        try {
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(source.url)}`;
-            const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-            if (response.ok) {
-                const data = await response.json();
-                if (data.contents) {
-                    const articles = parseXMLToArticles(data.contents, source);
-                    if (articles.length > 0) {
-                        writeCache(cacheKey, articles);
-                        return articles;
+        // 3. Last Resort: Self-Hosted RSS Parser (skip if Proxy-only source)
+        const isUrlValid = source.url && source.url.startsWith('http');
+        if (collected.length === 0 && isUrlValid && !source.url.startsWith('proxy:')) {
+            try {
+                const response = await fetch(RSS_PARSER, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ rssUrl: source.url })
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.items) {
+                        const articles = data.items.map((i: any) => buildSignalFromArticle(i, source));
+                        collected.push(...articles);
                     }
                 }
-            }
-        } catch (e) {
-            console.warn(`[useMarketNews] AllOrigins failed for ${source.shortLabel}`);
+            } catch (e) { /* total failure */ }
         }
 
-        // 4. Try CorsProxy.io (Alternative public proxy)
-        try {
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(source.url)}`;
-            const response = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-            if (response.ok) {
-                const xml = await response.text();
-                const articles = parseXMLToArticles(xml, source);
-                if (articles.length > 0) {
-                    writeCache(cacheKey, articles);
-                    return articles;
-                }
-            }
-        } catch (e) {
-            console.warn(`[useMarketNews] CorsProxy.io failed for ${source.shortLabel}`);
+        if (collected.length > 0) {
+            writeCache(cacheKey, collected);
         }
-
-        throw new Error(`All fetch methods failed for ${source.shortLabel}`);
-
-
+        return collected;
     }, []);
+
 
     const fetchAll = useCallback(async (force = false) => {
         // Rate-limit check (skip on initial mount, enforce on manual refresh)
@@ -700,23 +629,29 @@ export function useMarketNews(): UseMarketNewsReturn {
         setStatus('loading');
 
         try {
-            // Fetch all sources in parallel
-            const results = await Promise.allSettled(
-                NEWS_SOURCES.map(src => fetchFromSource(src))
-            );
-
+            // Sequential Fetching with Staggered Delays (Prevents 429 floods)
             const collected: NewsArticle[] = [];
             let anySuccess = false;
             let anyFromCache = false;
 
-            results.forEach((result, i) => {
-                if (result.status === 'fulfilled' && result.value.length > 0) {
-                    const cached = readCache(NEWS_SOURCES[i].shortLabel);
-                    if (cached && cached.age > (NEWS_SOURCES[i].cacheTTL || CACHE_TTL_MS)) anyFromCache = true;
-                    else anySuccess = true;
-                    collected.push(...result.value);
+            for (const src of NEWS_SOURCES) {
+                try {
+                    const articles = await fetchFromSource(src);
+                    if (articles.length > 0) {
+                        const cached = readCache(src.shortLabel);
+                        if (cached && cached.age > (src.cacheTTL || CACHE_TTL_MS)) {
+                            anyFromCache = true;
+                        } else {
+                            anySuccess = true;
+                        }
+                        collected.push(...articles);
+                    }
+                } catch (e) {
+                    console.error(`[useMarketNews] Batch error for ${src.shortLabel}:`, e);
                 }
-            });
+                // Small stagger delay between source requests
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
 
             if (collected.length === 0) {
                 setAllArticles([]);
@@ -797,7 +732,7 @@ export function useMarketNews(): UseMarketNewsReturn {
             const validation = validatePriceClaim(a, epraPrice);
             return {
                 ...a,
-                validationStatus: validation.status,
+                verificationStatus: validation.status === 'flagged' ? 'flagged' : a.verificationStatus,
                 validationLabel: a.validationLabel || validation.label,
                 isUnhighlighted: (validation as any).autoHide || false
             };

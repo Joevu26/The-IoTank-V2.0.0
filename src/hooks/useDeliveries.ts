@@ -46,15 +46,15 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
             // Based on types/index.ts, we might need to parse JSON fields
             const mappedDeliveries = (data || []).map(row => ({
                 id: row.id,
-                ts: row.ts || row.created_at,
-                ts_day: row.ts_day,
+                ts: row.delivery_date || row.created_at,
+                ts_day: row.delivery_date ? row.delivery_date.slice(0, 10) : null,
                 siteId: row.site_id,
                 nodeId: row.node_id,
                 tankId: row.tank_id,
                 product: row.product,
-                supplier: row.supplier,
-                invoiceNo: row.invoice_no,
-                invoiceLiters: row.invoice_liters,
+                supplier: row.supplier_name || row.supplier,
+                invoiceNo: row.bol_number || row.invoice_no,
+                invoiceLiters: row.bol_claimed_volume || row.invoice_liters,
                 measured: typeof row.measured === 'string' ? JSON.parse(row.measured) : row.measured,
                 before: typeof row.before === 'string' ? JSON.parse(row.before) : row.before,
                 after: typeof row.after === 'string' ? JSON.parse(row.after) : row.after,
@@ -84,8 +84,12 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
             .channel(`deliveries-all-${stationId}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'deliveries', filter: `station_id=eq.${stationId}` },
-                () => fetchDeliveries()
+                { event: 'INSERT', schema: 'public', table: 'deliveries' },
+                (payload) => {
+                    if ((payload.new as any)?.station_id === stationId) {
+                        fetchDeliveries();
+                    }
+                }
             )
             .subscribe();
 

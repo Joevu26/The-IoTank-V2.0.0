@@ -5,7 +5,7 @@ import {
     FiShield, FiActivity, FiCheck, FiZap, FiAlertTriangle, FiAlertOctagon, FiSliders, FiBell, FiMail
 } from 'react-icons/fi';
 import './AlertsCenter.css';
-import { useAlerts, resolveAlert, useTanks, updateTank } from '@/hooks/useSupabase';
+import { useAlerts, resolveAlert, useTanks } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { AuditService } from '@/services/AuditService';
 import { NotificationService } from '../../services/NotificationService';
@@ -189,26 +189,6 @@ export const AlertsCenter: React.FC = () => {
         }
     };
 
-    const handleThresholdUpdate = async (tankId: string, type: 'low' | 'critical', value: number) => {
-        try {
-            const updates = type === 'low' 
-                ? { lowLevelThreshold: value } 
-                : { criticalLevelThreshold: value };
-            await updateTank(tankId, updates);
-
-            const tank = tanks.find(t => t.id === tankId);
-            await AuditService.log(
-                'SYSTEM',
-                'THRESHOLD_UPDATED',
-                stationId,
-                `Recalibrated ${type} volume threshold for ${tank?.name || tankId} to ${value}L`,
-                'WARNING',
-                { tankId, type, newValue: value }
-            );
-        } catch (err) {
-            console.error('Threshold update failed:', err);
-        }
-    };
 
 
     return (

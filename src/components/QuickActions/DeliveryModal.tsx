@@ -7,13 +7,15 @@ import { supabase } from '@/config/supabase';
 import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUploadCloud, FiChevronDown } from 'react-icons/fi';
 import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
 import './QuickActions.css';
+import { NotificationService } from '@/services/NotificationService';
 
 interface DeliveryModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onSuccess?: (message: string) => void;
 }
 
-export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose }) => {
+export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, onSuccess }) => {
     const { currentUser } = useAuth();
     const stationId = currentUser?.stationId || '';
     const { tanks } = useTanks(stationId);
@@ -72,7 +74,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
     const executeSubmission = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         if (!currentUser?.stationId) {
-            alert('Organization context missing. Please sign in again.');
+            NotificationService.show('Submission Failed', { body: 'Organization context missing.' });
             return;
         }
 
@@ -102,7 +104,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
             const payload = {
                 station_id: currentUser.stationId,
                 tank_id: formData.tankId,
-                auth_user_id: currentUser.authUserId, // Fully migrated to Supabase Native ID
+                auth_user_id: currentUser.authUserId, 
                 delivery_date: new Date(formData.timestamp).toISOString(),
                 supplier_name: formData.supplier.trim(),
                 bol_number: formData.invoiceNumber.trim() || null,
@@ -111,13 +113,12 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
                 bol_photo_url: invoiceUrl,
                 tank_before_volume: Number(formData.existingVolume),
                 tank_after_volume: Number(formData.totalVolume),
-                actual_received_volume: Number(formData.expectedVolume), // Initial log treats expected as actual
+                actual_received_volume: Number(formData.expectedVolume), 
                 actual_temperature: formData.temperature ? Number(formData.temperature) : null,
                 metadata: {
                     variance: variance,
                     variance_percentage: variancePcnt,
                     variance_reason: formData.varianceReason || null,
-                    // Quality testing data
                     visual_check: formData.visualCheck,
                     water_contamination: {
                         type: formData.waterContaminationType,
@@ -132,55 +133,68 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose })
             const { data: deliveryData, error } = await supabase.from('deliveries').insert([payload]).select().single();
             if (error) throw error;
 
-            // 2. Automatically generate and store a formal Forensic Report
-            if (deliveryData) {
-                const reportPayload = {
-                    station_id: currentUser.stationId,
-                    delivery_id: deliveryData.id,
-                    name: `Delivery Verification - ${formData.supplier.trim()}`,
-                    report_type: 'delivery_verification',
-                    report_data: {
-                        delivery_id: deliveryData.id,
-                        tank_name: selectedTank?.name || 'Unknown',
-                        bol_number: formData.invoiceNumber,
-                        variance: variance,
-                        variance_percentage: variancePcnt,
-                        quality_status: {
-                            visual: formData.visualCheck || 'OK',
-                            water: Number(formData.waterContaminationValue) > 0 ? 'Contaminated' : 'OK',
-                            thermal_gradient: tempGradient
-                        },
-                        timestamp: new Date().toISOString(),
-                        operator: currentUser.displayName
-                    },
-                };
-                
-                // Insert report into database
-                await supabase.from('reports').insert([reportPayload]);
+            // 1. Success Notification & Toast (Local)
+            NotificationService.show('Delivery Successfully Recorded', {
+                body: `Forensic intake for ${formData.expectedVolume}L of ${selectedTank?.fuelType} from ${formData.supplier} has been verified and logged.`,
+                icon: '/favicon.ico'
+            });
+
+            if (onSuccess) {
+                onSuccess(`Inbound delivery reconciliation for ${formData.supplier} completed.`);
             }
 
-            // 🟢 Forensic Log
-            await AuditService.log(
-                'DELIVERY',
-                'DELIVERY_RECORDED',
-                stationId,
-                `Forensic Intake Verified: Stock replenishment recorded from [${formData.supplier}]. Waybill Vol: ${formData.expectedVolume}L to Tank [${selectedTank?.name}]. Reconciliation Variance: ${variance}L.`,
-                Math.abs(variance) > 50 ? 'WARNING' : 'INFO',
-                { 
-                    deliveryId: deliveryData?.id, 
-                    tankId: formData.tankId, 
-                    supplier: formData.supplier,
-                    expectedVolume: formData.expectedVolume,
-                    actualVolume: formData.totalVolume,
-                    variance,
-                    capturedBy: currentUser?.email 
+            // 2. Persistent Systems (Run in background or caught separately)
+            try {
+                // Generate Formal Report
+                if (deliveryData) {
+                    const reportPayload = {
+                        station_id: currentUser.stationId,
+                        delivery_id: deliveryData.id,
+                        name: `Delivery Verification - ${formData.supplier.trim()}`,
+                        report_type: 'delivery_verification',
+                        report_data: {
+                            delivery_id: deliveryData.id,
+                            tank_name: selectedTank?.name || 'Unknown',
+                            bol_number: formData.invoiceNumber,
+                            variance: variance,
+                            variance_percentage: variancePcnt,
+                            quality_status: {
+                                visual: formData.visualCheck || 'OK',
+                                water: Number(formData.waterContaminationValue) > 0 ? 'Contaminated' : 'OK',
+                                thermal_gradient: tempGradient
+                            },
+                            timestamp: new Date().toISOString(),
+                            operator: currentUser.displayName
+                        },
+                    };
+                    await supabase.from('reports').insert([reportPayload]);
                 }
-            );
 
-            alert('Delivery logged successfully and stored as a forensic report.');
+                // Forensic System Log
+                await AuditService.log(
+                    'DELIVERY',
+                    'DELIVERY_RECORDED',
+                    stationId,
+                    `Forensic Intake Verified: Stock replenishment recorded from [${formData.supplier}]. Waybill Vol: ${formData.expectedVolume}L to Tank [${selectedTank?.name}]. Reconciliation Variance: ${variance}L.`,
+                    Math.abs(variance) > 50 ? 'WARNING' : 'INFO',
+                    { 
+                        deliveryId: deliveryData?.id, 
+                        tankId: formData.tankId, 
+                        supplier: formData.supplier,
+                        expectedVolume: formData.expectedVolume,
+                        actualVolume: formData.totalVolume,
+                        variance,
+                        capturedBy: currentUser?.email 
+                    }
+                );
+            } catch (auxErr) {
+                console.warn('[DeliveryModal] Background reporting delay:', auxErr);
+            }
+
             onClose();
         } catch (err: any) {
-            alert(`Failed to log delivery: ${err.message || 'Unknown error'}`);
+             console.error('[DeliveryModal] Verification Error:', err);
+             NotificationService.show('Verification Failed', { body: err.message || 'System error. Please check your connection.' });
         } finally {
             setSubmitting(false);
             setUploadingInvoice(false);

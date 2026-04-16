@@ -8,6 +8,7 @@ import {
     FiGlobe, FiCpu, FiExternalLink, FiChevronDown, FiChevronUp,
     FiLock, FiUnlock, FiEye, FiBarChart2, FiChevronRight, FiFileText, FiPlus
 } from 'react-icons/fi';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import './AuditCompliance.css';
 
 const AuditCompliance: React.FC = () => {
@@ -19,6 +20,14 @@ const AuditCompliance: React.FC = () => {
     const [riskMetrics, setRiskMetrics] = useState<any>(null);
     const [expandedLog, setExpandedLog] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const parentRef = React.useRef<HTMLDivElement>(null);
+    const rowVirtualizer = useVirtualizer({
+        count: auditLogs.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 65,
+        overscan: 5,
+    });
 
     useEffect(() => {
         const fetchData = async () => {
@@ -62,7 +71,10 @@ const AuditCompliance: React.FC = () => {
                     <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" />
                     <input type="text" placeholder="Search by description, resource ID, or IP..." className="support-input pl-12" />
                 </div>
-                <select className="support-input w-auto font-bold opacity-60">
+                <select 
+                    title="Filter by Audit Category" 
+                    className="support-input w-auto font-bold opacity-60"
+                >
                     <option>Category: All</option>
                     <option>System</option>
                     <option>Financial</option>
@@ -70,12 +82,26 @@ const AuditCompliance: React.FC = () => {
                     <option>User Management</option>
                 </select>
                 <div className="flex gap-2">
-                    <input type="date" className="support-input w-auto text-xs" />
-                    <button className="btn-secondary flex items-center gap-2 text-xs"><FiDownload /> Export CSV</button>
+                    <input 
+                        type="date" 
+                        title="Filter by Date" 
+                        className="support-input w-auto text-xs" 
+                    />
+                    <button className="btn-secondary flex items-center gap-2 text-xs" title="Export Audit Logs as CSV"><FiDownload /> Export CSV</button>
                 </div>
             </div>
 
-            <div className="ticket-table-container">
+            <div 
+                className="ticket-table-container custom-scrollbar" 
+                ref={(el) => {
+                    if (el) {
+                        el.style.height = '500px';
+                        el.style.overflow = 'auto';
+                    }
+                    // @ts-expect-error: parentRef.current is read-only in types but writable for initialization
+                    parentRef.current = el;
+                }}
+            >
                 <table className="forensic-table">
                     <thead>
                         <tr>
@@ -89,71 +115,115 @@ const AuditCompliance: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {auditLogs.map(log => (
-                            <React.Fragment key={log.id}>
-                                <tr className="group cursor-pointer hover:bg-white hover:bg-opacity-5" onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}>
-                                    <td className="font-mono text-[10px] opacity-50 whitespace-nowrap">
-                                        {new Date(log.timestamp).toLocaleString([], { hour12: false })}
-                                    </td>
-                                    <td>
-                                        <div className="font-bold text-sm tracking-tight">{log.user_name}</div>
-                                        <div className="text-[10px] opacity-40 uppercase font-black">{log.user_role}</div>
-                                    </td>
-                                    <td>
-                                        <span className={`badge text-[8px] bg-opacity-10 border border-opacity-20 ${log.action_category === 'Financial' ? 'text-amber-500 border-amber-500' : 'text-primary border-primary'}`}>
-                                            {log.action_category}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="font-bold text-xs">{log.action_type}</div>
-                                        <div className="text-[10px] opacity-50 mt-1 max-w-[300px] truncate">{log.description}</div>
-                                    </td>
-                                    <td className="font-mono text-xs opacity-60 italic">{log.ip_address}</td>
-                                    <td>
-                                        <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${log.result === 'success' ? 'text-success' : 'text-danger'}`}>
-                                            {log.result === 'success' ? <FiCheckCircle /> : <FiAlertTriangle />}
-                                            {log.result}
-                                        </div>
-                                    </td>
-                                    <td className="text-right">
-                                        {expandedLog === log.id ? <FiChevronUp /> : <FiChevronDown />}
-                                    </td>
-                                </tr>
-                                {expandedLog === log.id && (
+                        {loading ? (
+                            <tr>
+                                <td colSpan={7} className="p-20 text-center opacity-40">Loading Forensic Logs...</td>
+                            </tr>
+                        ) : auditLogs.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="p-20 text-center opacity-40">
+                                    <FiList className="mx-auto mb-4" size={32} />
+                                    <p className="text-xs font-bold uppercase tracking-widest">No forensic events found</p>
+                                </td>
+                            </tr>
+                        ) : (
+                            <>
+                                {rowVirtualizer.getVirtualItems().length > 0 && (
                                     <tr>
-                                        <td colSpan={7} className="bg-white bg-opacity-5 p-6 animate-slide-down">
-                                            <div className="grid grid-cols-2 gap-8">
-                                                <div>
-                                                    <h5 className="info-label mb-2">Technical Context</h5>
-                                                    <div className="flex flex-col gap-2">
-                                                        <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">Resource ID:</span> <span className="font-mono font-bold">{log.resource_id || 'N/A'}</span></div>
-                                                        <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">User Agent:</span> <span className="opacity-60 truncate max-w-[200px]">{log.user_agent}</span></div>
-                                                        <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">Fingerprint:</span> <span className="font-mono opacity-30">sha256_e3b0...</span></div>
-                                                    </div>
-                                                </div>
-                                                {log.changes && (
-                                                    <div>
-                                                        <h5 className="info-label mb-2">State Transitions (Before / After)</h5>
-                                                        <div className="json-diff-container text-[10px]">
-                                                            {Object.keys(log.changes.after).map(key => (
-                                                                <div key={key} className="diff-field">
-                                                                    <span className="opacity-40">{key}:</span>
-                                                                    <div className="flex gap-2">
-                                                                        <span className="diff-before">{JSON.stringify(log.changes?.before[key])}</span>
-                                                                        <FiChevronRight className="opacity-20" />
-                                                                        <span className="diff-after">{JSON.stringify(log.changes?.after[key])}</span>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
+                                        <td 
+                                            colSpan={7} 
+                                            ref={(el) => {
+                                                if (el) {
+                                                    el.style.padding = '0';
+                                                    el.style.height = `${rowVirtualizer.getVirtualItems()[0].start}px`;
+                                                }
+                                            }} 
+                                        />
                                     </tr>
                                 )}
-                            </React.Fragment>
-                        ))}
+                                {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                                    const log = auditLogs[virtualRow.index];
+                                    return (
+                                        <React.Fragment key={log.id}>
+                                            <tr className="group cursor-pointer hover:bg-white hover:bg-opacity-5" onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)} ref={rowVirtualizer.measureElement} data-index={virtualRow.index}>
+                                                <td className="font-mono text-[10px] opacity-50 whitespace-nowrap">
+                                                    {new Date(log.timestamp).toLocaleString([], { hour12: false })}
+                                                </td>
+                                                <td>
+                                                    <div className="font-bold text-sm tracking-tight">{log.user_name}</div>
+                                                    <div className="text-[10px] opacity-40 uppercase font-black">{log.user_role}</div>
+                                                </td>
+                                                <td>
+                                                    <span className={`badge text-[8px] bg-opacity-10 border border-opacity-20 ${log.action_category === 'Financial' ? 'text-amber-500 border-amber-500' : 'text-primary border-primary'}`}>
+                                                        {log.action_category}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="font-bold text-xs">{log.action_type}</div>
+                                                    <div className="text-[10px] opacity-50 mt-1 max-w-[300px] truncate">{log.description}</div>
+                                                </td>
+                                                <td className="font-mono text-xs opacity-60 italic">{log.ip_address}</td>
+                                                <td>
+                                                    <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${log.result === 'success' ? 'text-success' : 'text-danger'}`}>
+                                                        {log.result === 'success' ? <FiCheckCircle /> : <FiAlertTriangle />}
+                                                        {log.result}
+                                                    </div>
+                                                </td>
+                                                <td className="text-right">
+                                                    {expandedLog === log.id ? <FiChevronUp /> : <FiChevronDown />}
+                                                </td>
+                                            </tr>
+                                            {expandedLog === log.id && (
+                                                <tr>
+                                                    <td colSpan={7} className="bg-white bg-opacity-5 p-6 animate-slide-down">
+                                                        <div className="grid grid-cols-2 gap-8">
+                                                            <div>
+                                                                <h5 className="info-label mb-2">Technical Context</h5>
+                                                                <div className="flex flex-col gap-2">
+                                                                    <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">Resource ID:</span> <span className="font-mono font-bold">{log.resource_id || 'N/A'}</span></div>
+                                                                    <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">User Agent:</span> <span className="opacity-60 truncate max-w-[200px]">{log.user_agent}</span></div>
+                                                                    <div className="flex justify-between text-[10px]"><span className="opacity-40 uppercase">Fingerprint:</span> <span className="font-mono opacity-30">sha256_e3b0...</span></div>
+                                                                </div>
+                                                            </div>
+                                                            {log.changes && (
+                                                                <div>
+                                                                    <h5 className="info-label mb-2">State Transitions (Before / After)</h5>
+                                                                    <div className="json-diff-container text-[10px]">
+                                                                        {Object.keys(log.changes.after).map(key => (
+                                                                            <div key={key} className="diff-field">
+                                                                                <span className="opacity-40">{key}:</span>
+                                                                                <div className="flex gap-2">
+                                                                                    <span className="diff-before">{JSON.stringify(log.changes?.before[key])}</span>
+                                                                                    <FiChevronRight className="opacity-20" />
+                                                                                    <span className="diff-after">{JSON.stringify(log.changes?.after[key])}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                                {rowVirtualizer.getVirtualItems().length > 0 && (
+                                    <tr>
+                                        <td 
+                                            colSpan={7} 
+                                            ref={(el) => {
+                                                if (el) {
+                                                    el.style.padding = '0';
+                                                    el.style.height = `${rowVirtualizer.getTotalSize() - rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1].end}px`;
+                                                }
+                                            }} 
+                                        />
+                                    </tr>
+                                )}
+                            </>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -188,7 +258,7 @@ const AuditCompliance: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {financialTrail.map(trail => (
+                        {financialTrail.length > 0 ? financialTrail.map(trail => (
                             <tr key={trail.id}>
                                 <td className="font-mono text-xs opacity-40">{trail.id}</td>
                                 <td className="font-mono text-[10px] opacity-60">{trail.timestamp}</td>
@@ -210,7 +280,14 @@ const AuditCompliance: React.FC = () => {
                                     <button className="icon-btn" title="View Related Invoice"><FiFileText /></button>
                                 </td>
                             </tr>
-                        ))}
+                        )) : (
+                            <tr>
+                                <td colSpan={8} className="p-20 text-center opacity-40">
+                                    <FiDollarSign className="mx-auto mb-4" size={32} />
+                                    <p className="text-xs font-bold uppercase tracking-widest">No financial audit records found</p>
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
@@ -233,7 +310,10 @@ const AuditCompliance: React.FC = () => {
                             <span className="text-[10px] font-bold opacity-30 uppercase mb-2">/ {cat.total} Active</span>
                         </div>
                         <div className="h-1 bg-white bg-opacity-5 mt-4 rounded-full overflow-hidden">
-                            <div className={`h-full bg-${cat.color}`} style={{width: `${(cat.active/cat.total)*100}%`}}></div>
+                            <div 
+                                className={`h-full bg-${cat.color}`} 
+                                ref={(el) => { if (el) el.style.width = `${(cat.active/cat.total)*100}%`; }}
+                            ></div>
                         </div>
                     </div>
                 ))}
@@ -248,7 +328,7 @@ const AuditCompliance: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {compliance.map(comp => (
+                {compliance.length > 0 ? compliance.map(comp => (
                     <div key={comp.id} className="report-template-card group">
                         <div className="flex items-center gap-6">
                             <div className="w-12 h-12 rounded-2xl bg-white bg-opacity-5 flex items-center justify-center text-2xl text-primary group-hover:bg-primary group-hover:text-black transition-all">
@@ -272,7 +352,12 @@ const AuditCompliance: React.FC = () => {
                              </button>
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="col-span-full py-20 text-center opacity-40 glass-card">
+                        <FiCheckCircle className="mx-auto mb-4 text-success" size={32} />
+                        <p className="text-xs font-bold uppercase tracking-widest">No active compliance permits in registry</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -363,7 +448,12 @@ const AuditCompliance: React.FC = () => {
                     <FiAlertTriangle size={24} className="mx-auto mb-2 text-warning" />
                     <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-1">System Risk Indicators</div>
                     <div className="text-3xl font-black text-warning">MODERATE</div>
-                    <div className="risk-meter"><div className="risk-level risk-med" style={{width: '65%'}}></div></div>
+                    <div className="risk-meter">
+                        <div 
+                            className="risk-level" 
+                            ref={(el) => { if (el) el.style.width = '65%'; }}
+                        ></div>
+                    </div>
                  </div>
                  <div className="glass-card text-center">
                     <FiTarget size={24} className="mx-auto mb-2 text-success" />
@@ -391,29 +481,17 @@ const AuditCompliance: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {[
-                            { name: 'Joseph O.', role: 'Super Admin', volume: 1450, adj: 12, accuracy: 99, risk: 4, color: 'success' },
-                            { name: 'Sarah L.', role: 'Admin Helper', volume: 840, adj: 2, accuracy: 94, risk: 2, color: 'success' },
-                            { name: 'Support Bot', role: 'Automated Bot', volume: 12400, adj: 0, accuracy: 100, risk: 0, color: 'success' }
-                        ].map((admin, i) => (
-                            <tr key={i}>
-                                <td className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-accent-primary flex items-center justify-center text-xs font-black">{admin.name.charAt(0)}</div>
-                                    <div className="font-bold">{admin.name}</div>
-                                </td>
-                                <td><span className="text-[10px] font-black uppercase opacity-40">{admin.role}</span></td>
-                                <td className="font-mono text-xs font-bold">{admin.volume.toLocaleString()}</td>
-                                <td className="font-mono text-xs font-bold text-amber-500">{admin.adj}</td>
-                                <td>
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 h-1 bg-white bg-opacity-5 rounded-full min-w-[50px]"><div className="h-full bg-primary" style={{width: `${admin.accuracy}%`}}></div></div>
-                                        <span className="text-xs font-black">{admin.accuracy}%</span>
-                                    </div>
-                                </td>
-                                <td><span className={`badge text-[8px] bg-${admin.color} bg-opacity-20 text-${admin.color} border-none`}>{admin.risk === 0 ? 'ZERO' : 'LOW'}</span></td>
-                                <td className="text-right"><button className="icon-btn hover:text-primary"><FiEye /></button></td>
-                            </tr>
-                        ))}
+                        {[]}
+                        {/* 
+                          CLEANUP: Removed hardcoded Joseph O., Sarah L., etc.
+                          Accountability table now reflects zero-state pending real administrative linkage.
+                        */}
+                        <tr>
+                            <td colSpan={7} className="p-20 text-center opacity-40">
+                                <FiUser className="mx-auto mb-4" size={32} />
+                                <p className="text-xs font-bold uppercase tracking-widest">No administrative entities mapped for behavioral scoring</p>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
              </div>

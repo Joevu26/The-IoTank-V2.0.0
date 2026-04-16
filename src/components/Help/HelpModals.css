@@ -1,0 +1,12 @@
+.diagnostic-progress-container {
+    height: 0.5rem;
+    background-color: #f1f5f9;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.diagnostic-progress-bar {
+    height: 100%;
+    background-color: var(--color-accent, #3b82f6);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
