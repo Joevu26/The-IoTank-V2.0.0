@@ -55,9 +55,9 @@ export const LoginForm: React.FC = () => {
 
                 // 🟢 Forensic Log
                 await AuditService.log(
-                    'AUTH',
+                    'SECURITY',
                     'LOGIN',
-                    userCredential.user.user_metadata?.station_id || 'SYSTEM',
+                    userCredential.user.user_metadata?.station_id || '',
                     `Identity verification successful for ${email}`,
                     'INFO',
                     { method: 'PASSWORD', email }
@@ -337,21 +337,21 @@ export const LoginForm: React.FC = () => {
 
                                         <div className="form-group-utility flex items-center justify-between mb-8 mt-2 px-1">
                                             <label className="remember-me-toggle flex items-center gap-3 cursor-pointer group">
-                                                <div className="relative flex items-center">
+                                                <div className="checkbox-custom-wrapper relative flex items-center">
                                                     <input 
                                                         type="checkbox" 
                                                         defaultChecked 
-                                                        className="peer appearance-none w-5 h-5 rounded-md border-2 border-slate-200/50 bg-white/10 checked:bg-blue-500 checked:border-blue-500 transition-all duration-200 cursor-pointer"
+                                                        className="peer appearance-none w-5 h-5 rounded-md border-2 border-slate-200/50 bg-white/10 checked:bg-indigo-600 checked:border-indigo-600 transition-all duration-200 cursor-pointer"
                                                     />
                                                     <svg className="absolute w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 pointer-events-none left-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                     </svg>
                                                 </div>
-                                                <span className="text-[11px] font-black text-slate-500 group-hover:text-blue-500 transition-colors uppercase tracking-widest select-none">Stay Signed In</span>
+                                                <span className="text-[11px] font-black text-slate-500 group-hover:text-indigo-600 transition-colors uppercase tracking-widest select-none">Stay Signed In</span>
                                             </label>
-                                            <Link to="/forgot-password" title="Recover account access" className="lost-access-action-btn flex items-center gap-2 text-[10px] font-black text-white uppercase tracking-[0.15em] py-2.5 px-5 rounded-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 shadow-[0_4px_15px_-5px_rgba(244,63,94,0.4)] hover:shadow-[0_6px_20px_-5px_rgba(244,63,94,0.6)] active:scale-95 transition-all">
-                                                <FaLock className="text-[12px]" />
-                                                Lost Access?
+                                            <Link to="/forgot-password" title="Recover account access" className="forgot-password-action-link flex items-center gap-2 text-[10px] font-black text-slate-600 uppercase tracking-[0.15em] py-2 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 hover:text-indigo-600 active:scale-95 transition-all shadow-sm border border-slate-200">
+                                                <FaLock className="text-[11px] opacity-60" />
+                                                Forgot Password?
                                             </Link>
                                         </div>
 

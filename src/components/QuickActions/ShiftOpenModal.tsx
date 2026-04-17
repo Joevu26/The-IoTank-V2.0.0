@@ -7,6 +7,8 @@ import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { AuditService } from '@/services/AuditService';
+import { validateIdleStability } from '@/utils/telemetryMath';
+import { differenceInHours } from 'date-fns';
 import './ShiftOpenModal.css';
 
 interface ShiftOpenModalProps {
@@ -29,6 +31,73 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
         setIsStarting(true);
         try {
+            // 0. Forensic Handshake: Detect Idle Gaps (Leak/Theft while closed)
+            const { data: lastShift } = await supabase
+                .from('shift_closures')
+                .select('closed_at, pump_readings')
+                .eq('station_id', currentUser.stationId)
+                .order('closed_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            if (lastShift) {
+                const closedAt = new Date(lastShift.closed_at);
+                const hrsClosed = Math.max(0.1, differenceInHours(now, closedAt));
+                const prevReadings = lastShift.pump_readings || {};
+
+                tanks.forEach(async (tank) => {
+                    // Search for this tank's closure in the polymorphic pumpReadings object
+                    // In ShiftCloseModal, it's saved as: pumpReadings[t.name] = { start, end }
+                    const tankClosureData = prevReadings[tank.name];
+                    const prevCloseVol = tankClosureData?.end;
+                    const currentOpenVol = readings[tank.id]?.volumeCorrected || readings[tank.id]?.volume || tank.currentVolume || 0;
+
+                    if (prevCloseVol !== undefined) {
+                        const forensic = validateIdleStability(prevCloseVol, currentOpenVol, hrsClosed);
+                        
+                        // Notify UI of the change immediately
+                        window.dispatchEvent(new CustomEvent('system-toast', {
+                            detail: {
+                                title: `Idle Sync: ${tank.name}`,
+                                message: `Fuel change during closed shift: ${forensic.delta.toFixed(1)} L (${forensic.rateLhr.toFixed(2)} L/hr)`,
+                                type: forensic.isTheft ? 'error' : (forensic.isLeak ? 'warning' : 'info'),
+                                attribution: 'FORENSIC AUDIT'
+                            }
+                        }));
+
+                        if (forensic.isTheft || forensic.isLeak) {
+                            const violationType = forensic.isTheft ? 'theft-detected' : 'leak-detected';
+                            const severity = forensic.isTheft ? 'critical' : 'warning';
+                            const title = forensic.isTheft ? '🔴 THEFT ALERT' : '⚠️ PRECISION LEAK';
+                            const message = forensic.isTheft 
+                                ? `Forensic Gap: Unexpected drop of ${Math.abs(forensic.delta).toFixed(1)}L detected during idle hours. SUSPECTED THEFT.`
+                                : `Precision Leak: Constant loss of ${forensic.rateLhr.toFixed(2)}L/hr detected while station was closed.`;
+
+                            // Trigger Forensic Alert for Action Queue
+                            await supabase.from('alerts').insert({
+                                station_id: currentUser.stationId,
+                                tank_id: tank.id,
+                                alert_type: violationType,
+                                severity: severity,
+                                title: title,
+                                message: message,
+                                timestamp: nowString,
+                                alert_data: { delta: forensic.delta, rate: forensic.rateLhr, closedDuration: hrsClosed }
+                            });
+
+                            await AuditService.log(
+                                'SECURITY',
+                                forensic.isTheft ? 'THEFT_DETECTED' : 'LEAK_DETECTED',
+                                currentUser.stationId,
+                                `Forensic alert for ${tank.name}: ${message}`,
+                                forensic.isTheft ? 'CRITICAL' : 'WARNING', 
+                                { forensic, tankId: tank.id }
+                            );
+                        }
+                    }
+                });
+            }
+
             // 1. Update stateless shift tracker in DB
             const { error: shiftError } = await supabase
                 .from('current_station_shifts')

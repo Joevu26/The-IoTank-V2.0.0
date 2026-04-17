@@ -938,12 +938,50 @@
 }
 
 .login-btn-submit-animated {
-    min-width: 220px;
-    height: 48px;
-    margin: 0 auto;
+    min-width: 260px;
+    height: 52px;
+    margin: 0.8rem auto 0;
     display: flex;
     justify-content: center;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+    background-size: 200% auto;
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    box-shadow: 0 6px 20px -4px rgba(79, 70, 229, 0.4);
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+}
+
+.login-btn-submit-animated:hover:not(:disabled) {
+    background-position: right center;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 25px -4px rgba(79, 70, 229, 0.5);
+}
+
+.login-btn-submit-animated:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.forgot-password-action-link {
+    transition: all 0.2s ease;
+}
+
+.forgot-password-action-link:hover {
+    border-color: rgba(79, 70, 229, 0.3) !important;
+    background: white !important;
+    text-decoration: none !important;
+}
+
+.checkbox-custom-wrapper input:checked ~ svg {
+    animation: checkmark-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes checkmark-pop {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 .hidden-honey-pot {
@@ -966,6 +1004,34 @@
 
 .shake {
   animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.btn-secondary.btn-google {
+    background: white;
+    border: 1.5px solid #e2e8f0;
+    color: #475569;
+    font-size: 0.9rem;
+    height: 50px;
+    max-width: 260px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    gap: 12px;
+}
+
+.btn-secondary.btn-google:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.06);
+}
+
+.btn-secondary.btn-google svg {
+    font-size: 1.1rem;
+    color: #4285F4; /* Google Blue */
+}
+
+.remember-me-toggle span {
+    font-size: 0.75rem !important; /* Slightly larger for readability */
+    letter-spacing: 0.1em !important;
 }
 
 /* Safari Compatibility Fixes */

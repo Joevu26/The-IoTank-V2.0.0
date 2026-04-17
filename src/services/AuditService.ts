@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
 
-export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'AUTH' | 'SYSTEM' | 'CALIBRATION' | 'SECURITY' | 'ORDER';
+export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'SECURITY' | 'SYSTEM' | 'FINANCE' | 'AI' | 'CALIBRATION';
 
 export type EventType =
     | 'LOGIN'
@@ -34,7 +34,9 @@ export type EventType =
     | 'UNAUTHORIZED_ACCESS_ATTEMPT'
     | 'DEVICE_COMMAND'
     | 'ORDER_REQUESTED'
-    | 'ORDER_CANCELLED';
+    | 'ORDER_CANCELLED'
+    | 'THEFT_DETECTED'
+    | 'LEAK_DETECTED';
 
 export interface UnifiedEvent {
     category: EventCategory;
@@ -66,8 +68,12 @@ export class AuditService {
                 return;
             }
 
+            // 🟢 Forensic Intelligence Sanitization: Ensure stationId is a valid UUID or null
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            const validStationId = uuidRegex.test(stationId) ? stationId : null;
+
             const { error } = await supabase.from('unified_events').insert({
-                station_id: stationId || null,
+                station_id: validStationId,
                 actor_id: user.id,
                 actor_email: user.email,
                 event_category: category,

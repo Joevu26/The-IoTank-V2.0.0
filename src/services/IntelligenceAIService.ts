@@ -15,6 +15,14 @@ export interface AIProviderConfig {
     deepseek?: { apiKey: string };
 }
 
+export interface ArticleAIDirective {
+    status: 'CRITICAL' | 'CAUTION' | 'STABLE';
+    recommendation: string;
+    actionRequired: boolean;
+    actionDetails?: string;
+    confidence: number;
+}
+
 export class IntelligenceAIService {
     constructor(_config?: AIProviderConfig) {
         // AI proxy securely handles configuration now
@@ -53,7 +61,7 @@ export class IntelligenceAIService {
 
         for (const provider of providers) {
             try {
-                const response = await this.callProvider(provider, context);
+                const response = await this.callProvider(provider, context, 'intelligence');
                 if (response) {
                     return this.parseResponse(provider as any, response, promptLog, provider, signals, risks, tankId);
                 }
@@ -64,6 +72,54 @@ export class IntelligenceAIService {
         }
 
         throw new Error('All AI providers failed to generate insights.');
+    }
+
+    /**
+     * TankIQ: Generate a specific directive for a new market signal based on tank levels
+     */
+    async generateArticleDirective(
+        article: any,
+        tanks: any[]
+    ): Promise<ArticleAIDirective> {
+        const tankData = (tanks || []).map(t => ({ 
+            id: t.id, 
+            name: t.name, 
+            fuel: t.fuelType, 
+            level: t.currentLevel 
+        }));
+
+        const context = {
+            signal: {
+                title: article.title,
+                summary: article.summary,
+                source: article.feedSource,
+                category: article.implicationCategory
+            },
+            inventory: tankData,
+            timestamp: Date.now()
+        };
+
+        const providers: (keyof AIProviderConfig)[] = ['gemini', 'groq', 'deepseek'];
+
+        for (const provider of providers) {
+            try {
+                const response = await this.callProvider(provider, context, 'directive');
+                if (response) {
+                    return this.parseDirectiveResponse(provider, response);
+                }
+            } catch (error) {
+                console.warn(`TankIQ (${provider}): Failed to generate directive, falling back...`, error);
+                continue;
+            }
+        }
+
+        // Final Fallback: Return a safe neutral directive if all AI fails
+        return {
+            status: 'STABLE',
+            recommendation: 'Market signal detected. AI failover exhausted. Monitor manually.',
+            actionRequired: false,
+            confidence: 0
+        };
     }
 
     /**
@@ -104,27 +160,33 @@ export class IntelligenceAIService {
         }
     }
 
-    private async callProvider(provider: keyof AIProviderConfig, context: any): Promise<string | null> {
+    private async callProvider(
+        provider: keyof AIProviderConfig, 
+        context: any, 
+        type: 'intelligence' | 'directive'
+    ): Promise<string | null> {
+        const endpoint = type === 'directive' ? 'directive' : 'intelligence';
+        
         switch (provider) {
             case 'gemini':
-                return this.callGemini(context);
+                return this.callGemini(context, endpoint);
             case 'groq':
-                return this.callGroq(context);
+                return this.callGroq(context, endpoint);
             case 'deepseek':
-                return this.callDeepSeek(context);
+                return this.callDeepSeek(context, endpoint);
             default:
                 return null;
         }
     }
 
-    private async callGemini(context: any): Promise<string> {
+    private async callGemini(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
             const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/gemini-proxy', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    action: 'intelligence',
+                    action: actionType === 'directive' ? 'intelligence' : actionType,
                     context,
                     endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
@@ -146,14 +208,14 @@ export class IntelligenceAIService {
         }
     }
 
-    private async callGroq(context: any): Promise<string> {
+    private async callGroq(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
             const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/groq-proxy', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    action: 'intelligence',
+                    action: actionType === 'directive' ? 'intelligence' : actionType,
                     context,
                     body: {
                         model: 'llama-3.3-70b-versatile',
@@ -175,14 +237,14 @@ export class IntelligenceAIService {
         }
     }
 
-    private async callDeepSeek(context: any): Promise<string> {
+    private async callDeepSeek(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
             const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/deepseek-proxy', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    action: 'chat',
+                    action: actionType === 'directive' ? 'intelligence' : (actionType === 'intelligence' ? 'intelligence' : 'chat'),
                     body: {
                         model: 'deepseek-chat',
                         messages: [
@@ -208,6 +270,41 @@ export class IntelligenceAIService {
         }
     }
 
+    private parseDirectiveResponse(provider: string, text: string): ArticleAIDirective {
+        try {
+            const cleanedText = this.cleanJSONResponse(text);
+            const data = JSON.parse(cleanedText);
+            
+            return {
+                status: (data.status || 'STABLE').toUpperCase() as any,
+                recommendation: data.recommendation || data.text || 'Monitor market conditions.',
+                actionRequired: !!data.actionRequired || !!data.suggestsAction,
+                actionDetails: data.actionDetails || data.details,
+                confidence: data.confidence || 0.85
+            };
+        } catch (e) {
+            console.error(`[IntelligenceAIService] Directive parsing failure for ${provider}:`, e);
+            throw new Error('AI response format invalid for directive');
+        }
+    }
+
+    private cleanJSONResponse(text: string): string {
+        let cleanedText = text.trim();
+        if (cleanedText.startsWith('```json')) {
+            cleanedText = cleanedText.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (cleanedText.startsWith('```')) {
+            cleanedText = cleanedText.replace(/^```/, '').replace(/```$/, '').trim();
+        }
+
+        const startIndex = cleanedText.indexOf('{');
+        const endIndex = cleanedText.lastIndexOf('}');
+        
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            return cleanedText.substring(startIndex, endIndex + 1);
+        }
+        return cleanedText;
+    }
+
     private parseResponse(
         _unused: any,
         text: string,
@@ -218,28 +315,8 @@ export class IntelligenceAIService {
         tankId: string
     ): GeminiInsight {
         try {
-            // Robust JSON Extraction
-            let cleanedText = text.trim();
-            if (cleanedText.startsWith('```json')) {
-                cleanedText = cleanedText.replace(/^```json/, '').replace(/```$/, '').trim();
-            } else if (cleanedText.startsWith('```')) {
-                cleanedText = cleanedText.replace(/^```/, '').replace(/```$/, '').trim();
-            }
-
-            let advisory: any;
-            try {
-                advisory = JSON.parse(cleanedText);
-            } catch (jsonErr) {
-                const startIndex = cleanedText.indexOf('{');
-                const endIndex = cleanedText.lastIndexOf('}');
-                
-                if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-                    const jsonCandidate = cleanedText.substring(startIndex, endIndex + 1);
-                    advisory = JSON.parse(jsonCandidate);
-                } else {
-                    throw jsonErr;
-                }
-            }
+            const cleanedText = this.cleanJSONResponse(text);
+            const advisory = JSON.parse(cleanedText);
 
             return {
                 id: `ai-${Date.now()}-${provider}`,

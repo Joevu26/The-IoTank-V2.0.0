@@ -226,32 +226,41 @@
 .tank-viz-container {
     flex: 1;
     width: 100%;
-    background: #F1F5F9;
-    border-radius: 12px;
+    background: #e2e8f0; /* Darker grey for better visibility */
+    border-radius: 99px; /* More pill-shaped */
     position: relative;
     overflow: hidden;
     margin-bottom: 16px;
-    border: 2px solid #E2E8F0;
+    border: 3px solid #cbd5e1;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
 
+/* Fuel Color Gradients */
+.tank-fluid.petrol { background: linear-gradient(180deg, #fbbf24, #d97706); }
+.tank-fluid.diesel { background: linear-gradient(180deg, #10b981, #047857); }
+.tank-fluid.kerosene { background: linear-gradient(180deg, #3b82f6, #1d4ed8); }
+.tank-fluid.vpower { background: linear-gradient(180deg, #ef4444, #b91c1c); }
+
 .tank-fluid {
-    position: absolute;
-    bottom: 0;
-    left: 0;
     width: 100%;
-    background: linear-gradient(180deg, #3B82F6, #1D4ED8);
-    transition: height 0.5s ease;
+    transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .liquid-wave {
     position: absolute;
-    top: -10px;
+    top: -12px;
     left: 0;
     width: 200%;
-    height: 20px;
-    background: rgba(59, 130, 246, 0.3);
-    border-radius: 40%;
+    height: 25px;
+    background: inherit;
+    opacity: 0.4;
+    border-radius: 45%;
     animation: waveFlow 4s infinite linear;
+    filter: blur(1px);
 }
 
 @keyframes waveFlow {

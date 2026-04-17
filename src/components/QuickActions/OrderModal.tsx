@@ -66,7 +66,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSucce
 
             // 1. Fire and monitor the log (The primary record for orders)
             await AuditService.log(
-                'ORDER',
+                'FINANCE',
                 'ORDER_REQUESTED',
                 stationId,
                 `Strategic Order Broadcast: ${formData.quantity}L of ${productType} requested from ${formData.supplier}. Expected delivery: ${formData.expectedDate}`,

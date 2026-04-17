@@ -26,7 +26,7 @@
     color: #a855f7;
     background: rgba(168, 85, 247, 0.08);
     padding: 0.25rem 0.75rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--border-radius-md);
     border: 1px solid rgba(168, 85, 247, 0.15);
     margin-bottom: 0.75rem;
 }
@@ -74,9 +74,9 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1.25rem;
-    background: var(--color-bg-primary);
-    border-radius: var(--radius-xl);
+    padding: 1rem;
+    background: #FFFFFF;
+    border-radius: var(--border-radius-xl);
     border: 1px solid var(--color-border);
     transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
@@ -179,14 +179,19 @@
 
 /* ── Section cards (white, portal aesthetic) ─────────────────── */
 .acp-card {
-    background: rgba(255, 255, 255, 0.7);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    border-radius: var(--radius-xl);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    padding: 1.75rem;
+    background: #FFFFFF;
+    border-radius: var(--border-radius-xl);
+    border: 1px solid var(--color-border);
+    padding: 1.25rem;
     box-shadow: 0 4px 15px -1px rgba(0, 0, 0, 0.05);
     transition: all var(--transition-base);
+}
+
+.acp-hub-card {
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: var(--border-radius-lg);
+    padding: 1.25rem;
 }
 
 .acp-card:hover {

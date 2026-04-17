@@ -374,11 +374,16 @@
     right: -4px !important;
     background: #ef4444 !important;
     color: #fff !important;
-    font-size: 0.6rem !important;
-    font-weight: 900 !important;
-    padding: 2px 4px !important;
-    border-radius: 4px !important;
+    font-size: 0.65rem !important;
+    font-weight: 800 !important;
+    padding: 2px 5px !important;
+    border-radius: 999px !important; /* Perfect circle/pill */
     border: 2px solid #fff !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .profile-btn {
@@ -426,15 +431,13 @@
     top: calc(100% + 12px) !important;
     right: -10px !important;
     background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important; /* Slightly darker border for distinction */
     border-radius: 12px !important;
-    /* Soft Neomorphic floating shadow */
+    /* High-elevation industrial shadow */
     box-shadow:
-        0 10px 15px -3px rgba(0, 0, 0, 0.05),
-        0 20px 25px -5px rgba(0, 0, 0, 0.03),
-        0 0 0 1px rgba(0, 0, 0, 0.02) !important;
+        0 20px 50px -12px rgba(0, 0, 0, 0.2),
+        0 0 0 1px rgba(0, 0, 0, 0.05) !important;
     width: 320px !important;
-    /* Slightly wider for better text flow */
     overflow: hidden !important;
     z-index: 10000 !important;
     animation: dropdownPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
@@ -468,7 +471,10 @@
 }
 
 .modern-dropdown.notifications-dropdown {
-    width: 360px !important;
+    width: 380px !important;
+    max-height: 520px !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 .modern-dropdown.quick-actions-dropdown {
@@ -476,15 +482,32 @@
 }
 
 .modern-dropdown .dropdown-header {
-    padding: 20px 24px 16px 24px !important;
-    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 153, 238, 0.05) 100%) !important;
-    border-bottom: 1px solid rgba(0, 212, 255, 0.15) !important;
-    border-radius: 24px 24px 0 0 !important;
+    padding: 24px !important;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 1) 0%, rgba(241, 245, 249, 0.5) 100%) !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 4px !important;
-    margin-bottom: 12px !important;
-    position: relative !important;
+    align-items: center !important; /* Centered Header */
+    text-align: center !important;
+    gap: 8px !important;
+}
+
+.notif-header h3 {
+    font-size: 1.2rem !important;
+    font-weight: 900 !important;
+    color: #1e1b4b !important;
+    margin: 0 !important;
+    letter-spacing: -0.03em !important;
+}
+
+.notif-badge-inline {
+    background: #ecfeff !important;
+    color: #0891b2 !important;
+    padding: 2px 10px !important;
+    border-radius: 99px !important;
+    font-size: 0.7rem !important;
+    font-weight: 800 !important;
+    border: 1px solid #cffafe !important;
 }
 
 .modern-dropdown .dropdown-header h3 {
@@ -519,6 +542,27 @@
 .notifications-dropdown .dropdown-content {
     padding-bottom: 10px !important;
     flex: 1 !important;
+    overflow-y: auto !important;
+    max-height: 420px !important;
+    padding: 0 4px !important;
+}
+
+/* Premium Scrollbar for High-Density Alerts */
+.notifications-dropdown .dropdown-content::-webkit-scrollbar {
+    width: 5px !important;
+}
+
+.notifications-dropdown .dropdown-content::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.notifications-dropdown .dropdown-content::-webkit-scrollbar-thumb {
+    background: #e2e8f0 !important;
+    border-radius: 10px !important;
+}
+
+.notifications-dropdown .dropdown-content::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1 !important;
 }
 
 .notifications-list-container {
@@ -727,35 +771,62 @@
 }
 
 .notification-title {
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    color: #1e1b4b !important;
     line-height: 1.4 !important;
     display: flex !important;
-    align-items: flex-start !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.notif-placeholder {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.1rem !important;
+    position: relative !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
+}
+
+/* Category Colors */
+.cat-security .notif-placeholder { background: #fee2e2 !important; color: #ef4444 !important; }
+.cat-shift .notif-placeholder { background: #ecfeff !important; color: #0891b2 !important; }
+.cat-delivery .notif-placeholder { background: #f0fdf4 !important; color: #16a34a !important; }
+.cat-team .notif-placeholder { background: #fffbeb !important; color: #d97706 !important; }
+.cat-system .notif-placeholder { background: #f8fafc !important; color: #475569 !important; }
+
+.notification-body {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
 }
 
 .btn-mark-read {
-    background: rgba(255,255,255,0.8) !important;
-    border: 1px solid rgba(0, 212, 255, 0.15) !important;
-    padding: 2px !important;
-    border-radius: 6px !important;
-    color: #00d4ff !important;
+    background: #10b981 !important; /* Solid Emerald Circle */
+    border: none !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    border-radius: 50% !important;
+    color: white !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: all 0.2s !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2) !important;
 }
 
 .btn-mark-read:hover {
-    color: #0099ee !important;
-    background: #f0f9ff !important;
-    border-color: rgba(0, 212, 255, 0.35) !important;
-    transform: scale(1.05);
+    transform: scale(1.15) !important;
+    box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3) !important;
+    background: #059669 !important;
 }
 
 .notification-time {
@@ -764,13 +835,21 @@
     margin-top: 2px !important;
 }
 
+.dropdown-footer {
+    padding: 16px !important;
+    background: #f8fafc !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.05) !important;
+    display: flex !important;
+    justify-content: center !important;
+}
+
 .btn-open-alerts {
     background: linear-gradient(135deg, #00d4ff 0%, #3b82f6 100%) !important;
     color: white !important;
     font-weight: 900 !important;
-    border-radius: 99px !important;
-    padding: 12px 32px !important;
-    box-shadow: 0 10px 20px -5px rgba(0, 212, 255, 0.4) !important;
+    border-radius: 12px !important; /* Matching standard card rounding */
+    padding: 10px 24px !important;
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3) !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
     font-size: 11px !important;
     letter-spacing: 0.1em !important;
@@ -778,8 +857,9 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: 100% !important;
+    width: calc(100% - 32px) !important;
     border: none !important;
+    cursor: pointer !important;
 }
 
 .btn-open-alerts:hover {

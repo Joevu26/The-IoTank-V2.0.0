@@ -16,9 +16,9 @@ BEGIN
     -- Only proceed if it's a sensor_readings insert
     SELECT client_id INTO v_client_id FROM tanks WHERE id = NEW.tank_id;
     
-    -- Check Low Level
+    -- Check Low Level: Percentage-based comparison (ambient_volume <= % threshold of capacity)
     BEGIN
-        IF NEW.ambient_volume <= (SELECT low_level_threshold FROM tanks WHERE id = NEW.tank_id) THEN
+        IF NEW.ambient_volume <= (SELECT (low_level_threshold / 100.0) * tank_capacity FROM tanks WHERE id = NEW.tank_id) THEN
             INSERT INTO public.alerts (client_id, tank_id, alert_type, severity, title, message)
             VALUES (
                 v_client_id, 

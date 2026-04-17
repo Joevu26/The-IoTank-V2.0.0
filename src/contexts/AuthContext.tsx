@@ -300,11 +300,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
                 } else {
                     console.log("[DEBUG_LOG] BOOT: No active session. Public flight mode.");
-                    setLoading(false);
+                    updateLoadingState(false);
                 }
             } catch (error) {
                 console.error("[DEBUG_LOG] BOOT: Handshake failed:", error);
-                setLoading(false);
+                updateLoadingState(false);
             } finally {
                 isBootingRef.current = false;
                 handshakeInProgressRef.current = false;
@@ -426,7 +426,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
              const userMeta = data.user.user_metadata || {};
              const dbStationId = userMeta.station_id || '';
              AuditService.log(
-                 'AUTH',
+                 'SECURITY',
                  'LOGIN',
                  dbStationId,
                  `User ${email} authenticated successfully.`,
@@ -537,7 +537,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const signOut = async () => {
         if (currentUser) {
             AuditService.log(
-                'AUTH',
+                'SECURITY',
                 'LOGOUT',
                 currentUser.stationId || '',
                 `User ${currentUser.email} ended their session.`,

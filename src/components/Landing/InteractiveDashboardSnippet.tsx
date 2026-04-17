@@ -96,7 +96,10 @@ const InteractiveDashboardSnippet: React.FC = () => {
             <div className="dash-card-mock main-tank">
               <div className="card-label-mock">Tank #1: Super Petrol</div>
               <div className="tank-viz-container">
-                <div className="tank-fluid" style={{ height: `${(tankLevel / 20000) * 100}%` }}>
+                <div 
+                  className={`tank-fluid ${tankLevel > 15000 ? 'petrol' : 'vpower'}`} 
+                  style={{ height: `${(tankLevel / 20000) * 100}%` }}
+                >
                   <div className="liquid-wave"></div>
                 </div>
               </div>

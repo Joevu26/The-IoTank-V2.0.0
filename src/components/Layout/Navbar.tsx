@@ -477,47 +477,48 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                 Active Risk Vectors
                                             </div>
                                         )}
-                                        {unreadAlerts.map((alert: Alert) => (
-                                            <div
-                                                key={alert.id}
-                                                className={`notification-item ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'} ${resolvingIds.has(alert.id) ? 'resolving-out' : ''}`}
-                                                onClick={() => {
-                                                    navigate('/alerts');
-                                                    setShowNotifications(false);
-                                                }}
-                                            >
-                                                <div className="notification-title">
-                                                    <span className="flex items-center gap-2">
-                                                        <span className="text-lg">
-                                                            {alert.message.includes('Started') ? '🏁' :
-                                                             alert.message.includes('Closed') || alert.message.includes('Closure') ? '🚩' :
-                                                             alert.message.includes('THEFT') ? '🚨' :
+                                        {unreadAlerts.map((alert: Alert) => {
+                                            const category = alert.severity === 'critical' || alert.message.includes('THEFT') || alert.message.includes('LEAK') ? 'security' : 
+                                                           alert.type === 'low-level' ? 'delivery' : 'system';
+                                            return (
+                                                <div
+                                                    key={alert.id}
+                                                    className={`notification-item cat-${category} ${!alert.resolved ? 'unread' : ''} severity-${alert.severity || 'info'} ${resolvingIds.has(alert.id) ? 'resolving-out' : ''}`}
+                                                    onClick={() => {
+                                                        navigate('/alerts');
+                                                        setShowNotifications(false);
+                                                    }}
+                                                >
+                                                    <div className="notification-title">
+                                                        <div className="notif-placeholder">
+                                                            {alert.message.includes('THEFT') ? '🚨' :
                                                              alert.message.includes('LEAK') ? '💧' :
-                                                             alert.message.includes('COLLUSION') ? '🤝' :
-                                                             alert.type === 'low-level' ? '📉' :
-                                                             alert.type === 'anomaly' ? '⚠️' : '🔔'}
-                                                        </span>
-                                                        {alert.message.split('.')[0]}
-                                                    </span>
-                                                    <button
-                                                        className="btn-mark-read hover:bg-emerald-50 hover:text-emerald-600 transition-colors bg-slate-100 rounded-full p-1.5"
-                                                        onClick={(e) => handleResolve(e, alert.id)}
-                                                        title="Mark as acknowledge"
-                                                    >
-                                                        <MdCheck size={18} className="text-emerald-500 font-bold" />
-                                                    </button>
+                                                             alert.type === 'low-level' ? '📉' : '⚠️'}
+                                                        </div>
+                                                        <div className="notification-body">
+                                                            <span className="font-black text-[13px] leading-tight block mb-1">
+                                                                {alert.message.split('.')[0]}
+                                                            </span>
+                                                            <div className="notification-meta flex justify-between items-center opacity-70">
+                                                                <span className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-tighter">
+                                                                    {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </span>
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/5 font-black uppercase">
+                                                                    {alert.severity || 'INFO'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            className="btn-mark-read hover:bg-emerald-50 hover:text-emerald-600 transition-colors bg-slate-100 rounded-full p-1.5 ml-2"
+                                                            onClick={(e) => handleResolve(e, alert.id)}
+                                                            title="Mark as acknowledge"
+                                                        >
+                                                            <MdCheck size={14} className="text-emerald-500 font-bold" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="notification-meta flex justify-between items-center mt-2 px-1">
-                                                    <span className="text-[10px] font-semibold text-gray-400 flex items-center gap-1">
-                                                        <MdCircle size={6} className={alert.severity === 'critical' ? 'text-red-500' : 'text-blue-500'} />
-                                                        {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 font-bold text-gray-500 border border-gray-200/50">
-                                                        {alert.detectionMethod === 'ai-assisted' ? '🤖 AI AGENT' : 'SYSTEM'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
 
                                         {/* Forensic Audit Section */}
                                         <div className="px-4 py-2 text-[11px] font-bold text-[#1e1b4b] uppercase tracking-wider border-b border-t border-slate-100 bg-[#f8fafc] sticky top-0 z-10">
@@ -529,30 +530,37 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                 const mins = Math.max(Math.floor(ms / 60000), 1);
                                                 return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
                                             };
+                                            const category = event.event_category?.toLowerCase() || 'system';
                                             return (
-                                                <div key={event.id} className={`mx-3 my-2 bg-white rounded-xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.1)] border border-slate-100 p-3 transition-all duration-300 ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="flex items-center gap-2 text-slate-500">
-                                                            {event.event_category === 'SHIFT' ? <FiClock size={14} /> :
-                                                             event.event_category === 'DELIVERY' ? <FiTrendingDown size={14} /> :
-                                                             event.event_category === 'SECURITY' ? <FiShield size={14} /> :
-                                                             event.event_category === 'TEAM' ? <FiUserPlus size={14} /> : <FiInfo size={14} />}
-                                                            <span className="text-[13px] uppercase text-[#1e1b4b] font-medium">{event.event_category}</span>
+                                                <div key={event.id} className={`notification-item cat-${category} ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
+                                                    <div className="notification-title">
+                                                        <div className="notif-placeholder">
+                                                            {event.event_category === 'SHIFT' ? <FiClock /> :
+                                                             event.event_category === 'DELIVERY' ? <FiTrendingDown /> :
+                                                             event.event_category === 'SECURITY' ? <FiShield /> :
+                                                             event.event_category === 'TEAM' ? <FiUserPlus /> : <FiInfo />}
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[13px] font-bold text-[#1e1b4b]">{toRelative(event.created_at)}</span>
-                                                            <button
-                                                                className="rounded-[4px] border border-slate-200 text-[#1e1b4b] hover:text-emerald-600 hover:border-emerald-200 transition-colors flex items-center justify-center w-[20px] h-[20px] bg-white"
-                                                                onClick={(e) => handleResolveEvent(e, event.id)}
-                                                                title="Mark as acknowledge"
-                                                            >
-                                                                <MdCheck size={12} />
-                                                            </button>
+                                                        <div className="notification-body">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                                                    {event.event_category || 'Log Entry'}
+                                                                </span>
+                                                                <span className="text-[10px] font-black text-[#1e1b4b] opacity-60">
+                                                                    {toRelative(event.created_at)}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-[12px] text-[#1e1b4b] font-medium leading-tight">
+                                                                {event.description}
+                                                            </p>
                                                         </div>
+                                                        <button
+                                                            className="rounded-full bg-slate-100 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center justify-center w-[24px] h-[24px]"
+                                                            onClick={(e) => handleResolveEvent(e, event.id)}
+                                                            title="Mark as acknowledge"
+                                                        >
+                                                            <MdCheck size={14} />
+                                                        </button>
                                                     </div>
-                                                    <p className="text-[13px] text-[#1e1b4b] leading-relaxed mb-2 pl-[22px]">
-                                                        {event.description}
-                                                    </p>
                                                 </div>
                                             );
                                         })}
@@ -567,7 +575,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                     </div>
                                 )}
                             </div>
-                            <div className="p-4 mt-4 mx-4 mb-2 bg-slate-50/80 rounded-[20px] border border-slate-200/60 flex items-center justify-center shadow-inner">
+                            <div className="dropdown-footer">
                                 <button
                                     onClick={() => {
                                         navigate('/alerts');

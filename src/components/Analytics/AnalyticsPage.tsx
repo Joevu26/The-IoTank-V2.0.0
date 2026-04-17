@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import {
-    FiPieChart, FiTrendingUp, FiAlertTriangle, FiDownload,
-    FiShield, FiActivity, FiTarget, FiArrowRight,
-    FiDollarSign, FiDroplet, FiRefreshCw, FiPercent
+import { 
+    FiTrendingUp, FiAlertTriangle, FiDownload, 
+    FiShield, FiActivity, FiTarget, 
+    FiDollarSign, FiDroplet, FiRefreshCw, FiPercent 
 } from 'react-icons/fi';
-import { PredictivePanel } from './PredictivePanel';
 import { PageHeader } from '../Common/PageHeader';
 import { WetstockReconciliation } from './WetstockReconciliation';
 import { ShrinkageHeatmap } from './ShrinkageHeatmap';
@@ -25,7 +24,13 @@ import './AnalyticsPage.css';
 
 export const AnalyticsPage: React.FC = () => {
     const { currentUser } = useAuth();
-    const stationId = currentUser?.stationId || 'default-station-id';
+    
+    // Forensic UUID validation to prevent RPC signature mismatches (PGRST202)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isValidStation = currentUser?.stationId && uuidRegex.test(currentUser.stationId);
+    
+    // Default to a system GUID if not authenticated to prevent hook crashes and signature errors
+    const stationId = isValidStation ? currentUser.stationId : '00000000-0000-0000-0000-000000000000';
 
     // ─── High Performance Analytics Fetching ──────────────────────
     const { analytics: analyticsData } = useTankAnalytics30d(stationId);
@@ -51,6 +56,17 @@ export const AnalyticsPage: React.FC = () => {
     stats.totalProfit = stats.totalSale - stats.totalPurchase;
     const marginPercent = stats.totalSale > 0 ? (stats.totalProfit / stats.totalSale) * 100 : 0;
     const revenuePerLitre = stats.litersSold > 0 ? stats.totalSale / stats.litersSold : 0;
+
+    // [ONE TRUTH]: Calculate Overall Station Variance matching the WRe module
+    const startVolumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
+    const totalOpening = tanks.reduce((sum, t) => sum + (startVolumes[t.id] || t.currentVolume || 0), 0);
+    const totalMeasured = tanks.reduce((sum, t) => sum + (t.currentVolume || 0), 0);
+    const totalDeliveries = transactions.filter(tx => tx.type === 'delivery').reduce((sum, tx) => sum + tx.amount, 0);
+    const totalSales = transactions.filter(tx => tx.type === 'sale').reduce((sum, tx) => sum + tx.amount, 0);
+    const totalExpected = totalOpening + totalDeliveries - totalSales;
+    const totalVariance = totalMeasured - totalExpected;
+    const totalVariancePct = totalExpected > 0 ? (totalVariance / totalExpected) * 100 : 0;
+    const inventoryTurnover = totalOpening > 0 ? (totalSales / totalOpening) : 0;
 
     const chartData = transactions
         .filter(t => t.timestamp)
@@ -130,16 +146,16 @@ export const AnalyticsPage: React.FC = () => {
                     <div className="acp-kpi-icon purple"><FiRefreshCw /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Inv. Turnover</span>
-                        <span className="acp-kpi-value">4.2x</span>
+                        <span className="acp-kpi-value">{inventoryTurnover.toFixed(1)}x</span>
                         <span className="acp-kpi-sub acp-metric-trend-accent">Target: 4.5x</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
-                    <div className="acp-kpi-icon red"><FiShield /></div>
+                    <div className={`acp-kpi-icon ${Math.abs(totalVariancePct) > 0.5 ? 'red' : 'green'}`}><FiShield /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Variance</span>
-                        <span className="acp-kpi-value">0.42%</span>
-                        <span className="acp-kpi-sub acp-icon-trend-up">Improving</span>
+                        <span className="acp-kpi-value">{totalVariancePct.toFixed(2)}%</span>
+                        <span className="acp-kpi-sub">{Math.abs(totalVariancePct) <= 0.5 ? 'Operational Sync' : 'Drift Detected'}</span>
                     </div>
                 </div>
             </div>
@@ -150,7 +166,7 @@ export const AnalyticsPage: React.FC = () => {
                 {/* Left Column */}
                 <div className="acp-main">
 
-                    {/* Operational Performance */}
+                    {/* Operational Performance Hub */}
                     <div className="acp-card">
                         <div className="acp-card-header">
                             <div className="acp-card-title">
@@ -159,16 +175,27 @@ export const AnalyticsPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Wetstock Reconciliation Section */}
-                        <LazyComponent minHeight="400px">
-                            <WetstockReconciliation
-                                tanks={tanks}
-                                transactions={transactions}
-                                currency="Ksh"
-                            />
-                        </LazyComponent>
+                        <div className="flex flex-col gap-4">
+                            {/* Wetstock Reconciliation Sub-card */}
+                            <div className="acp-hub-card">
+                                <LazyComponent minHeight="400px">
+                                    <WetstockReconciliation
+                                        tanks={tanks}
+                                        transactions={transactions}
+                                        currency="Ksh"
+                                    />
+                                </LazyComponent>
+                            </div>
 
-                        <div className="acp-two-col">
+                            {/* Forensic Heatmap Sub-card */}
+                            <div className="acp-hub-card">
+                                <LazyComponent minHeight="400px">
+                                    <ShrinkageHeatmap />
+                                </LazyComponent>
+                            </div>
+                        </div>
+
+                        <div className="acp-two-col mt-8 border-t border-slate-100 pt-6">
                             {/* Revenue Intelligence */}
                             <div>
                                 <div className="acp-col-label">
@@ -185,19 +212,12 @@ export const AnalyticsPage: React.FC = () => {
                                     </div>
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Revenue / Litre</span>
-                                        <span className="acp-metric-val">${revenuePerLitre.toFixed(2)}</span>
+                                        <span className="acp-metric-val">Ksh {revenuePerLitre.toFixed(2)}</span>
                                     </div>
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Sales Growth</span>
                                         <div className="text-right">
                                             <div className="acp-metric-val">+12.4%</div>
-                                            <div className="acp-sparkline-mini">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <AreaChart data={displayData.slice(-5)}>
-                                                        <Area type="monotone" dataKey="sales" stroke="#a855f7" fill="#a855f7" fillOpacity={0.3} />
-                                                    </AreaChart>
-                                                </ResponsiveContainer>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -217,7 +237,7 @@ export const AnalyticsPage: React.FC = () => {
                                     <div className="acp-metric-row">
                                         <span className="acp-metric-name">Inv. Turnover</span>
                                         <div className="text-right">
-                                            <div className="acp-metric-val">4.2x</div>
+                                            <div className="acp-metric-val">{inventoryTurnover.toFixed(1)}x</div>
                                             <span className="acp-metric-badge acp-metric-trend-accent">Target: 4.5x</span>
                                         </div>
                                     </div>
@@ -246,11 +266,11 @@ export const AnalyticsPage: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="acp-forecast-tiles">
-                            <div className="acp-tile">
+                        <div className="acp-forecast-tiles !mb-3 !gap-2">
+                            <div className="acp-tile !p-2">
                                 <div className="acp-tile-label">7-Day Forecast</div>
                                 <div className="flex justify-between items-end">
-                                    <span className="acp-tile-val">12,450 L</span>
+                                    <span className="acp-tile-val !text-sm">12,450 L</span>
                                     <div className="acp-tile-spark">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={displayData.slice(-7)}>
@@ -260,23 +280,23 @@ export const AnalyticsPage: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="acp-tile">
+                            <div className="acp-tile !p-2">
                                 <div className="acp-tile-label">30-Day Projection</div>
-                                <span className="acp-tile-val">54,200 L</span>
+                                <span className="acp-tile-val !text-sm">54,200 L</span>
                             </div>
-                            <div className="acp-tile">
+                            <div className="acp-tile !p-2">
                                 <div className="acp-tile-label">Confidence Band</div>
-                                <span className="acp-tile-val success">±2.4%</span>
+                                <span className="acp-tile-val success !text-sm">±2.4%</span>
                             </div>
-                            <div className="acp-tile border-l-[3px] border-[#f59e0b]">
+                            <div className="acp-tile border-l-[3px] border-[#f59e0b] !p-2">
                                 <div className="acp-tile-label">Days of Cover</div>
-                                <span className="acp-tile-val amber">14.2 Days</span>
+                                <span className="acp-tile-val amber !text-sm">14.2 Days</span>
                             </div>
                         </div>
 
-                        <div className="acp-chart-wrap">
-                            <LazyComponent minHeight="300px">
-                                <ResponsiveContainer width="100%" height="100%">
+                        <div className="acp-chart-wrap" style={{ height: '240px', minHeight: '240px', background: 'rgba(248, 250, 252, 0.5)' }}>
+                            <LazyComponent minHeight="240px">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                                     <AreaChart data={displayData}>
                                         <defs>
                                             <linearGradient id="gradForecast" x1="0" y1="0" x2="0" y2="1">
@@ -298,10 +318,6 @@ export const AnalyticsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Forensic Heatmap Section */}
-                    <LazyComponent minHeight="500px">
-                        <ShrinkageHeatmap />
-                    </LazyComponent>
 
                     {/* Risk & Variance Analysis */}
                     <div className="acp-card">
@@ -320,8 +336,8 @@ export const AnalyticsPage: React.FC = () => {
                                     <h4 className="acp-variance-hero-title">Inventory Variance %</h4>
                                 </div>
                                 <div className="text-right">
-                                    <div className="acp-variance-number">0.42%</div>
-                                    <span className="acp-variance-status">Improving</span>
+                                    <div className="acp-variance-number">{totalVariancePct.toFixed(2)}%</div>
+                                    <span className="acp-variance-status">{Math.abs(totalVariancePct) < 0.5 ? 'Stable' : 'Critical'}</span>
                                 </div>
                             </div>
                              <div className="acp-progress-bar">
@@ -370,46 +386,9 @@ export const AnalyticsPage: React.FC = () => {
                 {/* Right Sidebar */}
                 <aside className="acp-sidebar">
 
-                    {/* Decision Zone: Scenario Modeling */}
-                    <div className="acp-card-dark">
-                        <div className="relative overflow-hidden">
-                            <div className="acp-card-background-icon">
-                                <FiPieChart size={100} color="#fff" />
-                            </div>
-                            <div className="relative z-[1]">
-                                <h3 className="acp-card-dark-header">
-                                    <FiActivity className="text-[#a855f7]" /> Scenario Modeling
-                                </h3>
-                                <div className="acp-card-meta">Data window: 30 days baseline</div>
-
-                                <LazyComponent minHeight="150px">
-                                    <PredictivePanel 
-                                        stationId={stationId} 
-                                        tankId={tanks[0]?.id} 
-                                    />
-                                </LazyComponent>
-
-                                <div className="acp-dark-outputs">
-                                    <div className="acp-dark-outputs-label">Calculated Projections</div>
-                                    <div className="acp-dark-output-row">
-                                        <span className="acp-dark-output-label">Cash Flow Impact</span>
-                                        <span className="acp-dark-output-val">+$12,400</span>
-                                    </div>
-                                    <div className="acp-dark-output-row">
-                                        <span className="acp-dark-output-label">Procurement Risk</span>
-                                        <span className="acp-dark-output-val success">Low</span>
-                                    </div>
-                                </div>
-
-                                <button className="acp-apply-btn">
-                                    Apply Scenario <FiArrowRight />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
                     {/* Decision Zone: Strategic Recommendations */}
-                    <div className="acp-card-dark">
+                    <div className="acp-card">
                         <div className="acp-rec-meta-wrap">
                             <FiTrendingUp className="acp-icon-trend-up" /> Strategic Recommendations
                         </div>

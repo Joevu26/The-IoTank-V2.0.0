@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { MarketSignal, SupplyRisk, RegulatoryNotice, MarketData } from '@/types';
 import { NewsService } from '@/services/NewsService';
+import { extractPricesFromText } from './useMarketNews';
 
 export const useMarketIntelligence = (stationId: string) => {
     // Cache key for news feed
@@ -112,6 +113,56 @@ export const useMarketIntelligence = (stationId: string) => {
                     .sort((a, b) => b.timestamp - a.timestamp)
                     .slice(0, 30);
 
+                // ─── Price Extraction Logic ───
+                // Scan verified/high-relevance news for live updates
+                const extractedPrices: MarketData[] = [];
+                mergedSignals.forEach(signal => {
+                    const detections = extractPricesFromText(signal.title + ' ' + signal.summary);
+                    const topicTags = (signal as any).topicTags || [];
+                    const isEPRA = topicTags.includes('EPRA');
+                    
+                    detections.forEach(det => {
+                        // STRICT RULE: Fuel prices ONLY from EPRA sources.
+                        // Commodity data (Brent, FX) can come from any verified news.
+                        const isFuel = ['PETROL', 'DIESEL', 'KEROSENE'].includes(det.commodity.toUpperCase());
+                        
+                        if (det.commodity !== 'General' && (!isFuel || isEPRA)) {
+                            extractedPrices.push({
+                                id: `extraction-${det.commodity}-${signal.id}`,
+                                fuelType: det.commodity.toUpperCase(),
+                                pricePerLiter: det.value,
+                                currency: det.currency,
+                                timestamp: signal.timestamp,
+                                source: 'api', // Tagged as live extraction
+                                metadata: { isLiveExtraction: true, sourceTitle: signal.title, isOfficial: isEPRA }
+                            } as any);
+                        }
+                    });
+                });
+
+                // Merge: Live Extraction (High Priority) > Database Prices
+                const finalPrices = [...mappedPricesValue];
+                extractedPrices.forEach(ext => {
+                    const existingIdx = finalPrices.findIndex(p => p.fuelType === ext.fuelType);
+                    if (existingIdx === -1) {
+                        finalPrices.push(ext);
+                    } else if (ext.timestamp > finalPrices[existingIdx].timestamp) {
+                        // Check if value changed significantly to trigger notification
+                        const oldVal = finalPrices[existingIdx].pricePerLiter;
+                        if (Math.abs(oldVal - ext.pricePerLiter) > 0.01 && isMounted) {
+                            window.dispatchEvent(new CustomEvent('system-toast', {
+                                detail: {
+                                    title: 'Live Market Update',
+                                    message: `${ext.fuelType} price update detected: KES ${ext.pricePerLiter.toFixed(2)} (Extracted: ${(ext as any).metadata?.sourceTitle?.substring(0, 40)}...)`,
+                                    type: 'market',
+                                    attribution: 'TankIQ • Intelligence Extra'
+                                }
+                            }));
+                        }
+                        finalPrices[existingIdx] = ext;
+                    }
+                });
+
                 // 4. Fetch Risks
                 const { data: riskData, error: riskError } = await supabase
                     .from('supply_risks')
@@ -149,7 +200,7 @@ export const useMarketIntelligence = (stationId: string) => {
                 } as RegulatoryNotice));
 
                 if (isMounted) {
-                    setPrices(mappedPricesValue);
+                    setPrices(finalPrices);
                     setSignals(mergedSignals);
                     try {
                         localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mergedSignals));

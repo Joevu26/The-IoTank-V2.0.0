@@ -4,6 +4,7 @@ import { differenceInHours } from 'date-fns';
 import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
 import { useShiftStatus } from './useShiftStatus';
 import { supabase } from '@/config/supabase';
+import { calculateETE, calculateRate, TELEMETRY_CONSTANTS } from '@/utils/telemetryMath';
 
 export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
     const { pushEvent } = useTelemetryQueue();
@@ -64,59 +65,48 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
             const latest = sorted[0];
             const latestVolume = latest.volumeCorrected ?? latest.volume ?? 0;
 
-            // 1. Current Shift Dispense Rate (Rate of Change)
+            // 1. Current Shift Dispense Rate (Rate of Change) using unified math
             let currentShiftRate = 0;
             if (shiftStatus === 'open' && openedAt) {
                 const shiftStartVolumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
                 const startVol = shiftStartVolumes[tank.id] || latestVolume;
                 const hrsPassed = Math.max(0.1, (Date.now() - openedAt) / (1000 * 60 * 60));
-                currentShiftRate = Math.max(0, (startVol - latestVolume) / hrsPassed);
+                currentShiftRate = calculateRate(startVol, latestVolume, hrsPassed);
             } else {
                 // If shift is closed, use a short-term 2-hour window for the "Display Rate"
                 const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
                 const relevant = sorted.filter(r => r.timestamp >= twoHoursAgo);
                 if (relevant.length >= 2) {
                     const oldestInWindow = relevant[relevant.length - 1];
-                    const volDiff = (oldestInWindow.volumeCorrected || oldestInWindow.volume || 0) - latestVolume;
-                    const timeDiff = Math.max(0.1, (latest.timestamp - oldestInWindow.timestamp) / (1000 * 60 * 60));
-                    currentShiftRate = Math.max(0, volDiff / timeDiff);
+                    const hrs = Math.max(0.1, (latest.timestamp - oldestInWindow.timestamp) / (1000 * 60 * 60));
+                    currentShiftRate = calculateRate((oldestInWindow.volumeCorrected || oldestInWindow.volume || 0), latestVolume, hrs);
                 }
             }
 
-            // 2. ETE Calculation using Average Dispense Rate
-            // ETE = (Current Inventory - Dead Stock) / Avg Dispense Rate
-            // Dead Stock = 5% of capacity
-            const deadStock = tank.capacity * 0.05;
-            const usableVolume = Math.max(0, latestVolume - deadStock);
-            
-            // Use the higher of current rate or historical average to be conservative, 
-            // or just the historical average as requested.
-            // "so ETE doesnt use Dispense rate but Average Dispense Rate"
+            // 2. ETE Calculation using Unified Logic
             const effectiveRate = avgDailyRate || currentShiftRate || 0.1; 
+            const hoursLeft = calculateETE(latestVolume, tank.capacity, effectiveRate);
 
             let ete = 'Stable';
             let predictedRefillDate: number | null = null;
 
-            if (effectiveRate > 0) {
-                const hoursLeft = usableVolume / effectiveRate;
-                if (hoursLeft > 0) {
-                    predictedRefillDate = latest.timestamp + (hoursLeft * 60 * 60 * 1000);
-                    if (hoursLeft > 24) {
-                        ete = `${(hoursLeft / 24).toFixed(1)} Days`;
-                    } else {
-                        ete = `${hoursLeft.toFixed(1)} Hours`;
-                    }
+            if (hoursLeft !== null && hoursLeft > 0) {
+                predictedRefillDate = latest.timestamp + (hoursLeft * 60 * 60 * 1000);
+                if (hoursLeft > 24) {
+                    ete = `${(hoursLeft / 24).toFixed(1)} Days`;
+                } else {
+                    ete = `${hoursLeft.toFixed(1)} Hours`;
                 }
             }
 
             const trend = currentShiftRate > 0.5 ? 'decreasing' : currentShiftRate < -0.5 ? 'increasing' : 'stable';
 
             return {
-                defillRate: currentShiftRate, // This is the "Dispense Rate" shown in UI
+                defillRate: currentShiftRate, 
                 ete,
                 predictedRefillDate,
-                isTheftSuspected: currentShiftRate > (tank.rapidDefillThreshold || 50),
-                isLeakageSuspected: currentShiftRate > (tank.leakageThreshold || 2) && currentShiftRate < 10,
+                isTheftSuspected: currentShiftRate > (tank.rapidDefillThreshold || TELEMETRY_CONSTANTS.RAPID_DEFILL_LHR),
+                isLeakageSuspected: currentShiftRate > 0.38 && currentShiftRate < 10, // precision leak alignment
                 trend,
                 error: null
             };

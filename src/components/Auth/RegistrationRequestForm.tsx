@@ -87,7 +87,8 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': anonKey || ''
+          'apikey': anonKey || '',
+          'Authorization': `Bearer ${anonKey}`
         },
         body: JSON.stringify({
           full_name: sanitizeText(formData.full_name, 120),

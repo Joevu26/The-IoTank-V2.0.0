@@ -1,5 +1,5 @@
 // @ts-ignore Deno edge import
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 
 declare const Deno: any;
 

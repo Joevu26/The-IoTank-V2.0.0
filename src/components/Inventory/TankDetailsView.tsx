@@ -31,7 +31,6 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
     transactions,
 }) => {
     const [timeDomain, setTimeDomain] = useState<'shift' | 'week' | 'month'>('week');
-    const [showMetadata, setShowMetadata] = useState(false);
     const [intelligenceType, setIntelligenceType] = useState('Historical Level Intelligence');
     const [showIntelligenceDropdown, setShowIntelligenceDropdown] = useState(false);
     const { status: shiftStatus, openedAt } = useShiftStatus();
@@ -81,6 +80,19 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
     }, [timeDomain, openedAt]);
 
     const { readings } = useHistoricalReadings(stationId, tank.id, timeRange);
+    
+    // Continuity logic: If sensor is disconnected, show a straight line to current time
+    const chartReadings = React.useMemo(() => {
+        if (readings.length === 0) return [];
+        const latest = readings[readings.length - 1];
+        const now = Date.now();
+        // If latest reading is more than 5 minutes old, extend to 'now'
+        if (now - latest.timestamp > 300000) {
+            return [...readings, { ...latest, timestamp: now }];
+        }
+        return readings;
+    }, [readings]);
+
     const latestReading = readings.length > 0 ? readings[readings.length - 1] : null;
     const analytics = useConsumptionAnalytics(tank, readings);
 
@@ -164,7 +176,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                         <div className="visual-grid">
                             <div className="visual-main">
                                 <TankVisual2D
-                                    fuelLevel={latestReading?.fuelLevel || 0}
+                                    fuelLevel={fillPercent}
                                     fuelType={tank.fuelType}
                                     shape={tank.shape as any}
                                     height={tank.height}
@@ -212,39 +224,6 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Technical Metadata (Bento-style expansion) */}
-                        <div className="metadata-panel-container mt-2">
-                            <button
-                                className="metadata-toggle flex items-center justify-between w-full p-4 transition-all"
-                                onClick={() => setShowMetadata(!showMetadata)}
-                            >
-                                <span className="flex items-center gap-2 font-bold text-[11px] uppercase tracking-widest text-gray-500">
-                                    <FiInfo className="text-primary" /> Technical Specifications
-                                </span>
-                                {showMetadata ? <FiChevronUp /> : <FiChevronDown />}
-                            </button>
-
-                            {showMetadata && (
-                                <div className="metadata-content grid grid-cols-2 md:grid-cols-4 gap-6 p-6 animate-slide-down">
-                                    <div className="meta-item">
-                                        <label>Product Chemistry</label>
-                                        <p>{tank.fuelType.toUpperCase()}</p>
-                                    </div>
-                                    <div className="meta-item">
-                                        <label>Deployment Date</label>
-                                        <p>{tank.installationYear || '2024'}</p>
-                                    </div>
-                                    <div className="meta-item">
-                                        <label>Node Address</label>
-                                        <p className="font-mono">{tank.sensorId || 'US-NODE-001'}</p>
-                                    </div>
-                                    <div className="meta-item">
-                                        <label>Kernel Version</label>
-                                        <p>v3.1.0-gold</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
 
                         {/* Historical Level Trend */}
                         <div className="live-trends mt-4">
@@ -299,7 +278,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                     <div className="live-trends-chart-container">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <LineChart
-                                                data={readings}
+                                                data={chartReadings}
                                                 margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
                                             >
                                                 <defs>

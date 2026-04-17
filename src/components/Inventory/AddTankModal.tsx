@@ -27,8 +27,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
         name: '',
         siteId: '',
         espId: '',
-        fuelType: 'diesel' as Tank['fuelType'],
-        shape: 'cylinder' as Tank['shape'],
+        fuelType: 'Diesel' as Tank['fuelType'],
+        shape: 'capsule' as Tank['shape'],
         capacity: 10000,
         height: 200,
         diameter: 250,
@@ -65,7 +65,7 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
         const { name, value, type } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'number' ? parseFloat(value) : value
+            [name]: type === 'number' ? (parseFloat(value) || 0) : value
         }));
     };
 
@@ -94,7 +94,11 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                 sensorHeight: formData.sensorHeight,
                 sensorEmptyDistance: formData.sensorEmptyDistance,
                 sensorFullDistance: formData.sensorFullDistance,
-                sensorChannel: formData.sensorChannel
+                sensorChannel: formData.sensorChannel,
+                lowLevelThreshold: 20, // Reorder: 20%
+                criticalLevelThreshold: 10, // Emergency Stop: 10%
+                highLevelThreshold: 90, // Operator Warning: 90% (Handled as fallback)
+                temperatureAlertThreshold: 60 // High Temp Alert: 60°C
             });
 
             if (onSuccess) onSuccess(newTank);

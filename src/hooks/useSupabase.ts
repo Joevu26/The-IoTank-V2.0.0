@@ -524,7 +524,7 @@ export async function updateTank(tankId: string, updates: Partial<Tank>) {
 
                 // 🟢 Forensic Intelligence Log
                 await AuditService.log(
-                    'CALIBRATION',
+                    'SYSTEM',
                     'SETTINGS_CHANGED',
                     (updates as any).stationId || '',
                     `Hardware profile updated for ${updates.name || 'tank'}. Fields modified: ${Object.keys(dbUpdates).join(', ')}`,
@@ -560,9 +560,8 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
             sensor_height: tankData.sensorHeight,
             sensor_empty_distance: tankData.sensorEmptyDistance,
             sensor_full_distance: tankData.sensorFullDistance,
-            low_level_threshold: tankData.lowLevelThreshold,
-            high_level_threshold: tankData.highLevelThreshold,
-            high_temperature_threshold: tankData.temperatureAlertThreshold,
+            low_level_threshold: tankData.lowLevelThreshold || 20, // Reorder: 20% hardcoded benchmark
+            high_temperature_threshold: tankData.temperatureAlertThreshold || 60,
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()

@@ -1,6 +1,6 @@
 // supabase/functions/rss-parser/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.11.0"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7"
 import { XMLParser } from "https://esm.sh/fast-xml-parser@4.1.2"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { enforceDurableRateLimit, getOptionalProxyScope } from "../_shared/auth.ts"

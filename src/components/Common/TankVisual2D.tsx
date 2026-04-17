@@ -20,12 +20,15 @@ export const TankVisual2D: React.FC<TankVisual2DProps> = ({
   // Determine fuel color matching the original 3D logic
   const fuelColor = useMemo(() => {
     switch (fuelType.toLowerCase()) {
-      case 'diesel': return '#FFD700'; // Golden
+      case 'diesel': return '#10b981'; // Emerald Green
       case 'gasoline': 
-      case 'petrol': return '#FF4500'; // Orange-red
-      case 'kerosene': return '#ADD8E6'; // Light blue
-      case 'jet a1': return '#E0E0E0'; // Silver/Grey
-      default: return '#00D4FF'; // Electric Cyan
+      case 'petrol': 
+      case 'pms': return '#fbbf24'; // Gold Yellow
+      case 'kerosene': return '#3b82f6'; // Marine Blue
+      case 'vpower':
+      case 'v-power': return '#ef4444'; // Shell Red
+      case 'jet a1': return '#64748b'; // Slate Grey
+      default: return '#7c3aed'; // Deep Purple (Brand Color)
     }
   }, [fuelType]);
 

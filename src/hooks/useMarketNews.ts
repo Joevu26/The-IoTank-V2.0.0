@@ -13,21 +13,22 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/config/supabase';
-import { MarketSignal } from '@/types';
+import { MarketSignal, Tank } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { IntelligenceAIService, ArticleAIDirective } from '@/services/IntelligenceAIService';
 
 const CACHE_TTL_MS = 15 * 60 * 1000;       // 15 minutes — standard news sources
 const CACHE_TTL_SLOW_MS = 60 * 60 * 1000;  // 60 minutes — regulatory/forex (low frequency)
 const REFRESH_COOLDOWN_MS = 30 * 1000;     // 30 seconds
+const PERSISTENT_CACHE_KEY = 'mi:persistent_signals';
+const MAX_CACHE_DAYS = 30;                 // 30 days of signals kept locally
 
-// ─── Proxies ──────────────────────────────────────────────────────────────────
-const PROXY_BASE = 'https://suifvborodwergtrbjez.supabase.co/functions/v1';
-const RSS_PARSER = `${PROXY_BASE}/rss-parser`;
-const GNEWS_PROXY = `${PROXY_BASE}/gnews-proxy`;
-const NEWSDATA_PROXY = `${PROXY_BASE}/newsdata-proxy`;
-const CURRENTS_PROXY = `${PROXY_BASE}/currents-proxy`;
+// ─── Proxies (Function Names) ─────────────────────────────────────────────────
+const OFFICIAL_SCRAPER = 'official-scraper';
+const GNEWS_PROXY = 'gnews-proxy';
+const NEWSDATA_PROXY = 'newsdata-proxy';
+const CURRENTS_PROXY = 'currents-proxy';
+const RSS_PARSER = 'rss-parser';
 
 // Google News RSS fallback queries
 const GN_RSS = (query: string) =>
@@ -48,8 +49,6 @@ const SOURCE_CREDIBILITY: Record<string, number> = {
     'standardmedia.co.ke': 0.70,
 };
 
-const HIGH_IMPACT_KEYWORDS = ['price increase', 'price hike', 'fuel rise', 'pump price', 'price drop', 'price reduction'];
-
 // ─── Whitelisted RSS Sources ──────────────────────────────────────────────────
 
 export interface NewsFeedSource {
@@ -68,7 +67,7 @@ export const NEWS_SOURCES: NewsFeedSource[] = [
         label: 'EPRA — Petroleum Pricing',
         shortLabel: 'EPRA',
         region: 'Kenya',
-        url: GN_RSS('EPRA Kenya fuel petroleum price regulatory authority energy'),
+        url: GN_RSS('EPRA petroleum price Kenya'),
         type: 'Regulatory',
         cacheTTL: CACHE_TTL_MS,
     },
@@ -164,6 +163,7 @@ export interface NewsArticle extends MarketSignal {
     briefingSummary: string;   // Rule-based 200-char snippet + implication
     feedSource: string;        // shortLabel of origin
     imageUrl?: string;
+    url: string;               // Explicit source URL for deduplication
     
     // ─── Verification Metadata ───
     confidenceScore: number;   // 0-1.0
@@ -173,21 +173,20 @@ export interface NewsArticle extends MarketSignal {
     corroborationCount?: number;
     isUnhighlighted?: boolean; // If hidden/auto-hide
     isOfficial?: boolean;      // EPRA / Official Kenyan Agency
+
+    /** TankIQ AI-Generated Operational Intelligence */
+    aiDirective?: ArticleAIDirective;
 }
 
 
-interface CachePayload {
-    articles: NewsArticle[];
-    fetchedAt: number;
-}
 
 // ─── Rule-based helpers ───────────────────────────────────────────────────────
 
 function computeTopicTags(title: string, description: string): string[] {
     const text = (title + ' ' + description).toLowerCase();
     const tags: string[] = [];
-    if (text.includes('epra') || text.includes('energy regulatory')) tags.push('EPRA');
-    if (text.includes('price') || text.includes('pump price') || text.includes('petroleum price')) tags.push('PriceAlert');
+    if (text.includes('epra') || text.includes('energy and petroleum regulatory') || text.includes('epra_kenya')) tags.push('EPRA');
+    if (text.includes('price') || text.includes('pump price') || text.includes('petroleum price') || text.includes('retail price')) tags.push('PriceAlert');
     if (text.includes('supply') || text.includes('shortage') || text.includes('shortage')) tags.push('SupplyChain');
     if (text.includes('forex') || text.includes('dollar') || text.includes('shilling') || text.includes('exchange rate')) tags.push('Forex');
     if (text.includes('crude') || text.includes('brent') || text.includes('wti')) tags.push('CrudeOil');
@@ -234,13 +233,53 @@ function computeRelevanceScore(title: string, summary: string, sourceType: strin
     return Math.min(score * multiplier, 1.0);
 }
 
-function extractPriceFromText(text: string): number | null {
-    // Regex for "Ksh 123", "Ksh 123.45", "Ksh. 123"
-    const match = text.match(/ksh\.?\s?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)/i);
-    if (match && match[1]) {
-        return parseFloat(match[1].replace(/,/g, ''));
+export interface PriceDetection {
+    commodity: 'Petrol' | 'Diesel' | 'Kerosene' | 'BRENT' | 'FX' | 'General';
+    value: number;
+    currency: string;
+}
+
+export function extractPricesFromText(text: string): PriceDetection[] {
+    const results: PriceDetection[] = [];
+    
+    // 1. Kenya Pump Prices (Ksh)
+    // Strong patterns for official notices: "set at Ksh", "retail at Ksh", "price of Ksh"
+    const kshRegex = /(?:set at|retail at|price of|to ksh|ksh|shillings|sh)\.?\s*(\d{1,3}(?:\.\d{2})?)/gi;
+    let match;
+    
+    while ((match = kshRegex.exec(text)) !== null) {
+        const val = parseFloat(match[1]);
+        if (val < 50 || val > 300) continue; // Filter out unrealistic prices/years
+        
+        const snippet = text.substring(Math.max(0, match.index - 60), Math.min(text.length, match.index + 60)).toLowerCase();
+        
+        let commodity: PriceDetection['commodity'] = 'General';
+        if (snippet.includes('petrol') || snippet.includes('pms') || snippet.includes('super')) commodity = 'Petrol';
+        else if (snippet.includes('diesel') || snippet.includes('ago')) commodity = 'Diesel';
+        else if (snippet.includes('kerosene') || snippet.includes('ik')) commodity = 'Kerosene';
+        
+        // Boost confidence if specific regulatory keywords are nearby
+        const isOfficialPhrasing = snippet.includes('set at') || snippet.includes('retail at') || snippet.includes('regulated');
+        if (commodity !== 'General' || isOfficialPhrasing) {
+            results.push({ commodity, value: val, currency: 'KES' });
+        }
     }
-    return null;
+
+    // 2. Global Brent ($)
+    const brentRegex = /(?:brent|crude|oil).*?(\$?\d{1,3}(?:\.\d{2})?)/gi;
+    while ((match = brentRegex.exec(text)) !== null) {
+        const valStr = match[1].replace('$', '');
+        const val = parseFloat(valStr);
+        if (!isNaN(val)) results.push({ commodity: 'BRENT', value: val, currency: 'USD' });
+    }
+
+    return results;
+}
+
+// Legacy wrapper to keep validatePriceClaim working
+function extractPriceFromText(text: string): number | null {
+    const detections = extractPricesFromText(text);
+    return detections.length > 0 ? detections[0].value : null;
 }
 
 function validatePriceClaim(article: NewsArticle, currentEPRAPrice: number) {
@@ -261,64 +300,7 @@ function validatePriceClaim(article: NewsArticle, currentEPRAPrice: number) {
     return { status: 'plausible' as const };
 }
 
-function calculateSimilarity(str1: string, str2: string): number {
-    const s1 = str1.toLowerCase();
-    const s2 = str2.toLowerCase();
-    if (s1 === s2) return 1.0;
-    
-    // Simple word-based Jaccard similarity
-    const w1 = new Set(s1.split(/\s+/));
-    const w2 = new Set(s2.split(/\s+/));
-    const intersection = new Set([...w1].filter(x => w2.has(x)));
-    const union = new Set([...w1, ...w2]);
-    return intersection.size / union.size;
-}
 
-function calculateConfidenceScore(article: NewsArticle, corroborationCount: number): number {
-    let score = article.confidenceScore;
-
-    // + Boost for high-authority sources
-    const domain = article.externalUrl ? new URL(article.externalUrl).hostname.replace('www.', '') : '';
-    if (SOURCE_CREDIBILITY[domain] >= 0.9) score += 0.15;
-    
-    // + Boost for corroboration
-    score += (corroborationCount * 0.1);
-
-    // - Penalty for single-source high-impact claims
-    const isHighImpact = HIGH_IMPACT_KEYWORDS.some(kw => 
-        (article.title + ' ' + article.summary).toLowerCase().includes(kw)
-    );
-    if (isHighImpact && corroborationCount === 0) score -= 0.1;
-
-    return Math.min(score, 1.0);
-}
-
-function corroborateArticles(articles: NewsArticle[]): NewsArticle[] {
-    return articles.map(item => {
-        const others = articles.filter(n => 
-            n.id !== item.id && 
-            calculateSimilarity(n.title, item.title) > 0.35
-        );
-
-        const corroborationCount = others.length;
-        const score = calculateConfidenceScore(item, corroborationCount);
-        
-        // Final Status Determination
-        let status: NewsArticle['verificationStatus'] = 'unverified';
-        if (score > 0.85) status = 'verified';
-        if (score < 0.4 && corroborationCount === 0) status = 'unverified';
-        
-        return {
-            ...item,
-            corroborationCount,
-            isCorroborated: corroborationCount > 0,
-            confidenceScore: score,
-            verificationStatus: status,
-            validationLabel: status === 'unverified' && corroborationCount === 0 ? '🔍 Unconfirmed — single source' : 
-                             status === 'verified' ? '✅ Verified Market Signal' : undefined
-        };
-    });
-}
 
 
 function buildBriefingSummary(title: string, description: string, implication: string): string {
@@ -335,7 +317,7 @@ function buildSignalFromArticle(
     const description = (article.description || article.content || '').replace(/<[^>]*>/g, '');
     const topicTags = computeTopicTags(title, description);
     const implicationCategory = computeImplication(title, description);
-    const link = article.link || article.url || article.guid || undefined;
+    const link = article.link || article.url || article.guid || '';
     const relevanceScore = computeRelevanceScore(title, description, source.type, link);
     
     let publishedAt = Date.now();
@@ -362,7 +344,7 @@ function buildSignalFromArticle(
         relevanceScore,
         confidenceScore: source.type === 'Regulatory' ? 0.95 : 0.7,
         verificationStatus: 'unverified',
-        externalUrl: link,
+        url: link,
         attribution: source.shortLabel,
         region: source.region,
         topicTags,
@@ -377,35 +359,57 @@ function buildSignalFromArticle(
 
 // ─── Cache helpers ────────────────────────────────────────────────────────────
 
-function getCacheKey(sourceLabel: string): string {
-    return `mi:news:${sourceLabel.replace(/\s/g, '_')}`;
-}
+// ─── Cache Management (Offline-First Persistent Store) ─────────────────────────
 
-function readCache(sourceLabel: string): { articles: NewsArticle[]; age: number } | null {
+function readMasterHistory(): NewsArticle[] {
     try {
-        const raw = localStorage.getItem(getCacheKey(sourceLabel));
-        if (!raw) return null;
+        const raw = localStorage.getItem(PERSISTENT_CACHE_KEY);
+        if (!raw) return [];
         const payload: any = JSON.parse(raw);
-        const age = Date.now() - payload.fetchedAt;
-        if (age > CACHE_TTL_MS * 2) {
-            // Purge very old cache
-            localStorage.removeItem(getCacheKey(sourceLabel));
-            return null;
-        }
-        return { articles: payload.articles, age };
+        const articles: NewsArticle[] = Array.isArray(payload) ? payload : (payload.articles || []);
+        
+        // Retention cleanup: keep signals from last 30 days
+        const limit = Date.now() - (MAX_CACHE_DAYS * 24 * 60 * 60 * 1000);
+        return articles.filter(a => a.timestamp > limit);
     } catch {
-        return null;
+        return [];
     }
 }
 
-
-function writeCache(sourceLabel: string, articles: NewsArticle[]): void {
+function writeMasterHistory(newArticles: NewsArticle[]): void {
     try {
-        const payload: CachePayload = { articles, fetchedAt: Date.now() };
-        localStorage.setItem(getCacheKey(sourceLabel), JSON.stringify(payload));
-    } catch {
-        // Ignore storage quota errors
-    }
+        const existing = readMasterHistory();
+        
+        // Incremental Merge & Deduplicate
+        const mergedMap = new Map<string, NewsArticle>();
+        
+        // Load existing
+        existing.forEach(a => mergedMap.set(a.url || `${a.title}-${a.feedSource}`, a));
+        
+        // Append New (overwrite existing if same source+title)
+        newArticles.forEach(a => mergedMap.set(a.url || `${a.title}-${a.feedSource}`, a));
+        
+        const final = Array.from(mergedMap.values())
+            .sort((a, b) => b.timestamp - a.timestamp);
+            
+        // Limit total history to 200 items to prevent storage bloat
+        localStorage.setItem(PERSISTENT_CACHE_KEY, JSON.stringify(final.slice(0, 200)));
+    } catch { /* Quota exceeded: silent fail */ }
+}
+
+function getSyncTime(sourceLabel: string): number {
+    try {
+        const syncs = JSON.parse(localStorage.getItem('mi:sync_times') || '{}');
+        return syncs[sourceLabel] || 0;
+    } catch { return 0; }
+}
+
+function updateSyncTime(sourceLabel: string): void {
+    try {
+        const syncs = JSON.parse(localStorage.getItem('mi:sync_times') || '{}');
+        syncs[sourceLabel] = Date.now();
+        localStorage.setItem('mi:sync_times', JSON.stringify(syncs));
+    } catch { /* noop */ }
 }
 
 function getLastRefreshTime(): number {
@@ -427,12 +431,11 @@ function setLastRefreshTime(): void {
 export interface UseMarketNewsReturn {
     articles: NewsArticle[];
     status: FetchStatus;
-    cacheAge: number | null;        // ms since last fetch (null if live)
     lastUpdated: Date | null;       // Date of last successful fetch
     isRefreshing: boolean;
     canRefresh: boolean;            // false during 30s cooldown
     countdown: number;              // seconds remaining in cooldown
-    refresh: () => Promise<void>;
+    refresh: (tanks?: Tank[]) => Promise<void>;
     activeSource: string;           // 'all' or a source shortLabel
     setActiveSource: (s: string) => void;
     activeRegion: 'all' | 'Kenya' | 'Global';
@@ -442,10 +445,13 @@ export interface UseMarketNewsReturn {
 }
 
 export function useMarketNews(): UseMarketNewsReturn {
-    const [allArticles, setAllArticles] = useState<NewsArticle[]>([]);
-    const [status, setStatus] = useState<FetchStatus>('loading');
-    const [cacheAge, setCacheAge] = useState<number | null>(null);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    // Initialize from persistent store for instant offline availability (0ms UI)
+    const [allArticles, setAllArticles] = useState<NewsArticle[]>(() => readMasterHistory());
+    const [status, setStatus] = useState<FetchStatus>(allArticles.length > 0 ? 'ok' : 'loading');
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(() => {
+        const last = getLastRefreshTime();
+        return last > 0 ? new Date(last) : null;
+    });
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [countdown, setCountdown] = useState(0);
     const [activeSource, setActiveSource] = useState('all');
@@ -497,127 +503,161 @@ export function useMarketNews(): UseMarketNewsReturn {
         }, 1000);
     }, []);
 
-    const getSafeAuthHeaders = async (): Promise<Record<string, string>> => {
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        const headers: Record<string, string> = { 
-            'Content-Type': 'application/json',
-            'apikey': anonKey || ''
-        };
-
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
-            
-            if (isValidToken && session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-        } catch (e) {
-            console.warn('[useMarketNews] Auth check failed, proceeding anonymously.');
-        }
-
-        return headers;
-    };
-
-    const fetchFromSource = useCallback(async (source: NewsFeedSource): Promise<NewsArticle[]> => {
-        const cacheKey = source.shortLabel;
-        const cached = readCache(cacheKey);
+    const fetchFromSource = useCallback(async (source: NewsFeedSource, tanks?: Tank[]): Promise<NewsArticle[]> => {
+        // [SYNC_OPTIMIZATION]: Check per-source TTL before triggering a network sync
+        const lastSync = getSyncTime(source.shortLabel);
         const ttl = source.cacheTTL ?? CACHE_TTL_MS;
-        if (cached && cached.age < ttl) {
-            return cached.articles;
+        if (Date.now() - lastSync < ttl) {
+            // Data is still fresh in master history, skip network load
+            return [];
         }
 
-        const headers = await getSafeAuthHeaders();
         const collected: NewsArticle[] = [];
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-        // 1. Try Primary: GNews API Proxy
+        // [FORENSIC_PRIORITY]: EPRA is our primary regulatory source.
+        // If we fail to get results from the scraper, we immediately try the GNews proxy.
+        // 0. Try HIGH-INTEGRITY: Official Scraper (only for Regulatory/Logistics)
+        if (source.type === 'Regulatory' || source.type === 'Logistics') {
+            try {
+                const { data, error } = await supabase.functions.invoke(OFFICIAL_SCRAPER, {
+                    method: 'POST',
+                    body: { source: source.shortLabel },
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`, // Force anon key for scraper reliability
+                        'apikey': anonKey
+                    }
+                });
+
+                if (!error && data?.results?.length > 0) {
+                    const signals = data.results.map((s: any) => ({
+                        ...s,
+                        feedSource: s.source || source.shortLabel,
+                        isOfficial: true,
+                        isCorroborated: true,
+                        relevanceScore: 1.0 
+                    }));
+                    collected.push(...signals);
+                }
+            } catch (e) {
+                console.warn(`[useMarketNews] Scraper fail for ${source.shortLabel}:`, e);
+            }
+        }
+
+        // 1. Try Primary: GNews API Proxy (Optimized for EPRA)
         if (isApiAvailable('GNEWS')) {
             try {
-                const response = await fetch(GNEWS_PROXY, {
+                const query = source.shortLabel === 'EPRA' 
+                    ? 'EPRA petroleum price Kenya news' 
+                    : `${source.shortLabel} fuel petroleum Kenya`;
+
+                const { data, error } = await supabase.functions.invoke(GNEWS_PROXY, {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ query: source.shortLabel + ' fuel petroleum Kenya', max: 5 })
+                    body: { query, max: 8 }, // Higher limit for regulatory sources
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`,
+                        'apikey': anonKey
+                    }
                 });
                 
-                if (response.status === 429) {
+                if (error && (error as any).status === 429) {
                     markApiLimited('GNEWS');
-                } else if (response.ok) {
-                    const data = await response.json();
-                    if (data.articles) {
-                        const articles = data.articles.map((a: any) => buildSignalFromArticle(a, source));
-                        collected.push(...articles);
-                    }
+                } else if (!error && data?.articles) {
+                    const articles = data.articles.map((a: any) => buildSignalFromArticle(a, source));
+                    collected.push(...articles);
                 }
-            } catch (e) { /* silent fail to fallback */ }
+            } catch (e) { /* fallback */ }
         }
 
         // 2. Try Secondary Redundancy (only if primary failed or returned nothing)
         if (collected.length === 0 && isApiAvailable('NEWSDATA')) {
             try {
-                const response = await fetch(NEWSDATA_PROXY, {
+                const { data, error } = await supabase.functions.invoke(NEWSDATA_PROXY, {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ query: source.shortLabel + ' energy Kenya' })
+                    body: { query: source.shortLabel + ' energy Kenya' },
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`,
+                        'apikey': anonKey
+                    }
                 });
                 
-                if (response.status === 429) {
+                if (error && (error as any).status === 429) {
                     markApiLimited('NEWSDATA');
-                } else if (response.ok) {
-                    const data = await response.json();
-                    if (data.results) {
-                        const articles = data.results.map((a: any) => buildSignalFromArticle(a, source));
-                        collected.push(...articles);
-                    }
+                } else if (!error && data?.results) {
+                    const articles = data.results.map((a: any) => buildSignalFromArticle(a, source));
+                    collected.push(...articles);
                 }
             } catch (e) {
                 // Failover to Currents Proxy
                 if (isApiAvailable('CURRENTS')) {
                     try {
-                        const response = await fetch(CURRENTS_PROXY, {
+                        const { data: currentsData, error: currentsError } = await supabase.functions.invoke(CURRENTS_PROXY, {
                             method: 'POST',
-                            headers,
-                            body: JSON.stringify({ query: source.shortLabel })
-                        });
-                        if (response.status === 429) {
-                            markApiLimited('CURRENTS');
-                        } else if (response.ok) {
-                            const data = await response.json();
-                            if (data.news) {
-                                const articles = data.news.map((a: any) => buildSignalFromArticle(a, source));
-                                collected.push(...articles);
+                            body: { query: source.shortLabel },
+                            headers: {
+                                'Authorization': `Bearer ${anonKey}`,
+                                'apikey': anonKey
                             }
+                        });
+                        if (currentsError && (currentsError as any).status === 429) {
+                            markApiLimited('CURRENTS');
+                        } else if (!currentsError && currentsData?.news) {
+                            const articles = currentsData.news.map((a: any) => buildSignalFromArticle(a, source));
+                            collected.push(...articles);
                         }
                     } catch (ce) { /* exhaust proxies */ }
                 }
             }
         }
 
-        // 3. Last Resort: Self-Hosted RSS Parser (skip if Proxy-only source)
+        // 3. Last Resort: Self-Hosted RSS Parser
         const isUrlValid = source.url && source.url.startsWith('http');
         if (collected.length === 0 && isUrlValid && !source.url.startsWith('proxy:')) {
             try {
-                const response = await fetch(RSS_PARSER, {
+                const { data, error } = await supabase.functions.invoke(RSS_PARSER, {
                     method: 'POST',
-                    headers,
-                    body: JSON.stringify({ rssUrl: source.url })
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.items) {
-                        const articles = data.items.map((i: any) => buildSignalFromArticle(i, source));
-                        collected.push(...articles);
+                    body: { rssUrl: source.url },
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`,
+                        'apikey': anonKey
                     }
+                });
+                if (!error && data?.items) {
+                    const articles = data.items.map((i: any) => buildSignalFromArticle(i, source));
+                    collected.push(...articles);
                 }
-            } catch (e) { /* total failure */ }
+            } catch (e) { 
+                console.error('[useMarketNews] Parser total failure:', e);
+            }
         }
 
         if (collected.length > 0) {
-            writeCache(cacheKey, collected);
+            // [TankIQ ENRICHMENT]: Only for newly fetched high-relevance signals
+            const aiService = new IntelligenceAIService();
+            const enriched = await Promise.all(collected.map(async (article) => {
+                if ((article.relevanceScore ?? 0) > 0.70) {
+                    try {
+                        const directive = await aiService.generateArticleDirective(article, tanks || []);
+                        return { ...article, aiDirective: directive };
+                    } catch (e) {
+                        console.warn(`[useMarketNews] TankIQ failed for ${article.title}`, e);
+                        return article;
+                    }
+                }
+                return article;
+            }));
+
+            writeMasterHistory(enriched);
+            updateSyncTime(source.shortLabel);
+            // After individual source fetch, update state with master timeline
+            setAllArticles(readMasterHistory());
+        } else {
+            // Even if no news found, mark as synced to prevent flood
+            updateSyncTime(source.shortLabel);
         }
         return collected;
     }, []);
-
-
-    const fetchAll = useCallback(async (force = false) => {
+    const fetchAll = useCallback(async (force = false, tanks?: Tank[]) => {
         // Rate-limit check (skip on initial mount, enforce on manual refresh)
         if (force) {
             const last = getLastRefreshTime();
@@ -634,90 +674,44 @@ export function useMarketNews(): UseMarketNewsReturn {
         }
 
         try {
-            // Sequential Fetching with Staggered Delays (Prevents 429 floods)
-            const collected: NewsArticle[] = [];
             let anySuccess = false;
-            let anyFromCache = false;
 
             for (const src of NEWS_SOURCES) {
                 try {
-                    const articles = await fetchFromSource(src);
+                    const articles = await fetchFromSource(src, tanks);
                     if (articles.length > 0) {
-                        const cached = readCache(src.shortLabel);
-                        if (cached && cached.age > (src.cacheTTL || CACHE_TTL_MS)) {
-                            anyFromCache = true;
-                        } else {
-                            anySuccess = true;
-                        }
-                        collected.push(...articles);
+                        anySuccess = true;
                     }
                 } catch (e) {
                     console.error(`[useMarketNews] Batch error for ${src.shortLabel}:`, e);
                 }
-                // Small stagger delay between source requests
+                // Small stagger delay between source requests to prevent gateway 429s
                 await new Promise(resolve => setTimeout(resolve, 150));
             }
 
-            if (collected.length > 0) {
-                // Deduplicate by URL or unique ID
-                const seen = new Set<string>();
-                
-                // Merge new articles with existing ones (Priority: new)
-                const merged = [...collected, ...allArticles].filter(a => {
-                    const ident = a.externalUrl || a.id;
-                    if (seen.has(ident)) return false;
-                    seen.add(ident);
-                    return true;
-                });
-
-                // Sort by newest first
-                merged.sort((a, b) => b.timestamp - a.timestamp);
-                
-                // Cap history to prevent storage bloat (e.g., 200 items)
-                const capped = merged.slice(0, 200);
-                
-                // Final Pass: Corroboration
-                const corroborated = corroborateArticles(capped);
-                
-                setAllArticles(corroborated);
-                
-                // Persist the Master History
-                try {
-                    localStorage.setItem('mi:master_history', JSON.stringify({
-                        articles: corroborated,
-                        lastSync: Date.now()
-                    }));
-                } catch (e) { /* silent storage fail */ }
-
-                setStatus(anyFromCache && !anySuccess ? 'cached-stale' : 'ok');
+            // Refresh completed: Update global state from persistent store
+            const final = readMasterHistory();
+            setAllArticles(final);
+            
+            if (anySuccess) {
+                setStatus('ok');
                 setLastUpdated(new Date());
-                setCacheAge(anyFromCache ? Date.now() - (getLastRefreshTime() - REFRESH_COOLDOWN_MS) : null);
-            } else if (allArticles.length === 0) {
-                setStatus('no-signal');
+                setLastRefreshTime();
+            } else if (final.length > 0) {
+                setStatus('cached-stale');
             } else {
-                setStatus('ok'); // Still ok if we have old articles
+                setStatus('no-signal');
             }
-        } catch {
-            setStatus('no-signal');
+        } catch (e) {
+            console.error('[useMarketNews] Fetch failure:', e);
+            setStatus(allArticles.length > 0 ? 'cached-stale' : 'no-signal');
         } finally {
             setIsRefreshing(false);
         }
     }, [fetchFromSource, startCooldown]);
 
-    // Initial fetch on mount / Auth ready
+    // Initial background sync check
     useEffect(() => {
-        // 1. Initial Load: Try master history instantly for 0-second UI pop
-        try {
-            const rawHistory = localStorage.getItem('mi:master_history');
-            if (rawHistory) {
-                const history = JSON.parse(rawHistory);
-                if (history.articles && history.articles.length > 0) {
-                    setAllArticles(history.articles);
-                    setStatus('ok');
-                    setLastUpdated(new Date(history.lastSync || Date.now()));
-                }
-            }
-        } catch (e) { /* fallback to fetch */ }
 
         // 2. Background Refresh: Wait until Auth is ready OR we have a session to avoid 401s
         if (!authLoading && !initialFetchAttempted.current) {
@@ -736,9 +730,9 @@ export function useMarketNews(): UseMarketNewsReturn {
         };
     }, [authLoading]);
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async (tanks?: Tank[]) => {
         if (!canRefresh) return;
-        await fetchAll(true);
+        await fetchAll(true, tanks);
     }, [canRefresh, fetchAll]);
 
     // Filtered view
@@ -763,7 +757,6 @@ export function useMarketNews(): UseMarketNewsReturn {
     return {
         articles: allArticles,
         status,
-        cacheAge,
         lastUpdated,
         isRefreshing,
         canRefresh,

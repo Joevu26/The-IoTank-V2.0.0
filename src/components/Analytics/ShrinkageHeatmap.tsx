@@ -18,46 +18,44 @@ export const ShrinkageHeatmap: React.FC = () => {
     };
 
     return (
-        <div className="acp-card mt-6">
-            <div className="acp-card-header mb-4">
-                <div className="acp-card-title">
-                    <div className="acp-section-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><FiAlertTriangle /></div>
-                    <h3 className="text-slate-800">Forensic Shrinkage Heatmap</h3>
+        <div className="acp-card mt-4 !p-4">
+            <div className="acp-card-header mb-3">
+                <div className="acp-card-title !gap-2">
+                    <div className="acp-section-icon !w-7 !h-7 !text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><FiAlertTriangle /></div>
+                    <h3 className="!text-sm">Forensic Shrinkage Heatmap</h3>
                 </div>
-                <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-2">
-                    <FiMoon className="text-indigo-400" /> Nocturnal Detection Active
+                <div className="text-[9px] text-slate-400 font-bold uppercase flex items-center gap-2">
+                    <FiMoon className="text-indigo-400" /> Nocturnal Active
                 </div>
             </div>
 
-            <div className="heatmap-container overflow-x-auto">
+            <div className="heatmap-container overflow-x-auto pb-2">
                 <div className="min-w-[500px]">
                     <div className="flex mb-1">
-                        <div className="w-10"></div>
-                        <div className="flex-1 flex justify-between px-2 text-[8px] text-slate-400 font-bold">
-                            <span>00:00</span>
-                            <span>06:00</span>
-                            <span>12:00</span>
-                            <span>18:00</span>
-                            <span>23:00</span>
+                        <div className="w-8"></div>
+                        <div className="flex-1 flex justify-between text-[7px] text-slate-400 font-bold px-[2px]">
+                            {Array.from({ length: 25 }, (_, i) => i % 4 === 0 ? (
+                                <span key={i} className="w-0 flex justify-center">{i < 10 ? `0${i}` : i}:00</span>
+                            ) : null)}
                         </div>
                     </div>
 
                     {days.map(day => (
-                        <div key={day} className="flex items-center gap-2 mb-1">
-                            <span className="w-10 text-[10px] font-bold text-slate-500">{day}</span>
-                            <div className="flex-1 flex gap-1">
+                        <div key={day} className="flex items-center gap-1.5 mb-[3px]">
+                            <span className="w-8 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{day}</span>
+                            <div className="flex-1 flex gap-[2px]">
                                 {hours.map(h => {
                                     const intensity = getShrinkageIntensity(day, h);
                                     let bgColor = '#f8fafc';
-                                    if (intensity > 0.7) bgColor = '#4c1d95'; // Deep Plum
-                                    else if (intensity > 0.5) bgColor = '#7c3aed'; // Rich Violet
-                                    else if (intensity > 0.3) bgColor = '#a855f7'; // Vibrant Amethyst
-                                    else if (intensity > 0.1) bgColor = '#e9d5ff'; // Light Lavender
+                                    if (intensity > 0.7) bgColor = '#4c1d95'; 
+                                    else if (intensity > 0.5) bgColor = '#7c3aed'; 
+                                    else if (intensity > 0.3) bgColor = '#a855f7'; 
+                                    else if (intensity > 0.1) bgColor = '#e9d5ff'; 
 
                                     return (
                                         <div
                                             key={h}
-                                            className="flex-1 h-6 rounded-sm transition-all hover:scale-110 cursor-pointer"
+                                            className="flex-1 h-5 rounded-[1px] transition-all hover:scale-110 cursor-pointer border-[0.5px] border-slate-100/50"
                                             style={{ backgroundColor: bgColor }}
                                             title={`${day} ${h}:00 - Intensity: ${(intensity * 100).toFixed(0)}%`}
                                         ></div>
@@ -69,19 +67,19 @@ export const ShrinkageHeatmap: React.FC = () => {
                 </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between text-[10px]">
-                <div className="flex items-center gap-4">
+            <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-3">
                     <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}></div>
-                        <span className="text-slate-500 italic uppercase font-bold">No Activity</span>
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}></div>
+                        <span className="text-[8px] text-slate-500 font-bold uppercase">No Activity</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4c1d95' }}></div>
-                        <span className="text-slate-500 italic uppercase font-bold">High Variance</span>
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#4c1d95' }}></div>
+                        <span className="text-[8px] text-slate-500 font-bold uppercase">High Variance</span>
                     </div>
                 </div>
-                <div className="p-2 font-black uppercase tracking-tighter" style={{ background: 'rgba(124, 58, 237, 0.05)', color: '#7c3aed', borderRadius: '4px', border: '1px solid rgba(124, 58, 237, 0.1)' }}>
-                    Pattern Alert: Recursive loss detected between 01:00 - 04:00 on Weekends.
+                <div className="px-2 py-1 text-[8px] font-black uppercase tracking-tighter flex items-center gap-2" style={{ background: 'rgba(124, 58, 237, 0.05)', color: '#7c3aed', borderRadius: '4px', border: '1px solid rgba(124, 58, 237, 0.1)' }}>
+                    <FiAlertTriangle size={10} /> Pattern: Recursive loss 01:00-04:00 (Weekends)
                 </div>
             </div>
         </div>

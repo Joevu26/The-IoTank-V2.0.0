@@ -325,16 +325,16 @@
     min-width: 0;
 }
 
-/* 3D Tank viewer cell */
+/* Tank viewer cell — High-visibility industrial theme */
 .visual-main {
-    background: linear-gradient(160deg, #1e1230 0%, #150d28 100%);
-    border: 1px solid rgba(168, 85, 247, 0.18);
+    background: #f8fafc;
+    border: 1px solid var(--color-border);
     border-radius: 18px;
     padding: 20px;
     min-height: 320px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.12);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
 }
 
 .visual-main::before {

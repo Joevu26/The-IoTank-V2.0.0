@@ -24,13 +24,14 @@ import { useTanks } from '@/hooks/useSupabase';
 import { useMarketIntelligence } from '@/hooks/useMarketIntelligence';
 import { useGeminiInsights } from '@/hooks/useGeminiInsights';
 import { useMarketNews, NewsArticle } from '@/hooks/useMarketNews';
-import { STRATEGIC_CAPABILITIES, OPERATIONAL_BOUNDARIES } from './MarketConstants';
+import { STRATEGIC_CAPABILITIES, OPERATIONAL_BOUNDARIES, IMPLICATION_META } from './MarketConstants';
 import { calculateCommandOverviewMetrics } from '@/utils/strategicIntelligence';
 import { TelemetryErrorBoundary, useTelemetryErrorHandling } from '@/components/Common/TelemetryErrorBoundary';
 import { supabase } from '@/config/supabase';
 import '../Common/DesignSystemCards.css';
 import './MarketPage.css';
 import officialBadge from '../../assets/images/official-badge.png';
+import { FiCpu } from 'react-icons/fi';
 
 /**
  * Clean up HTML entities like &nbsp; or &amp; from RSS strings safely
@@ -162,19 +163,25 @@ const NewsCard: React.FC<{
 
                 {/* Expanded: Intelligence Briefing OVERHAUL */}
                 {expanded && (
-                    <div className="mi-briefing-panel animate-in fade-in slide-in-from-top-2 duration-300">
-                        {/* Section 1: Intelligence Summary */}
+                    <div className="mi-briefing-panel animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Section 1: Intelligence Summary & Strategic Context */}
                         <div className="mi-briefing-section">
-                            <div className="mi-section-header">
-                                <FiShield size={12} className="text-accent" />
-                                <span>Rule-based Intelligence Briefing</span>
-                            </div>
-                            <p className="mi-briefing-text italic opacity-70 mb-2 text-[11px]">
-                                {article.briefingSummary.split('|')[1]?.trim() || 'Rule-based pattern matching: Contextualizing market signal for operational impact.'}
-                            </p>
-                            <p className="mi-briefing-text">
+                            {/* Full News Context - Moved to top as per user request */}
+                            <p className="mi-briefing-text mb-5">
                                 {decodeHTMLEntities(article.summary).replace(article.title, '').trim() || decodeHTMLEntities(article.summary)}
                             </p>
+
+                            <div className="mi-section-header">
+                                <FiShield size={12} className="text-accent" />
+                                <span>Strategic context</span>
+                            </div>
+
+                            {/* [Strategic Context Placeholder] - Focus on inference only (no repeated title) */}
+                            <div className={`mi-strategic-context-placeholder ${IMPLICATION_META[article.implicationCategory]?.bg} border rounded-lg p-3.5 mb-3 border-accent/10`}>
+                                <p className="text-[11px] leading-relaxed text-[#5A5A75] font-semibold">
+                                    {(article.aiDirective?.recommendation || article.briefingSummary.split('|')[1]?.trim() || '').replace(/^Strategic Context:\s*/i, '')}
+                                </p>
+                            </div>
                         </div>
 
                         {/* Section 2: Market Footprint Grid */}
@@ -184,8 +191,8 @@ const NewsCard: React.FC<{
                                 <span className="mi-grid-value uppercase">{article.region} / {article.implicationCategory}</span>
                             </div>
                             <div className="mi-grid-item">
-                                <span className="mi-grid-label">Signal Source Reliability</span>
-                                <span className="mi-grid-value">{article.isCorroborated ? 'MULTI-SOURCE VERIFIED' : 'SINGLE SOURCE ANALYSIS'}</span>
+                                <span className="mi-grid-label">TankIQ Reliability</span>
+                                <span className="mi-grid-value">{article.aiDirective ? `${Math.round(article.aiDirective.confidence * 100)}% Confidence` : (article.isCorroborated ? 'MULTI-SOURCE VERIFIED' : 'SINGLE SOURCE ANALYSIS')}</span>
                             </div>
                             <div className="mi-grid-item">
                                 <span className="mi-grid-label">Scoring Confidence</span>
@@ -197,10 +204,31 @@ const NewsCard: React.FC<{
                         <div className="mi-briefing-section mi-briefing-section--operational">
                             <div className="mi-section-header">
                                 <FiActivity size={12} className="text-accent" />
-                                <span>Localized Station Impact Analysis</span>
+                                <span>TankIQ Operational Directive</span>
                             </div>
                             
                             {(() => {
+                                // TankIQ AI Directive
+                                if (article.aiDirective) {
+                                    const status = article.aiDirective.status;
+                                    const color = status === 'CRITICAL' ? 'mi-status--red' : status === 'CAUTION' ? 'mi-status--amber' : 'mi-status--green';
+                                    
+                                    return (
+                                        <div className="mi-directive-container">
+                                            <div className={`mi-directive-badge ${color} flex items-center gap-1.5`}>
+                                                <FiCpu size={10} /> DIRECTIVE: {status}
+                                            </div>
+                                            <p className="mi-directive-text">{article.aiDirective.recommendation}</p>
+                                            {article.aiDirective.actionDetails && (
+                                                <div className="mt-2 text-[10px] bg-white/50 p-2 rounded border border-accent/10 text-accent font-bold">
+                                                    ACTION: {article.aiDirective.actionDetails}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
+
+                                // Rule-based Fallback
                                 const fuelTypes = article.topicTags.map(t => t.toLowerCase());
                                 const relevantTanks = tanks?.filter(t => fuelTypes.includes(t.fuelType.toLowerCase()) || fuelTypes.includes('all') || article.implicationCategory === 'Price');
                                 
@@ -311,9 +339,8 @@ const NewsCard: React.FC<{
 const StatusBanner: React.FC<{
     type: 'no-signal' | 'cached-stale' | 'source-unavailable';
     onRetry?: () => void;
-    cacheAgeMs?: number | null;
     onDismiss: () => void;
-}> = ({ type, onRetry, cacheAgeMs, onDismiss }) => {
+}> = ({ type, onRetry, onDismiss }) => {
     if (type === 'no-signal') return (
         <div className="mi-banner mi-banner--error">
             <FiWifiOff size={14} />
@@ -323,11 +350,10 @@ const StatusBanner: React.FC<{
         </div>
     );
     if (type === 'cached-stale') {
-        const mins = cacheAgeMs ? Math.round(cacheAgeMs / 60000) : '?';
         return (
             <div className="mi-banner mi-banner--warn">
                 <FiClock size={14} />
-                <span><strong>Cached results shown</strong> ({mins} min old). Sources may be temporarily unavailable.</span>
+                <span><strong>Sync Mode: Offline-First.</strong> Showing persisted intelligence data.</span>
                 {onRetry && <button className="mi-banner-btn" onClick={onRetry} title="Force refresh from source news feeds">Refresh</button>}
                 <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss stale cache warning"><FiX size={12} /></button>
             </div>
@@ -356,7 +382,6 @@ export const MarketPage: React.FC = () => {
 
     const {
         status: newsStatus,
-        cacheAge,
         isRefreshing,
         canRefresh,
         refresh,
@@ -388,6 +413,7 @@ export const MarketPage: React.FC = () => {
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
     const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'med'>('all');
+    const [fuelFilter, setFuelFilter] = useState<string>('all');
 
     // Tab logic
     const [activeTab, setActiveTab] = useState<'news' | 'analytics' | 'strategy' | 'archive'>('news');
@@ -396,6 +422,20 @@ export const MarketPage: React.FC = () => {
     const LIFESPAN_DAYS = 14;
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const ARCHIVE_THRESHOLD = LIFESPAN_DAYS * MS_PER_DAY;
+
+    // Dynamic Fuel Types from Tanks
+    const registeredFuelTypes = React.useMemo(() => {
+        const types = new Set<string>();
+        tanks.forEach(t => {
+            if (t.fuelType) {
+                // Normalize e.g. gasoline -> Petrol, diesel -> Diesel
+                let label = t.fuelType.charAt(0).toUpperCase() + t.fuelType.slice(1).toLowerCase();
+                if (label === 'Gasoline') label = 'Petrol';
+                types.add(label);
+            }
+        });
+        return Array.from(types).sort();
+    }, [tanks]);
 
     // Persist deleted IDs
     useEffect(() => {
@@ -473,6 +513,7 @@ export const MarketPage: React.FC = () => {
             feedSource: s.attribution || s.source || 'Intelligence',
             verificationStatus: 'verified' as const,
             confidenceScore: s.confidenceScore ?? 0.85,
+            url: (s as any).url || (s as any).externalUrl || '',
         }));
 
         const combined = [...filteredArticles, ...mappedSignals];
@@ -486,6 +527,15 @@ export const MarketPage: React.FC = () => {
             if (seenIds.has(a.id)) return false;
             if (deletedNewsIds.has(a.id)) return false;
             if (ignoredNewsIds.has(a.id)) return false;
+
+            // Fuel Filter
+            if (fuelFilter !== 'all') {
+                const searchStr = (a.title + ' ' + a.summary).toLowerCase();
+                const matchesFuel = searchStr.includes(fuelFilter.toLowerCase()) || 
+                                   (a as any).topicTags?.some((t: string) => t.toLowerCase() === fuelFilter.toLowerCase());
+                if (!matchesFuel) return false;
+            }
+
             seenIds.add(a.id);
             return true;
         });
@@ -532,7 +582,25 @@ export const MarketPage: React.FC = () => {
     const currentDisplayList = activeTab === 'archive' ? filterList(archiveFeed) : filterList(verifiedFeed);
     const currentUnverifiedList = activeTab === 'archive' ? [] : filterList(unverifiedFeed);
     
-    const procurementAdvisories = insights.filter(i => i.type === 'procurement');
+    // [TankIQ Strategy Integration]
+    // Harvest actionable directives from articles and merge into the strategy insights
+    const allActionableArticles = [...verifiedFeed, ...unverifiedFeed]
+        .filter(a => a.aiDirective?.actionRequired)
+        .map(a => ({
+            id: `article-action-${a.id}`,
+            type: 'procurement' as any,
+            title: `SIGNAL ACTION: ${a.aiDirective?.status}`,
+            summary: a.title,
+            recommendation: a.aiDirective?.recommendation || 'Operational response required.',
+            timestamp: a.timestamp,
+            confidence: a.aiDirective?.confidence || 0.9,
+            modelVersion: 'TankIQ-Signal-Insight',
+            supportingData: { article: a }
+        }));
+
+    const mergedInsights = [...insights, ...allActionableArticles].sort((a, b) => b.timestamp - a.timestamp);
+
+    const procurementAdvisories = mergedInsights.filter(i => i.type === 'procurement');
     const showBanner = !bannerDismissed && (newsStatus === 'no-signal' || newsStatus === 'cached-stale');
 
     return (
@@ -558,7 +626,7 @@ export const MarketPage: React.FC = () => {
                             <button
                                 className={`mi-refresh-btn-premium ${!canRefresh || isRefreshing ? 'mi-refresh-btn-premium--disabled' : ''}`}
                                 title="Scanner for the latest market intelligence signals"
-                                onClick={refresh}
+                                onClick={() => refresh(tanks)}
                                 disabled={!canRefresh || isRefreshing}
                             >
                                 <FiRefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
@@ -573,10 +641,31 @@ export const MarketPage: React.FC = () => {
                     {/* Mission-Critical KPIs: Real Data Injection */}
                     <div className="mission-status-grid">
                         {(() => {
-                            const brent = prices.find(p => p.fuelType === 'BRENT')?.pricePerLiter || 74.50;
-                            const fx = prices.find(p => p.fuelType === 'GBP_KSH')?.pricePerLiter || 162.40;
-                            const epra = prices.find(p => p.fuelType === 'AGO' || p.source === 'epra')?.pricePerLiter || 184.50;
                             
+                            // Map registered types to EPRA source keys
+                            const fuelPriceCards = registeredFuelTypes.map(ft => {
+                                const sourceKey = ft.toUpperCase() === 'DIESEL' ? 'AGO' : 
+                                                ft.toUpperCase() === 'PETROL' ? 'PMS' : 
+                                                ft.toUpperCase() === 'KEROSENE' ? 'IK' : ft;
+                                
+                                const priceData = prices.find(p => p.fuelType === sourceKey || p.fuelType === ft);
+                                const price = priceData?.pricePerLiter || (sourceKey === 'PMS' ? 179.30 : sourceKey === 'AGO' ? 168.20 : 184.50);
+                                const metadata = (priceData as any)?.metadata || {};
+                                const isLive = metadata.isLiveExtraction;
+                                const isOfficial = metadata.isOfficial;
+                                
+                                return {
+                                    label: `EPRA ${ft} Price`,
+                                    val: `KES ${price.toFixed(2)}`,
+                                    unit: '/L',
+                                    delta: isOfficial ? 'OFFICIAL' : (isLive ? '+Live' : '+2.1%'),
+                                    up: true,
+                                    sub: `${sourceKey} · Current cycle`,
+                                    isLive,
+                                    isOfficial
+                                };
+                            });
+
                             // Calculate OTS Cycle (Countdown to next 14th)
                             const now = new Date();
                             const next14th = new Date(now.getFullYear(), now.getMonth(), 14);
@@ -589,14 +678,28 @@ export const MarketPage: React.FC = () => {
 
                             const formatMonth = (d: Date) => d.toLocaleString('default', { month: 'short' });
 
+                            const brentData = prices.find(p => p.fuelType === 'BRENT');
+                            const fxData = prices.find(p => p.fuelType === 'FX' || p.fuelType === 'GBP_KSH');
+
+                            const brentPrice = brentData?.pricePerLiter || 81.40;
+                            const fxPrice = fxData?.pricePerLiter || 129.50;
+
                             return [
-                                { label: 'Brent Crude', val: `$${brent.toFixed(2)}`, unit: '/bbl', delta: '+1.2%', up: true, sub: 'Global benchmark' },
-                                { label: 'GBP/Ksh Rate', val: fx.toFixed(2), unit: '', delta: '+0.1%', up: true, sub: 'CBK mid-rate' },
-                                { label: 'EPRA Pump Price', val: `KES ${epra.toFixed(2)}`, unit: '/L', delta: '+4.2%', up: true, sub: 'AGO · Current cycle' },
+                                { label: 'Brent Crude', val: `$${brentPrice.toFixed(2)}`, unit: '/bbl', delta: '+1.2%', up: true, sub: 'Global benchmark', isLive: (brentData as any)?.metadata?.isLiveExtraction },
+                                { label: 'FX Rate', val: fxPrice.toFixed(2), unit: ' KES', delta: '-0.3%', up: false, sub: 'USD/KES Spot', isLive: (fxData as any)?.metadata?.isLiveExtraction },
+                                ...fuelPriceCards,
                                 { label: 'OTS Cycle', val: `${daysLeft} days`, unit: '', delta: `${formatMonth(cycleStart)} 15–${formatMonth(cycleEnd)} 14`, up: true, sub: 'Next review countdown' },
-                            ].map((kpi, idx) => (
-                                <div key={idx} className="an-kpi-card">
-                                    <div className="an-kpi-label">{kpi.label}</div>
+                            ].map((kpi: any, idx) => (
+                                <div key={idx} className={`an-kpi-card ${kpi.isLive ? 'an-kpi-card--live' : ''}`}>
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="an-kpi-label">{kpi.label}</div>
+                                        {kpi.isLive && (
+                                            <span className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[9px] font-bold animate-pulse">
+                                                <div className="w-1 h-1 rounded-full bg-cyan-400" />
+                                                LIVE
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="an-kpi-value">{kpi.val}<span className="an-kpi-unit">{kpi.unit}</span></div>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className={`an-kpi-delta ${kpi.up ? 'an-kpi-delta--up' : 'an-kpi-delta--down'}`}>
@@ -636,7 +739,6 @@ export const MarketPage: React.FC = () => {
                         {showBanner && activeTab === 'news' && (
                             <StatusBanner
                                 type={newsStatus as any}
-                                cacheAgeMs={cacheAge}
                                 onRetry={canRefresh ? refresh : undefined}
                                 onDismiss={() => setBannerDismissed(true)}
                             />
@@ -661,7 +763,26 @@ export const MarketPage: React.FC = () => {
                                 />
                             </div>
 
-                            <div className="mi-chip-row">
+                            <div className="mi-chip-row mb-3">
+                                <button
+                                    className={`mi-pill-btn ${fuelFilter === 'all' ? 'mi-pill-btn--active' : ''}`}
+                                    onClick={() => setFuelFilter('all')}
+                                >
+                                    All Products
+                                </button>
+                                {registeredFuelTypes.map(ft => (
+                                    <button
+                                        key={ft}
+                                        className={`mi-pill-btn ${fuelFilter === ft ? 'mi-pill-btn--active' : ''}`}
+                                        onClick={() => setFuelFilter(ft)}
+                                        title={`Filter signals for ${ft}`}
+                                    >
+                                        {ft}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="mi-chip-row border-t border-accent/5 pt-3">
                                 {(['all', 'high', 'med'] as const).map(p => (
                                     <button
                                         key={p}
