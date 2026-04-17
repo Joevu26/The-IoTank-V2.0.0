@@ -3,7 +3,7 @@ import { Tank } from '@/types';
 import { useHistoricalReadings } from '@/hooks/useSupabase';
 import { useConsumptionAnalytics } from '@/hooks/useConsumptionAnalytics';
 import { TankVisual2D } from '../Common/TankVisual2D';
-import { FiActivity, FiDownload, FiShare2, FiRefreshCw, FiInfo, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiActivity, FiDownload, FiShare2, FiRefreshCw, FiChevronDown } from 'react-icons/fi';
 import { formatVolume } from '@/utils/formatUtils';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Area } from 'recharts';
 
