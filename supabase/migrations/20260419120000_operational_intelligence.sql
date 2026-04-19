@@ -51,16 +51,20 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_notifications ENABLE ROW LEVEL SECURITY;
 
 -- Admins can manage everything
+DROP POLICY IF EXISTS "Admins manage ticket messages" ON public.ticket_messages;
 CREATE POLICY "Admins manage ticket messages" ON public.ticket_messages
     FOR ALL USING (EXISTS (SELECT 1 FROM public.system_users WHERE auth_user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "Admins manage invoices" ON public.invoices;
 CREATE POLICY "Admins manage invoices" ON public.invoices
     FOR ALL USING (EXISTS (SELECT 1 FROM public.system_users WHERE auth_user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "Admins manage system notifications" ON public.system_notifications;
 CREATE POLICY "Admins manage system notifications" ON public.system_notifications
     FOR ALL USING (EXISTS (SELECT 1 FROM public.system_users WHERE auth_user_id = auth.uid() AND is_active = TRUE));
 
 -- Clients/Users can see their own
+DROP POLICY IF EXISTS "Clients see their own messages" ON public.ticket_messages;
 CREATE POLICY "Clients see their own messages" ON public.ticket_messages
     FOR SELECT USING (
         EXISTS (
@@ -70,6 +74,7 @@ CREATE POLICY "Clients see their own messages" ON public.ticket_messages
         )
     );
 
+DROP POLICY IF EXISTS "Clients see their own invoices" ON public.invoices;
 CREATE POLICY "Clients see their own invoices" ON public.invoices
     FOR SELECT USING (
         EXISTS (
@@ -170,6 +175,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+DROP TRIGGER IF EXISTS on_message_created ON public.ticket_messages;
 CREATE TRIGGER on_message_created
     BEFORE INSERT ON public.ticket_messages
     FOR EACH ROW EXECUTE FUNCTION public.stamp_sender_name();
