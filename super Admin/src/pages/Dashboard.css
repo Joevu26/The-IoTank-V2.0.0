@@ -1,261 +1,346 @@
-/* Dashboard.css - Amethyst Pro Bento Design System */
-
-:root {
-    --dash-spacing: 24px;
-    --dash-border-radius: 24px;
-    --dash-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.08);
-    --dash-bg-card: #ffffff;
-    --dash-bg-sub: #f8fafc;
-    --dash-gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-    --dash-glass-bg: rgba(255, 255, 255, 0.7);
-    --dash-glass-border: rgba(255, 255, 255, 0.4);
-}
+/* =============================================================================
+   IoTank Super Admin - Visionary Command Console
+   Expert-level high-density interface with Glassmorphism depth
+   ============================================================================= */
 
 .dashboard-container {
-    padding: var(--dash-spacing);
-    max-width: 1600px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-areas:
-        "h h h h h h h h h h h h"
-        "s s s s s s s s q q q q"
-        "f f f f f f f f f f f f"
-        "o o o o o o o o a a a a";
-    gap: var(--dash-spacing);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    width: 100%;
+    animation: console-fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 1. Mission Control Hero Area */
-.mission-control-hero {
-    grid-area: h;
-    background: var(--dash-bg-card);
-    border-radius: var(--dash-border-radius);
-    padding: 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: var(--dash-shadow);
-    border: 1px solid rgba(0, 0, 0, 0.03);
+@keyframes console-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- High-Density Glass Base --- */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius-xl);
+    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.05);
+    transition: all var(--transition-base);
     position: relative;
     overflow: hidden;
 }
 
-.mission-control-hero::before {
-    content: '';
+.glass-panel:hover {
+    background: rgba(255, 255, 255, 0.75);
+    border-color: var(--color-accent-primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -4px rgba(0, 212, 255, 0.08);
+}
+
+/* --- Metric Ornaments (High-Ranking Detail) --- */
+.ornament {
     position: absolute;
-    top: -50%;
-    right: -10%;
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
-    z-index: 0;
-}
-
-.hero-content { position: relative; z-index: 1; }
-.hero-content h1 {
-    font-size: 3.5rem;
-    font-weight: 900;
-    color: #0f172a;
-    letter-spacing: -0.04em;
-    line-height: 1;
-}
-
-/* 2. System Health - High Density Stats */
-.health-grid-bento {
-    grid-area: s;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-}
-
-.health-status-card-v2 {
-    background: var(--dash-bg-card);
-    border-radius: 20px;
-    padding: 24px;
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    box-shadow: var(--dash-shadow);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 180px;
-}
-
-.health-status-card-v2:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.12);
-    border-color: #e2e8f0;
-}
-
-.health-label-v2 {
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: #94a3b8;
+    font-family: var(--font-family-mono);
+    font-size: 8px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-bottom: 12px;
+    color: var(--color-text-disabled);
+    opacity: 0.4;
+    pointer-events: none;
 }
 
-.health-value-v2 {
-    font-size: 2rem;
-    font-weight: 900;
-    color: #0f172a;
+.ornament-tl { top: 12px; left: 12px; }
+.ornament-tr { top: 12px; right: 12px; }
+.ornament-bl { bottom: 12px; left: 12px; }
+
+/* --- 1. Streamlined Command Hero --- */
+.mission-control-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(244,245,255,0.8) 100%);
+    border-radius: var(--border-radius-xl);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 20px -2px rgba(50, 50, 100, 0.04);
+}
+
+.hero-content h1 {
+    font-size: 1.5rem;
+    margin: 0;
+    letter-spacing: -0.03em;
+    color: var(--color-text-primary);
+}
+
+.hero-subtitle {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--color-accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-bottom: 2px;
+}
+
+/* --- 2. Functional Bento Sections --- */
+.dashboard-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin: var(--spacing-md) 0;
+    padding-left: 4px;
+}
+
+.dashboard-section-title svg {
+    font-size: 13px;
+    color: var(--color-accent-primary);
+}
+
+/* --- 3. High-Density Stat Cards --- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.compact-stat-card {
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 110px;
+    border-left: 3px solid transparent;
+}
+
+.compact-stat-card.primary { border-left-color: var(--color-accent-primary); }
+.compact-stat-card.success { border-left-color: var(--color-success); }
+.compact-stat-card.warning { border-left-color: var(--color-warning); }
+.compact-stat-card.danger { border-left-color: var(--color-danger); }
+
+.stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    margin-bottom: 2px;
+}
+
+.stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
     line-height: 1;
 }
 
-/* Integrity Progress Bar */
-.integrity-container {
-    margin-top: 16px;
-    width: 100%;
-}
-.integrity-label-small {
-    font-size: 0.6rem;
-    font-weight: 900;
-    color: #64748b;
-    text-transform: uppercase;
+.stat-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 4px;
-}
-.integrity-bar-bg {
-    height: 4px;
-    background: #f1f5f9;
-    border-radius: 2px;
-    overflow: hidden;
-}
-.integrity-bar-fill {
-    height: 100%;
-    background: var(--dash-gradient-primary);
-    border-radius: 2px;
-    transition: width 1s ease-out;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
 }
 
-/* 3. Quick Actions - Command Bar */
-.command-center-bar {
-    grid-area: q;
-    background: #1e293b;
-    border-radius: var(--dash-border-radius);
-    padding: 32px;
-    color: white;
+.stat-footer {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+/* --- 4. Tactical Matrix (Map & Ops) --- */
+.ops-matrix-grid {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: var(--spacing-lg);
+}
+
+/* Tactical Map Display */
+.tactical-map-wrapper {
+    height: 340px;
+}
+
+.tactical-map-container {
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(244, 245, 255, 0.4) 0%, rgba(255, 255, 255, 0.8) 100%);
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.map-scan-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-accent-primary-light), transparent);
+    animation: map-scan 4s linear infinite;
+    z-index: 2;
+}
+
+@keyframes map-scan {
+    0% { top: 0; opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { top: 100%; opacity: 0; }
+}
+
+/* Command Sidebar */
+.command-blade {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--spacing-sm);
 }
 
-.command-title {
-    font-size: 0.9rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #94a3b8;
-    margin-bottom: 12px;
+.blade-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-}
-
-.cmd-btn {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 14px 18px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    transition: all 0.2s;
-    cursor: pointer;
+    gap: var(--spacing-md);
+    padding: 10px 14px;
+    border-radius: var(--border-radius-lg);
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     text-align: left;
 }
 
-.cmd-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #6366f1;
+.blade-btn:hover {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-accent-primary-light);
     transform: translateX(4px);
 }
 
-.cmd-icon {
-    font-size: 1.1rem;
-    color: #818cf8;
-}
-
-.cmd-details .title {
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: #f1f5f9;
-    line-height: 1.2;
-}
-
-.cmd-details .desc {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #94a3b8;
-}
-
-/* 4. Financial Command Area */
-.financial-bento-area {
-    grid-area: f;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-}
-
-.fin-card-premium {
-    background: white;
-    border-radius: 24px;
-    padding: 32px;
-    box-shadow: var(--dash-shadow);
-    border: 1px solid rgba(0, 0, 0, 0.03);
+.blade-icon {
+    width: 32px;
+    height: 32px;
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 200px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--color-bg-primary);
+    color: var(--color-accent-primary);
+    font-size: 16px;
 }
 
-.fin-card-premium.accent {
-    background: #0f172a;
+.blade-btn:hover .blade-icon {
+    background: var(--color-accent-primary);
     color: white;
 }
 
-/* 5. Support & Activity */
-.ops-grid-wrapper {
-    grid-area: o;
-}
-.audit-feed-wrapper {
-    grid-area: a;
-}
-
-.ops-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-
-/* Utility Classes */
-.glass-panel {
-    background: var(--dash-glass-bg);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--dash-glass-border);
+.blade-text h4 {
+    font-size: 11px;
+    font-weight: 700;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-.text-gradient {
-    background: var(--dash-gradient-primary);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+.blade-text p {
+    font-size: 8px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--color-text-disabled);
+    text-transform: uppercase;
 }
 
-/* Scrollbar Refinement */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+/* --- 5. Audit Feed --- */
+.audit-container {
+    height: 340px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
 
-/* Responsive Overrides */
-@media (max-width: 1200px) {
-    .dashboard-container {
-        grid-template-areas:
-            "h h h h"
-            "s s s s"
-            "q q q q"
-            "f f f f"
-            "o o o o"
-            "a a a a";
+.audit-scroll {
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.audit-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    padding: 8px;
+    border-radius: var(--border-radius-md);
+    transition: background 0.2s ease;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.audit-entry:hover {
+    background: rgba(0, 212, 255, 0.03);
+}
+
+.audit-icon {
+    font-size: 10px;
+    color: var(--color-accent-primary);
+    margin-top: 2px;
+}
+
+.audit-content p {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.audit-meta {
+    font-size: 7px;
+    font-family: var(--font-family-mono);
+    color: var(--color-text-disabled);
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* --- Status Modifiers --- */
+.status-indicator {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.status-online { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }
+.status-syncing { background: var(--color-warning); animation: pulse-glow 2s infinite; }
+
+/* Header Actions */
+.header-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+}
+
+.header-stat-item {
+    text-align: right;
+}
+
+.header-stat-label {
+    font-size: 8px;
+    font-weight: 800;
+    color: var(--color-text-disabled);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.header-stat-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+/* Responsive Adaptations */
+@media (max-width: 1024px) {
+    .ops-matrix-grid {
         grid-template-columns: 1fr;
     }
 }

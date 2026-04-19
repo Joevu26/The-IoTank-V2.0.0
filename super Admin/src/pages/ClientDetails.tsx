@@ -12,8 +12,18 @@ const ClientDetails = () => {
     const [loading, setLoading] = useState(true);
     const [isAdjustingDebt, setIsAdjustingDebt] = useState(false);
     const [isAddingTank, setIsAddingTank] = useState(false);
+    const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+    const [isRecordingPayment, setIsRecordingPayment] = useState(false);
     const [adjustmentAmount, setAdjustmentAmount] = useState('');
     const [adjustmentReason, setAdjustmentReason] = useState('');
+    const [paymentData, setPaymentData] = useState({ amount: '', method: 'M-PESA', reference: '' });
+    const [profileUpdates, setProfileUpdates] = useState({ 
+        station_name: '', 
+        email: '', 
+        phone: '', 
+        station_location: '', 
+        county: '' 
+    });
     const [newTank, setNewTank] = useState({ name: '', type: 'Super Petrol (Unleaded Premium)', capacity: 10000 });
 
     useEffect(() => {
@@ -61,6 +71,52 @@ const ClientDetails = () => {
         }
     };
 
+    const handleReactivate = async () => {
+        if (!id || !window.confirm("Reactivate all services for this subject?")) return;
+        try {
+            await clientsService.reactivateClient(id);
+            const data = await clientsService.getClientById(id);
+            setClient(data);
+            alert("Services reactivated successfully.");
+        } catch (err: any) {
+            alert("Error: " + err.message);
+        }
+    };
+
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!id) return;
+        try {
+            await clientsService.updateProfile(id, profileUpdates);
+            const data = await clientsService.getClientById(id);
+            setClient(data);
+            setIsUpdatingProfile(false);
+            alert("Profile updated successfully!");
+        } catch (err: any) {
+            alert("Error: " + err.message);
+        }
+    };
+
+    const handleRecordPayment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!id) return;
+        try {
+            await clientsService.recordExternalPayment(
+                id, 
+                parseFloat(paymentData.amount), 
+                paymentData.method, 
+                paymentData.reference
+            );
+            const data = await clientsService.getClientById(id);
+            setClient(data);
+            setIsRecordingPayment(false);
+            setPaymentData({ amount: '', method: 'M-PESA', reference: '' });
+            alert("Payment recorded successfully!");
+        } catch (err: any) {
+            alert("Error: " + err.message);
+        }
+    };
+
     if (loading) return (
         <Layout>
             <div className="p-20 flex flex-col items-center justify-center min-h-[60vh]">
@@ -96,11 +152,23 @@ const ClientDetails = () => {
                                 <FiSlash /> suspend operational access
                             </button>
                         ) : (
-                            <button className="btn btn-success gap-2">
+                            <button onClick={handleReactivate} className="btn btn-success gap-2">
                                 <FiCheckCircle /> reactivate services
                             </button>
                         )}
-                        <button className="btn btn-primary gap-2">
+                        <button 
+                            className="btn btn-primary gap-2"
+                            onClick={() => {
+                                setProfileUpdates({
+                                    station_name: client.station_name,
+                                    email: client.email,
+                                    phone: client.phone || '',
+                                    station_location: client.station_location,
+                                    county: client.county
+                                });
+                                setIsUpdatingProfile(true);
+                            }}
+                        >
                             <FiEdit2 /> update profile
                         </button>
                     </div>
@@ -180,7 +248,7 @@ const ClientDetails = () => {
                                 <button onClick={() => setIsAdjustingDebt(true)} className="btn btn-secondary flex-1 border-info text-info font-black">
                                     MANUAL DEBT ADJUSTMENT
                                 </button>
-                                <button className="btn btn-secondary flex-1 font-black">
+                                <button onClick={() => setIsRecordingPayment(true)} className="btn btn-secondary flex-1 font-black">
                                     RECORD EXTERNAL PAYMENT
                                 </button>
                             </div>
@@ -358,6 +426,83 @@ const ClientDetails = () => {
                                 <div className="flex gap-4 mt-4">
                                     <button type="button" onClick={() => setIsAdjustingDebt(false)} className="btn btn-secondary flex-1">ABORT</button>
                                     <button type="submit" className="btn btn-primary flex-1 font-black">COMMIT ADJUSTMENT</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {isUpdatingProfile && (
+                    <div className="modal-overlay-premium" onClick={() => setIsUpdatingProfile(false)}>
+                        <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
+                            <header className="mb-8">
+                                <h2 className="text-xl font-black text-primary uppercase tracking-tight">Update Station Profile</h2>
+                                <p className="text-xs text-secondary mt-2">Modify the master registration details for this subject.</p>
+                            </header>
+                            <form onSubmit={handleUpdateProfile} className="flex flex-col gap-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="input-group-premium">
+                                        <label>Station Name</label>
+                                        <input type="text" className="input-premium" value={profileUpdates.station_name} onChange={e => setProfileUpdates({...profileUpdates, station_name: e.target.value})} required />
+                                    </div>
+                                    <div className="input-group-premium">
+                                        <label>Email Address</label>
+                                        <input type="email" className="input-premium" value={profileUpdates.email} onChange={e => setProfileUpdates({...profileUpdates, email: e.target.value})} required />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="input-group-premium">
+                                        <label>Phone Number</label>
+                                        <input type="text" className="input-premium" value={profileUpdates.phone} onChange={e => setProfileUpdates({...profileUpdates, phone: e.target.value})} />
+                                    </div>
+                                    <div className="input-group-premium">
+                                        <label>County</label>
+                                        <input type="text" className="input-premium" value={profileUpdates.county} onChange={e => setProfileUpdates({...profileUpdates, county: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="input-group-premium">
+                                    <label>Specific Location</label>
+                                    <input type="text" className="input-premium" value={profileUpdates.station_location} onChange={e => setProfileUpdates({...profileUpdates, station_location: e.target.value})} />
+                                </div>
+                                <div className="flex gap-4 mt-4">
+                                    <button type="button" onClick={() => setIsUpdatingProfile(false)} className="btn btn-secondary flex-1">CANCEL</button>
+                                    <button type="submit" className="btn btn-primary flex-1 font-black">SAVE CHANGES</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {isRecordingPayment && (
+                    <div className="modal-overlay-premium" onClick={() => setIsRecordingPayment(false)}>
+                        <div className="modal-content-premium" onClick={e => e.stopPropagation()}>
+                            <header className="mb-8">
+                                <h2 className="text-xl font-black text-primary uppercase tracking-tight">Record External Remittance</h2>
+                                <p className="text-xs text-secondary mt-2">Manually register a payment received outside the automated billing pipeline.</p>
+                            </header>
+                            <form onSubmit={handleRecordPayment} className="flex flex-col gap-6">
+                                <div className="input-group-premium">
+                                    <label>Amount (KES)</label>
+                                    <input type="number" className="input-premium" value={paymentData.amount} onChange={e => setPaymentData({...paymentData, amount: e.target.value})} required />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="input-group-premium">
+                                        <label>Payment Method</label>
+                                        <select className="input-premium" value={paymentData.method} onChange={e => setPaymentData({...paymentData, method: e.target.value})}>
+                                            <option>M-PESA</option>
+                                            <option>Bank Transfer (RTGS/EFT)</option>
+                                            <option>Cash Deposit</option>
+                                            <option>Cheque</option>
+                                        </select>
+                                    </div>
+                                    <div className="input-group-premium">
+                                        <label>Transaction Reference</label>
+                                        <input type="text" className="input-premium" value={paymentData.reference} onChange={e => setPaymentData({...paymentData, reference: e.target.value})} required />
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 mt-4">
+                                    <button type="button" onClick={() => setIsRecordingPayment(false)} className="btn btn-secondary flex-1">DISCARD</button>
+                                    <button type="submit" className="btn btn-primary flex-1 font-black">RECORD PAYMENT</button>
                                 </div>
                             </form>
                         </div>

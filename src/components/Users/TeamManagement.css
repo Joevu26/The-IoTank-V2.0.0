@@ -16,7 +16,7 @@
 
 .tm-header-info h1 {
     font-size: 1.6rem;
-    font-weight: 900;
+    font-weight: 500;
     color: #0f172a;
     display: flex;
     align-items: center;
@@ -45,7 +45,7 @@
     color: white;
     border: none;
     border-radius: 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -88,7 +88,7 @@
 
 .tm-stat-label {
     font-size: 0.65rem;
-    font-weight: 800;
+    font-weight: 400;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -96,7 +96,7 @@
 
 .tm-stat-value {
     font-size: 2rem;
-    font-weight: 900;
+    font-weight: 500;
     color: #0f172a;
     line-height: 1;
 }
@@ -135,13 +135,13 @@
 
 .tm-role-count {
     font-size: 1.1rem;
-    font-weight: 900;
+    font-weight: 500;
     line-height: 1;
 }
 
 .tm-role-name {
     font-size: 0.45rem;
-    font-weight: 800;
+    font-weight: 400;
     text-transform: uppercase;
     margin-top: 2px;
     white-space: nowrap;
@@ -182,7 +182,7 @@
 
 .tm-table-header h3 {
     font-size: 0.8rem;
-    font-weight: 900;
+    font-weight: 500;
     color: #374151;
     text-transform: lowercase;
     margin: 0;
@@ -211,7 +211,7 @@
 
 .tm-table th {
     font-size: 0.65rem;
-    font-weight: 800;
+    font-weight: 600;
     color: #9ca3af;
     text-align: left;
     padding: 0.5rem 0.875rem;
@@ -255,7 +255,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
+    font-weight: 600;
     font-size: 0.7rem;
     text-transform: uppercase;
     flex-shrink: 0;
@@ -272,7 +272,7 @@
 }
 
 .tm-member-name {
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.8rem;
     color: #1f2937;
 }
@@ -306,7 +306,7 @@
     padding: 0.2rem 0.6rem;
     border-radius: 2rem;
     font-size: 0.65rem;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     white-space: nowrap;
 }
@@ -322,7 +322,7 @@
     padding: 0.2rem 0.6rem;
     border-radius: 2rem;
     font-size: 0.65rem;
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     white-space: nowrap;
 }
@@ -434,7 +434,7 @@
 
 .tm-modal-title-group h2 {
     font-size: 1.1rem;
-    font-weight: 800;
+    font-weight: 600;
     color: #0f172a;
     margin: 0 0 0.2rem;
 }
@@ -477,7 +477,7 @@
     padding: 0.625rem 0.875rem;
     font-size: 0.75rem;
     color: #1d4ed8;
-    font-weight: 600;
+    font-weight: 500;
     margin-bottom: 1.25rem;
 }
 
@@ -492,7 +492,7 @@
 .tm-form-group label {
     display: block;
     font-size: 0.8rem;
-    font-weight: 700;
+    font-weight: 600;
     color: #374151;
     margin-bottom: 0.4rem;
 }
@@ -535,7 +535,7 @@
     padding: 0.625rem 0.875rem;
     font-size: 0.8rem;
     color: #991b1b;
-    font-weight: 600;
+    font-weight: 500;
     margin-bottom: 1rem;
 }
 
@@ -552,7 +552,7 @@
     border: 1.5px solid #e2e8f0;
     background: white;
     color: #64748b;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
@@ -570,7 +570,7 @@
     border: none;
     background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: white;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s;
@@ -634,7 +634,7 @@
 
 .tm-modal-success h3 {
     font-size: 1.1rem;
-    font-weight: 800;
+    font-weight: 600;
     color: #0f172a;
     margin: 0 0 0.5rem;
 }
@@ -653,7 +653,7 @@
     padding: 4rem;
     color: #94a3b8;
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 500;
 }
 
 /* ─── Responsive ─── */

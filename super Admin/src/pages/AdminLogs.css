@@ -1,150 +1,111 @@
-/* super Admin/src/pages/AdminLogs.css */
-
 .logs-container {
-    padding: var(--spacing-xl);
-    animation: fadeIn 0.4s ease-out;
+    padding: 2.5rem;
 }
 
-.logs-header {
-    margin-bottom: var(--spacing-xl);
-}
-
-.logs-header h1 {
-    font-size: var(--font-size-2xl);
-    font-weight: 800;
-    margin: 0;
-    color: var(--color-text-primary);
-}
-
-.logs-header p {
-    color: var(--color-text-secondary);
-    margin-top: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-}
-
-.logs-list {
+/* ── Standard Header ── */
+.dp-header {
     display: flex;
-    flex-direction: column;
-    gap: var(--spacing-base);
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2.5rem;
 }
 
-.log-premium-card {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-lg);
-    padding: var(--spacing-lg);
-    transition: all 0.2s ease;
-    display: flex;
-    gap: var(--spacing-lg);
+/* ── Forensic Log Table ── */
+.tdv-transaction-table-container {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
 }
 
-.log-premium-card:hover {
-    border-color: var(--color-accent-primary-light);
-    box-shadow: var(--shadow-sm);
+.tdv-transaction-table {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.log-icon-wrapper {
-    width: 42px;
-    height: 42px;
-    border-radius: var(--border-radius-md);
-    background: var(--color-bg-tertiary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    color: var(--color-text-disabled);
-    flex-shrink: 0;
-}
-
-.log-content {
-    flex: 1;
-    min-width: 0;
-}
-
-.log-header-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-xs);
-}
-
-.log-type-tag {
-    padding: 0.2rem 0.6rem;
-    border-radius: var(--border-radius-full);
-    font-size: 9px;
-    font-weight: 800;
+.tdv-transaction-table th {
+    padding: 1.25rem 1.5rem;
+    background: #f8fafc;
+    text-align: left;
+    font-size: 0.62rem;
+    font-weight: 950;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-divider);
-    color: var(--color-text-secondary);
+    letter-spacing: 0.12em;
+    color: #475569;
+    border-bottom: 2px solid #f1f5f9;
 }
 
-.log-time {
-    font-size: 11px;
-    color: var(--color-text-disabled);
-    font-weight: 600;
+.tdv-transaction-table td {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    color: #334155;
+    vertical-align: middle;
 }
 
-.log-description {
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: var(--color-text-primary);
-    line-height: 1.5;
+.tdv-transaction-table tr:hover {
+    background: #fdfcff;
 }
 
-.log-meta-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--spacing-lg);
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-md);
-    border-top: 1px solid var(--color-divider);
+/* ── Log Specifics ── */
+.log-type-tag {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.6rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
 }
 
-.meta-pill {
-    display: flex;
+.log-meta-pill {
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--color-text-secondary);
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #64748b;
 }
 
-.meta-pill b {
-    color: var(--color-text-primary);
+.log-meta-pill b {
+    color: #0f172a;
+    font-weight: 950;
 }
 
-.meta-icon {
-    width: 14px;
-    opacity: 0.6;
+/* ── Payload Expansion ── */
+.log-expansion-panel {
+    background: #f8fafc;
+    padding: 2rem;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .log-changes-box {
-    margin-top: var(--spacing-lg);
-    background: var(--color-bg-tertiary);
-    border-radius: var(--border-radius-md);
-    border: 1px solid var(--color-divider);
-    padding: var(--spacing-md);
+    background: #0f172a;
+    border-radius: 12px;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 .changes-label {
-    font-size: 9px;
-    font-weight: 900;
-    color: var(--color-text-disabled);
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 950;
     text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 0.75rem;
     letter-spacing: 0.1em;
-    margin-bottom: var(--spacing-sm);
 }
 
 .changes-pre {
-    font-family: var(--font-family-mono);
-    font-size: 11px;
-    color: var(--color-text-secondary);
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 0.75rem;
     white-space: pre-wrap;
     word-break: break-all;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
 }

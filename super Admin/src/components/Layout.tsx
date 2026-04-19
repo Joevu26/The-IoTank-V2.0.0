@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { Sidebar } from './Layout/Sidebar';
 import { Navbar } from './Layout/Navbar';
-import { FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi';
+import { FiFacebook, FiInstagram, FiTwitter, FiBell } from 'react-icons/fi';
 import brandMark from '../assets/iotank-logo-v3.png';
 import './Layout/MainLayout.css';
+import { supabase } from '../config/supabase';
+import NotificationPanel from './NotificationPanel';
 
 interface LayoutProps {
     children: ReactNode;
@@ -14,11 +16,38 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const navigate = useNavigate();
-
     const location = useLocation();
 
     const isFullBleedPage = location.pathname.includes('/market') || location.pathname.includes('/clients/');
+
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            const { count } = await supabase
+                .from('system_notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_read', false);
+            setUnreadCount(count || 0);
+        };
+
+        fetchUnreadCount();
+
+        const channel = supabase
+            .channel('unread_tracker')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'system_notifications' 
+            }, () => {
+                fetchUnreadCount();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
+
 
     const toggleSidebar = () => {
         if (window.innerWidth <= 768) {
@@ -37,7 +66,17 @@ const Layout = ({ children }: LayoutProps) => {
             />
 
             <div className="content-wrapper">
-                <Navbar onToggleSidebar={toggleSidebar} />
+                <Navbar onToggleSidebar={toggleSidebar}>
+                    <button 
+                        className="icon-btn relative" 
+                        onClick={() => setShowNotifications(!showNotifications)}
+                    >
+                        <FiBell />
+                        {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white animate-pulse">{unreadCount}</span>}
+                    </button>
+                </Navbar>
+                
+                {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
                 
                 <main className={`main-content ${isFullBleedPage ? 'full-bleed' : ''}`}>
                     {children}

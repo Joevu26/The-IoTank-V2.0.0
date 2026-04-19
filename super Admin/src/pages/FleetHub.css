@@ -1,0 +1,113 @@
+.fleet-hub-container {
+    position: relative;
+    padding-bottom: 5rem;
+}
+
+/* ── Sticky Hub Navigator ── */
+.hub-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(244, 245, 255, 0.8);
+    backdrop-filter: blur(12px);
+    padding: 1.25rem 2.5rem;
+    margin: 0 -2.5rem 2.5rem -2.5rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+    transition: all 0.3s ease;
+}
+
+.hub-header-sticky.scrolled {
+    padding: 0.75rem 2.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.hub-nav-track {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.hub-nav-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: 14px;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.hub-nav-pill:hover {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: #e2e8f0;
+}
+
+.hub-nav-pill.active {
+    background: #fff;
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.hub-nav-icon {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    transition: color 0.2s ease;
+}
+
+.hub-nav-pill.active .hub-nav-icon {
+    color: #6366f1;
+}
+
+.hub-nav-label {
+    font-size: 0.75rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    transition: color 0.2s ease;
+}
+
+.hub-nav-pill.active .hub-nav-label {
+    color: #1e293b;
+}
+
+.hub-nav-indicator {
+    position: absolute;
+    bottom: -1.3rem;
+    left: 15%;
+    right: 15%;
+    height: 3px;
+    background: #6366f1;
+    border-radius: 10px 10px 0 0;
+}
+
+/* ── Content Surface ── */
+.hub-content-surface {
+    min-height: 80vh;
+}
+
+/* Hub View Overrides for Sub-pages */
+.fleet-hub-container .dp-header {
+    margin-top: 1rem;
+    border-bottom: none;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fleet-hub-container .pending-reg-container,
+.fleet-hub-container .clients-list-container,
+.fleet-hub-container .hardware-page {
+    padding: 0;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease forwards;
+}

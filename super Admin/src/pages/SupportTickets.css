@@ -1,292 +1,330 @@
 .support-page {
-    background: var(--bg-primary);
-    min-height: 100vh;
-    color: var(--text-primary);
-    padding: 32px;
+    background: transparent;
+    padding: 2.5rem;
 }
 
-/* Tab Navigation */
-.support-tabs {
+/* ── Standard Header Strategy ── */
+.dp-header {
     display: flex;
-    gap: 8px;
-    padding: 6px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 100px;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2.5rem;
+}
+
+.dp-title-group h1 {
+    font-size: 2.5rem;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+.dp-subtitle {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #94a3b8;
+}
+
+.dp-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* ── Stats Grid: Support Cyan Theme ── */
+.dp-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+}
+
+.dp-premium-stat-card {
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(10px);
-    width: fit-content;
-    margin-bottom: 32px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.dp-premium-stat-card:hover {
+    transform: translateY(-4px);
+    border-color: #06b6d4;
+    box-shadow: 0 12px 24px rgba(6, 182, 212, 0.08);
+}
+
+.stat-icon-blob {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    background: #ecfeff;
+    color: #06b6d4;
+}
+
+.stat-icon-blob.urgent {
+    background: #fef2f2;
+    color: #f43f5e;
+}
+
+.stat-content label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.stat-content h3 {
+    font-size: 1.25rem;
+    font-weight: 950;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+/* ── SLA Compliance Bars ── */
+.sla-compliance-row {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.sla-premium-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 1.25rem;
+    flex: 1;
+}
+
+.sla-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.sla-label-row label {
+    font-size: 0.7rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.sla-value {
+    font-size: 0.85rem;
+    font-weight: 950;
+    color: #1e293b;
+}
+
+.sla-bar-container {
+    height: 6px;
+    background: #f1f5f9;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.sla-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.8s ease;
+}
+
+.sla-fill.cyan { background: #06b6d4; }
+.sla-fill.amber { background: #f59e0b; }
+
+/* ── Ticket Queue Table ── */
+.tdv-transaction-table-container {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.table-header-toolbar {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fafafa;
+}
+
+.header-search-box {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.5rem 1rem;
+    width: 280px;
+    transition: all 0.2s ease;
+}
+
+.header-search-box:focus-within {
+    border-color: #06b6d4;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.header-search-box input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #1e293b;
+    width: 100%;
+}
+
+.tdv-transaction-table th {
+    padding: 1rem 1.5rem;
+    background: #f8fafc;
+    text-align: left;
+    font-size: 0.62rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #475569;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.tdv-transaction-table td {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.tdv-transaction-table tr:hover td {
+    background: #fcfcfc;
+}
+
+/* ── Support Control Hub Tabs ── */
+.support-tabs-container {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 4px;
+    display: inline-flex;
+    gap: 4px;
+    margin-bottom: 2rem;
+    max-width: 100%;
     overflow-x: auto;
 }
 
 .support-tab-btn {
-    padding: 8px 18px;
-    border-radius: 100px;
+    padding: 0.6rem 1.25rem;
+    border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 800;
-    color: var(--text-secondary);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
     border: none;
     background: transparent;
-    cursor: pointer;
+    color: #64748b;
     white-space: nowrap;
 }
 
 .support-tab-btn.active {
-    background: var(--primary-color);
-    color: white;
-    box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.3);
+    background: #06b6d4;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
 }
 
-/* Metrics Dashboard */
-.support-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-}
-
-.support-stats-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    border-radius: 24px;
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.support-stats-card.highlight {
-    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.1) 0%, rgba(255,255,255,0.02) 100%);
-    border-color: rgba(var(--primary-rgb), 0.3);
-}
-
-.support-stats-card.urgent {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255,255,255,0.02) 100%);
-    border-color: rgba(239, 68, 68, 0.3);
-}
-
-.stat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.stat-label {
-    font-size: 0.75rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.6;
-}
-
-.stat-value {
-    font-size: 2rem;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-}
-
-.stat-subtext {
-    font-size: 0.7rem;
-    font-weight: 600;
-    opacity: 0.5;
-}
-
-/* SLA Status Bars */
-.sla-status-row {
-    margin-top: 32px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 24px;
-}
-
-.sla-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 20px;
-    padding: 20px;
-}
-
-.sla-progress-bg {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 3px;
-    margin: 12px 0;
-    overflow: hidden;
-}
-
-.sla-progress {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 1s ease;
-}
-
-/* Ticket Queue Table */
-.ticket-table-container {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 24px;
-    overflow: hidden;
-    margin-top: 24px;
-}
-
-.ticket-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.ticket-table th {
-    text-align: left;
-    padding: 16px 20px;
-    background: rgba(0, 0, 0, 0.2);
-    font-size: 0.7rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-}
-
-.ticket-table td {
-    padding: 16px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    font-size: 0.85rem;
-    vertical-align: middle;
-}
-
-.ticket-table tr:hover td {
-    background: rgba(255, 255, 255, 0.01);
-}
-
-/* Badges */
+/* ── Status Badges & Priorities ── */
 .badge {
-    padding: 4px 10px;
-    border-radius: 100px;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
     font-size: 0.65rem;
-    font-weight: 800;
+    font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-.badge-urgent { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
-.badge-high { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
-.badge-medium { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-low { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge--urgent { background: #fef2f2; color: #dc2626; border: 1px solid #fee2e2; }
+.badge--high { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; }
+.badge--medium { background: #fffbeb; color: #d97706; border: 1px solid #fef3c7; }
+.badge--low { background: #f0fdf4; color: #16a34a; border: 1px solid #dcfce7; }
 
-/* Conversation Thread */
-.conversation-thread {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    padding: 24px;
-    max-height: 600px;
-    overflow-y: auto;
-    background: rgba(0,0,0,0.1);
-    border-radius: 16px;
+.status-pill {
+    padding: 4px 8px;
+    background: #f1f5f9;
+    color: #475569;
+    border-radius: 6px;
+    font-size: 0.6rem;
+    font-weight: 900;
+    text-transform: uppercase;
 }
 
+/* ── Action Circles ── */
+.action-circle {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.action-circle.view {
+    color: #06b6d4;
+    background: #ecfeff;
+}
+
+.action-circle.view:hover {
+    background: #06b6d4;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+}
+
+/* ── Ticket Detail Specifics ── */
 .message-bubble {
-    max-width: 80%;
-    padding: 16px;
-    border-radius: 18px;
-    position: relative;
+    padding: 1.25rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    max-width: 85%;
 }
 
 .message-bubble.client {
-    align-self: flex-start;
-    background: rgba(255, 255, 255, 0.05);
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-bottom-left-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .message-bubble.admin {
-    align-self: flex-end;
-    background: var(--primary-color);
-    color: white;
+    background: #ecfeff;
+    border: 1px solid #cffafe;
     border-bottom-right-radius: 4px;
-}
-
-.message-bubble.internal {
-    align-self: center;
-    background: rgba(245, 158, 11, 0.08);
-    border: 1px dashed rgba(245, 158, 11, 0.4);
-    color: #f59e0b;
-    font-size: 0.8rem;
-    max-width: 90%;
+    margin-left: auto;
 }
 
 .message-meta {
     display: flex;
-    justify-content: space-between;
-    font-size: 0.65rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    opacity: 0.6;
-}
-
-/* Detail View Layout */
-.ticket-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 350px;
-    gap: 24px;
-}
-
-.info-panel-section {
-    padding: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.info-label {
-    font-size: 0.65rem;
+    gap: 1rem;
+    font-size: 0.7rem;
     font-weight: 800;
     text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.5;
-    margin-bottom: 4px;
-    display: block;
-}
-
-.info-value {
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-/* Forms */
-.support-input {
-    width: 100%;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 12px 16px;
-    color: white;
-    outline: none;
-    transition: all 0.3s ease;
-}
-
-.support-input:focus {
-    border-color: var(--primary-color);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* Knowledge Base */
-.kb-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.kb-card {
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.kb-meta {
-    display: flex;
-    gap: 12px;
-    font-size: 0.7rem;
-    opacity: 0.6;
+    color: #94a3b8;
+    margin-bottom: 0.5rem;
 }

@@ -29,60 +29,109 @@ export interface NewsletterTemplate {
 
 export const communicationService = {
     async getAnnouncements(): Promise<Announcement[]> {
-        return [
-            {
-                id: '1',
-                date_sent: '2026-03-20 09:00',
-                subject: 'Planned Maintenance: March 25th',
-                recipients_count: 1250,
-                methods: ['Email', 'Dashboard'],
-                open_rate: 68,
-                click_rate: 12,
-                status: 'sent'
-            },
-            {
-                id: '2',
-                date_sent: '2026-03-15 14:30',
-                subject: 'New Feature: 3D Digital Twin Hub',
-                recipients_count: 840,
-                methods: ['Email', 'Push'],
-                open_rate: 45,
-                click_rate: 28,
-                status: 'sent'
-            }
-        ];
+        const { data, error } = await supabase
+            .from('global_announcements')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error('Error fetching announcements:', error);
+            return [];
+        }
+
+        return data.map(a => ({
+            id: a.id,
+            date_sent: new Date(a.created_at).toLocaleString(),
+            subject: a.subject,
+            recipients_count: a.recipients_count,
+            methods: a.channels,
+            open_rate: a.open_rate,
+            click_rate: a.click_rate,
+            status: a.status as any
+        }));
     },
 
     async getActiveBanners(): Promise<DashboardBanner[]> {
-        return [
-            {
-                id: 'B1',
-                type: 'warning',
-                message: 'Scheduled maintenance on March 25, 3-5 AM EAT',
-                target: 'All',
-                is_dismissible: true,
-                active: true
-            },
-            {
-                id: 'B2',
-                type: 'error',
-                message: 'M-Pesa payment gateway temporarily unavailable, use bank transfer',
-                target: 'All',
-                is_dismissible: false,
-                active: true
-            }
-        ];
+        const { data, error } = await supabase
+            .from('dashboard_banners')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching banners:', error);
+            return [];
+        }
+
+        return data.map(b => ({
+            id: b.id,
+            type: b.type as any,
+            message: b.message,
+            target: b.target as any,
+            is_dismissible: b.is_dismissible,
+            active: b.is_active
+        }));
     },
 
     async getNewsletterTemplates(): Promise<NewsletterTemplate[]> {
-        return [
-            { id: 'T1', name: 'Monthly Product Update', last_modified: '2026-03-01', category: 'Product' },
-            { id: 'T2', name: 'Fuel Market Insights Q1', last_modified: '2026-02-15', category: 'Insights' }
-        ];
+        const { data, error } = await supabase
+            .from('newsletter_templates')
+            .select('*')
+            .order('last_modified', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching newsletter templates:', error);
+            return [];
+        }
+
+        return data.map(t => ({
+            id: t.id,
+            name: t.name,
+            last_modified: new Date(t.last_modified).toLocaleDateString(),
+            category: t.category as any
+        }));
     },
 
-    async sendAnnouncement(data: any) {
+    async saveNewsletterTemplate(template: Omit<NewsletterTemplate, 'id' | 'last_modified'>) {
+        const { data, error } = await supabase
+            .from('newsletter_templates')
+            .insert({
+                ...template,
+                created_by: (await supabase.auth.getUser()).data.user?.id
+            })
+            .select()
+            .single();
 
-        return { success: true };
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteNewsletterTemplate(id: string) {
+        const { error } = await supabase
+            .from('newsletter_templates')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async sendAnnouncement(data: { subject: string, body: string, channels: string[], target: string }) {
+        const { data: result, error } = await supabase
+            .from('global_announcements')
+            .insert({
+                subject: data.subject,
+                body: data.body,
+                channels: data.channels,
+                target_audience: data.target,
+                status: 'sent', // Immediate dispatch by default for this UI
+                created_by: (await supabase.auth.getUser()).data.user?.id
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return { success: true, data: result };
     }
 };
+

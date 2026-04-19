@@ -70,27 +70,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // ── ─────────────────────────────────────────────────────────────────────────
 
     const menuItems = [
-        { name: 'platform intelligence', isSection: true, path: 'sec-intel', level: 4 },
+        { name: 'strategic operations', isSection: true, path: 'sec-intel', level: 4 },
         { name: 'dashboard', path: '/', icon: <MdDashboard />, level: 4 },
-        
-        { name: 'client management', isSection: true, path: 'sec-clients', level: 4 },
-        { name: 'new registrations', path: '/registrations', icon: <MdPersonAdd />, level: 1 },
-        { name: 'registered clients', path: '/clients', icon: <MdPeople />, level: 4 },
-        { name: 'billing & revenue', path: '/billing', icon: <MdAttachMoney />, level: 4 },
-        { name: 'support tickets', path: '/support', icon: <MdConfirmationNumber />, level: 4 },
-        { name: 'system hardware', path: '/hardware', icon: <MdMemory />, level: 1 },
+        { name: 'fleet control', path: '/fleet', icon: <MdMemory />, level: 4 },
+        { name: 'forensic hub', path: '/governance', icon: <FiShield />, level: 1 },
+        { name: 'security events', path: '/security-events', icon: <MdReportGmailerrorred />, level: 1 },
+
+        { name: 'business & revenue', isSection: true, path: 'sec-biz', level: 4 },
+        { name: 'billing archive', path: '/billing', icon: <MdAttachMoney />, level: 4 },
         { name: 'analytics & reports', path: '/analytics', icon: <MdBarChart />, level: 1 },
 
-        { name: 'system governance', isSection: true, path: 'sec-gov', level: 4 },
-        { name: 'settings', path: '/settings', icon: <MdSettings />, level: 4 },
-        { name: 'system logs', path: '/logs', icon: <MdHistory />, level: 1 },
-        { name: 'user management', path: '/admins', icon: <MdAdminPanelSettings />, level: 1 },
-        { name: 'audit & compliance', path: '/audit', icon: <MdSecurity />, level: 1 },
-        { name: 'security events', path: '/security-events', icon: <MdReportGmailerrorred />, level: 1 },
+        { name: 'workspace & support', isSection: true, path: 'sec-work', level: 4 },
+        { name: 'workforce hub', path: '/workforce', icon: <MdPeople />, level: 4 },
+        { name: 'system settings', path: '/settings', icon: <MdSettings />, level: 4 },
         
-        { name: 'resources', isSection: true, path: 'sec-resources', level: 4 },
-        { name: 'announcements', path: '/announcements', icon: <MdNotificationsActive />, level: 1 },
-        { name: 'help center', path: '/help', icon: <MdHelpOutline />, level: 4 },
+        { name: 'resource studio', isSection: true, path: 'sec-resources', level: 4 },
+        { name: 'platform resources', path: '/resources', icon: <MdNotificationsActive />, level: 4 },
     ].filter(item => canSee(item.level));
 
     return (

@@ -1,33 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import { analyticsService, BusinessKPIs, UsageStats, ScheduledReport } from '../services/analyticsService';
 import { 
     FiBarChart2, FiPieChart, FiTrendingUp, FiTrendingDown, 
     FiActivity, FiFileText, FiCalendar, FiUsers, 
     FiMap, FiTarget, FiZap, FiDownload, FiPlus,
-    FiFilter, FiMail, FiClock, FiCheckCircle, FiChevronRight
+    FiFilter, FiMail, FiClock, FiCheckCircle, FiChevronRight,
+    FiBox, FiCpu, FiShield, FiExternalLink, FiAlertCircle
 } from 'react-icons/fi';
 import './AnalyticsReports.css';
 
 const AnalyticsReports: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'usage' | 'reports' | 'behavior' | 'automation'>('overview');
+    const [activeTab, setActiveTab] = useState<'intelligence' | 'reporting'>('intelligence');
     const [kpis, setKpis] = useState<BusinessKPIs | null>(null);
     const [usage, setUsage] = useState<UsageStats | null>(null);
     const [scheduled, setScheduled] = useState<ScheduledReport[]>([]);
     const [loading, setLoading] = useState(true);
+    const [growthStats, setGrowthStats] = useState<number[]>(new Array(12).fill(0));
+
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [kpiData, usageData, scheduledData] = await Promise.all([
+                const [kpiData, usageData, scheduledData, growthData] = await Promise.all([
                     analyticsService.getBusinessKPIs(),
                     analyticsService.getUsageStats(),
-                    analyticsService.getScheduledReports()
+                    analyticsService.getScheduledReports(),
+                    analyticsService.getMonthlyGrowthStats()
                 ]);
                 setKpis(kpiData);
                 setUsage(usageData);
                 setScheduled(scheduledData);
+                setGrowthStats(growthData);
             } catch (error) {
                 console.error('Error fetching analytics data:', error);
             } finally {
@@ -45,79 +50,75 @@ const AnalyticsReports: React.FC = () => {
         }).format(amount);
     };
 
-    const renderBusinessDashboard = () => (
-        <div className="analytics-overview animate-fade-in">
-            {/* 7.1 Key Performance Indicators */}
-            <div className="kpi-grid">
-                <div className="kpi-card">
-                    <span className="kpi-label">MRR Growth</span>
-                    <h2 className="kpi-value">+{kpis?.mrrGrowth}%</h2>
-                    <span className="kpi-growth positive">
-                        <FiTrendingUp className="inline mr-1" /> Superior
-                    </span>
+    const maxGrowth = useMemo(() => Math.max(...growthStats, 1), [growthStats]);
+
+    const renderIntelligence = () => (
+        <div className="analytics-intelligence animate-fade-in">
+            {/* Business Dashboard Section */}
+            <div className="dp-stats-grid">
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob"><FiTrendingUp /></div>
+                    <div className="stat-content">
+                        <label>MRR Momentum</label>
+                        <h3>+{kpis?.mrrGrowth}%</h3>
+                        <div className="stat-trend up">Above target</div>
+                    </div>
                 </div>
-                <div className="kpi-card highlight">
-                    <span className="kpi-label">Annual Run Rate (ARR)</span>
-                    <h2 className="kpi-value text-primary">{formatCurrency(kpis?.arr || 0)}</h2>
-                    <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Target: 20M</span>
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#ecfdf5', color: '#10b981' }}><FiBarChart2 /></div>
+                    <div className="stat-content">
+                        <label>Annual Run Rate</label>
+                        <h3>{formatCurrency(kpis?.arr || 0)}</h3>
+                        <div className="stat-trend up">Steady growth</div>
+                    </div>
                 </div>
-                <div className="kpi-card">
-                    <span className="kpi-label">Churn Rate</span>
-                    <h2 className="kpi-value text-danger">{kpis?.churnRate}%</h2>
-                    <span className="kpi-growth negative">
-                         Below industry avg
-                    </span>
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#fff1f2', color: '#f43f5e' }}><FiTarget /></div>
+                    <div className="stat-content">
+                        <label>Churn Velocity</label>
+                        <h3 className="text-rose-600">{kpis?.churnRate}%</h3>
+                        <div className="stat-trend down">Low risk</div>
+                    </div>
                 </div>
-                <div className="kpi-card">
-                    <span className="kpi-label">Average ARPU</span>
-                    <h2 className="kpi-value text-cyan-400">{formatCurrency(kpis?.arpu || 0)}</h2>
-                    <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Per client/mo</span>
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#ecfeff', color: '#06b6d4' }}><FiActivity /></div>
+                    <div className="stat-content">
+                        <label>Avg ARPU</label>
+                        <h3>{formatCurrency(kpis?.arpu || 0)}</h3>
+                        <div className="stat-trend up">+4.2%</div>
+                    </div>
                 </div>
             </div>
 
-            <div className="analytics-dashboard-grid">
-                {/* Simulated Growth Chart */}
-                <div className="chart-container relative overflow-hidden">
-                     <div className="flex justify-between items-start mb-6">
-                        <div>
-                            <h4 className="font-black text-sm uppercase tracking-widest opacity-40">Client Growth Over Time</h4>
-                            <p className="text-xl font-bold">Total Hubs: 4,285</p>
-                        </div>
-                        <FiTrendingUp className="text-success text-2xl" />
-                     </div>
-                     <div className="h-48 flex items-end gap-2 px-2">
-                        {[40, 60, 45, 80, 55, 90, 75, 110, 95, 130, 120, 156].map((v, i) => (
-                            <div key={i} className="flex-1 bg-primary bg-opacity-20 rounded-t-lg transition-all hover:bg-opacity-50 group relative" style={{height: `${v}%`}}>
-                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black p-1 rounded text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {v} nodes
-                                </div>
-                            </div>
+            <div className="analytics-dashboard-grid mt-8">
+                <div className="dp-intelligence-card">
+                    <div className="card-label-row">
+                        <h4>Client Network Expansion</h4>
+                        <span className="text-[10px] font-black uppercase text-slate-400">{usage?.totalTanks || 0} Nodes</span>
+                    </div>
+                    <div className="bar-chart-container">
+                        {growthStats.map((v, i) => (
+                            <div key={i} className="bar-segment" style={{ height: `${(v / maxGrowth) * 100}%` }} data-value={`${v} Nodes`} />
                         ))}
-                     </div>
-                     <div className="flex justify-between mt-4 text-[8px] font-black uppercase tracking-widest opacity-30 px-2">
-                        <span>Jan 25</span>
-                        <span>Jun 25</span>
-                        <span>Dec 25</span>
-                     </div>
+                    </div>
                 </div>
 
-                {/* Simulated Geodistribution */}
-                <div className="chart-container">
-                    <h4 className="font-black text-sm uppercase tracking-widest opacity-40 mb-6">Regional Distribution</h4>
-                    <div className="flex flex-col gap-4">
+
+                <div className="dp-intelligence-card">
+                    <div className="card-label-row">
+                        <h4>Engagement Funnel</h4>
+                    </div>
+                    <div className="funnel-container">
                         {[
-                            { county: 'Nairobi', share: 45, color: 'bg-primary' },
-                            { county: 'Mombasa', share: 22, color: 'bg-cyan-400' },
-                            { county: 'Kisumu', share: 15, color: 'bg-amber-500' },
-                            { county: 'Nakuru', share: 18, color: 'bg-indigo-500' }
-                        ].map(c => (
-                            <div key={c.county}>
-                                <div className="flex justify-between text-[10px] font-bold opacity-60 uppercase mb-1">
-                                    <span>{c.county}</span>
-                                    <span>{c.share}%</span>
-                                </div>
-                                <div className="h-2 bg-white bg-opacity-5 rounded-full overflow-hidden">
-                                    <div className={`h-full ${c.color}`} style={{width: `${c.share}%`}}></div>
+                            { step: 'Registration', val: '1,240', drop: '0%' },
+                            { step: 'Setup', val: '850', drop: '31% drop' },
+                            { step: 'Connection', val: '720', drop: '15% drop' },
+                            { step: 'Pro Activation', val: '450', drop: '37% drop' }
+                        ].map((s, i) => (
+                            <div key={i} className="funnel-step" style={{ opacity: 1 - (i * 0.1), width: `${100 - (i * 8)}%`, margin: '0 auto' }}>
+                                <span>{s.step}</span>
+                                <div className="text-right">
+                                    <div className="text-xs font-black text-purple-700">{s.val}</div>
                                 </div>
                             </div>
                         ))}
@@ -125,56 +126,80 @@ const AnalyticsReports: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
-                 <div className="glass-card text-center">
-                    <FiActivity size={24} className="mx-auto mb-2 text-primary" />
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-1">System Uptime</div>
-                    <div className="text-2xl font-black">{kpis?.uptime}%</div>
-                 </div>
-                 <div className="glass-card text-center">
-                    <FiZap size={24} className="mx-auto mb-2 text-cyan-400" />
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-1">API Success Rate</div>
-                    <div className="text-2xl font-black">{kpis?.apiSuccess}%</div>
-                 </div>
-                 <div className="glass-card text-center">
-                    <FiUsers size={24} className="mx-auto mb-2 text-amber-500" />
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-1">CAC Recovery</div>
-                    <div className="text-2xl font-black">4.2 Months</div>
-                 </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                 <div className="dp-intelligence-card">
+                    <div className="card-label-row"><h4>Stickiness Index</h4></div>
+                    <div className="flex gap-4">
+                        <div className="flex-1 p-6 bg-slate-50 rounded-3xl">
+                            <span className="text-[10px] font-black uppercase opacity-40">DAU/MAU</span>
+                            <div className="text-3xl font-black text-purple-600">84%</div>
+                        </div>
+                        <div className="flex-1 p-6 bg-slate-50 rounded-3xl">
+                            <span className="text-[10px] font-black uppercase opacity-40">Retention</span>
+                            <div className="text-3xl font-black text-cyan-500">96%</div>
+                        </div>
+                    </div>
+                </div>
+                <div className="dp-intelligence-card">
+                    <div className="card-label-row"><h4>Regional Distribution</h4></div>
+                    <div className="space-y-4">
+                        {[{ county: 'Nairobi', share: 45 }, { county: 'Mombasa', share: 22 }].map(c => (
+                            <div key={c.county} className="region-row">
+                                <div className="flex justify-between text-[10px] font-bold mb-1">
+                                    <span>{c.county}</span>
+                                    <span>{c.share}%</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-purple-500" style={{ width: `${c.share}%` }} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );
 
     const renderUsageAnalytics = () => (
         <div className="usage-analytics animate-fade-in">
-            <div className="usage-grid mb-8">
-                <div className="usage-card glass-card">
-                    <div className="kpi-label">Fuel Volume Monitored</div>
-                    <h2 className="text-3xl font-black tracking-tighter text-primary">{usage?.totalFuel.toLocaleString()} <small className="text-xs opacity-50 uppercase tracking-widest font-bold">Liters</small></h2>
-                    <div className="text-[10px] font-bold opacity-40 mt-1 uppercase tracking-widest">Daily Average: 42k Liters</div>
+            <div className="dp-stats-grid mb-8">
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob"><FiBox /></div>
+                    <div className="stat-content">
+                        <label>Fuel Volume Monitored</label>
+                        <h3>{usage?.totalFuel.toLocaleString()}L</h3>
+                    </div>
                 </div>
-                <div className="usage-card glass-card">
-                    <div className="kpi-label">API Requests (30d)</div>
-                    <h2 className="text-3xl font-black tracking-tighter text-cyan-400">{usage?.apiCalls30d.toLocaleString()}</h2>
-                    <div className="text-[10px] font-bold opacity-40 mt-1 uppercase tracking-widest text-success">99.9% Latency compliant</div>
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#ecfeff', color: '#06b6d4' }}><FiActivity /></div>
+                    <div className="stat-content">
+                        <label>API Requests (30D)</label>
+                        <h3>{usage?.apiCalls30d.toLocaleString()}</h3>
+                    </div>
                 </div>
-                <div className="usage-card glass-card highlight">
-                    <div className="kpi-label">Alerts Triggered (30d)</div>
-                    <h2 className="text-3xl font-black tracking-tighter text-amber-500">{usage?.alertsTriggered30d}</h2>
-                    <div className="text-[10px] font-bold opacity-40 mt-1 uppercase tracking-widest">Critial incidents flagged</div>
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#fffbeb', color: '#f59e0b' }}><FiAlertCircle /></div>
+                    <div className="stat-content">
+                        <label>Critical Incidents</label>
+                        <h3>{usage?.alertsTriggered30d}</h3>
+                    </div>
                 </div>
             </div>
 
-            <div className="glass-card">
-                <h4 className="font-black text-sm uppercase tracking-widest opacity-40 mb-8">Feature Adoption Performance</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+            <div className="dp-intelligence-card">
+                <div className="card-label-row">
+                    <h4>Feature Adoption Matrix</h4>
+                </div>
+                <div className="adoption-matrix">
                     {Object.entries(usage?.featureAdoption || {}).map(([feature, adoption]) => (
-                        <div key={feature} className="adoption-row">
-                            <div className="flex-1">
-                                <span className="text-xs font-bold">{feature}</span>
-                                <div className="progress-track mt-1"><div className="progress-bar bg-primary" style={{width: `${adoption}%`}}></div></div>
+                        <div key={feature} className="adoption-segment">
+                            <div className="adoption-label">
+                                <span>{feature}</span>
+                                <b>{adoption}%</b>
                             </div>
-                            <span className="text-xs font-black opacity-60">{adoption}%</span>
+                            <div className="adoption-bar-bg">
+                                <div className="adoption-fill" style={{ width: `${adoption}%` }} />
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -182,153 +207,65 @@ const AnalyticsReports: React.FC = () => {
         </div>
     );
 
-    const renderFinancialReports = () => (
-        <div className="financial-reports animate-fade-in">
-            <div className="builder-layout">
-                <div className="builder-controls">
-                    <h5 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-30">Configurator</h5>
-                    <div>
-                        <label className="kpi-label block mb-2">Report Template</label>
-                        <select className="support-input w-full text-xs">
-                            <option>Monthly Revenue Report</option>
-                            <option>Tax Compliance (KRA)</option>
-                            <option>Quarterly Analysis</option>
-                            <option>Debt Aging</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="kpi-label block mb-2">Date Range</label>
-                        <input type="month" className="support-input w-full text-xs" defaultValue="2026-03" />
-                    </div>
-                    <div>
-                        <label className="kpi-label block mb-2">Filters</label>
-                        <div className="flex flex-col gap-2">
-                             <div className="flex items-center gap-2"><input type="checkbox" defaultChecked /> <span className="text-[10px] font-bold opacity-60">Enterprise Tier</span></div>
-                        </div>
-                    </div>
-                    <button className="btn-primary w-full py-4 text-xs font-black uppercase tracking-widest mt-4">
-                        <FiFileText className="inline mr-2" /> Build Custom Report
-                    </button>
-                </div>
-
-                <div className="report-library">
-                    <div className="flex justify-between items-center mb-6">
-                        <h4 className="font-black lowercase tracking-tighter">Generated archives</h4>
-                        <div className="flex gap-2">
-                            <button className="icon-btn text-xs"><FiFilter /></button>
-                            <button className="icon-btn text-xs"><FiDownload /></button>
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                        {[
-                            { name: 'Monthly Revenue - Feb 2026', type: 'Tax compliant', date: 'Mar 1, 2026', size: '2.4 MB' },
-                            { name: 'KRA P10 - Annual Summary', type: 'KRA/PDF', date: 'Feb 15, 2026', size: '1.8 MB' },
-                            { name: 'Quarterly Audit (Q4 2025)', type: 'Internal Use', date: 'Jan 10, 2026', size: '5.2 MB' }
-                        ].map((r, i) => (
-                            <div key={i} className="report-template-card">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-primary-soft flex items-center justify-center text-primary text-xl">
-                                        <FiFileText />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-sm">{r.name}</div>
-                                        <div className="text-[10px] font-bold opacity-30 uppercase">{r.type} • {r.date}</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="text-[10px] font-mono opacity-30">{r.size}</span>
-                                    <button className="icon-btn hover:text-primary"><FiDownload /></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderBehavior = () => (
-        <div className="behavior-analytics animate-fade-in">
-            <div className="grid grid-cols-2 gap-8 mb-12">
-                <div className="glass-card">
-                    <h4 className="font-black text-sm uppercase tracking-widest opacity-40 mb-6">Client engagement funnel</h4>
-                    <div className="funnel-container">
-                        {[
-                            { step: 'Registration Started', val: '1,240', drop: '0%' },
-                            { step: 'Completed Setup', val: '850', drop: '31% drop' },
-                            { step: 'First Connection', val: '720', drop: '15% drop' },
-                            { step: 'Activated Pro Tier', val: '450', drop: '37% drop' }
-                        ].map((s, i) => (
-                            <div key={i} className="funnel-step" style={{ opacity: 1 - (i * 0.15), width: `${100 - (i * 10)}%`, margin: '0 auto' }}>
-                                <span className="text-xs font-bold text-white uppercase tracking-widest">{s.step}</span>
-                                <div className="text-right">
-                                    <div className="text-sm font-black font-mono">{s.val}</div>
-                                    <div className="text-[8px] font-bold opacity-60 uppercase">{s.drop}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="glass-card">
-                    <h4 className="font-black text-sm uppercase tracking-widest opacity-40 mb-6">Retention & Stickiness</h4>
-                    <div className="flex flex-col gap-6 mt-12">
-                        <div className="flex justify-between items-center p-6 bg-white bg-opacity-5 rounded-3xl">
+    const renderReportingSuite = () => (
+        <div className="reporting-suite animate-fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div className="lg:col-span-1">
+                     <div className="dp-intelligence-card h-full">
+                        <h4 className="mb-6">Report Compiler</h4>
+                        <div className="space-y-4">
                             <div>
-                                <span className="text-[10px] font-black uppercase opacity-40">Daily Active Hubs</span>
-                                <div className="text-4xl font-black text-primary">84%</div>
+                                <label className="info-label">Template</label>
+                                <select className="support-input">
+                                    <option>Monthly Revenue Report</option>
+                                    <option>Tax Compliance (KRA)</option>
+                                </select>
                             </div>
-                            <FiTrendingUp size={32} className="text-primary opacity-30" />
-                        </div>
-                        <div className="flex justify-between items-center p-6 bg-white bg-opacity-5 rounded-3xl">
-                            <div>
-                                <span className="text-[10px] font-black uppercase opacity-40">Monthly Active Hubs</span>
-                                <div className="text-4xl font-black text-cyan-400">96%</div>
-                            </div>
-                            <FiActivity size={32} className="text-cyan-400 opacity-30" />
+                            <button className="w-full py-4 bg-purple-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-600/20">Launch Generator</button>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    );
-
-    const renderAutomation = () => (
-        <div className="report-automation animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h2 className="text-2xl font-black lowercase tracking-tighter">automated distributions</h2>
-                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Scheduled recurring reporting engine</p>
+                <div className="lg:col-span-2">
+                     <div className="tdv-transaction-table-container">
+                        <div className="table-header-toolbar">
+                             <div className="table-title">Automated Protocols</div>
+                             <button className="action-circle view"><FiPlus /></button>
+                        </div>
+                        <table className="tdv-transaction-table">
+                            <thead>
+                                <tr><th>Protocol</th><th>Frequency</th><th>Target</th><th>Status</th></tr>
+                            </thead>
+                            <tbody>
+                                {scheduled.slice(0, 3).map(s => (
+                                    <tr key={s.id}>
+                                        <td className="font-bold">{s.type}</td>
+                                        <td>{s.frequency}</td>
+                                        <td className="font-mono text-[9px]">{s.last_run}</td>
+                                        <td className="text-emerald-600 text-[9px] font-black uppercase">Active</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <button className="btn-primary flex items-center gap-2"><FiPlus /> New Schedule</button>
             </div>
 
-            <div className="scheduler-list glass-card p-0 overflow-hidden">
-                <table className="ticket-table">
+            <div className="tdv-transaction-table-container">
+                <table className="tdv-transaction-table">
                     <thead>
-                        <tr>
-                            <th>Distribution Type</th>
-                            <th>Frequency</th>
-                            <th>Next Run</th>
-                            <th>Recipients</th>
-                            <th>Status</th>
-                            <th className="text-right">Action</th>
-                        </tr>
+                        <tr><th>Archive Identifier</th><th>Classification</th><th>Certified Date</th><th>Magnitude</th><th className="text-right">Action</th></tr>
                     </thead>
                     <tbody>
-                        {scheduled.map(s => (
-                            <tr key={s.id}>
-                                <td className="font-bold">{s.type}</td>
-                                <td><span className="badge badge-medium capitalize">{s.frequency}</span></td>
-                                <td className="font-mono text-xs opacity-60">{s.last_run}</td>
-                                <td>
-                                    <div className="flex items-center gap-2">
-                                        <FiMail className="opacity-40" />
-                                        <span className="text-xs truncate max-w-[150px]">{s.recipients.join(', ')}</span>
-                                    </div>
-                                </td>
-                                <td><span className="text-success text-xs font-black uppercase tracking-widest">Active</span></td>
-                                <td className="text-right"><button className="icon-btn hover:text-primary"><FiCalendar /></button></td>
+                        {[
+                            { name: 'Monthly Revenue - Feb 2026', type: 'Tax compliant', date: 'Mar 1, 2026', size: '2.4 MB' },
+                            { name: 'KRA P10 - Annual Summary', type: 'KRA/PDF', date: 'Feb 15, 2026', size: '1.8 MB' }
+                        ].map((r, i) => (
+                            <tr key={i}>
+                                <td className="font-bold">{r.name}</td>
+                                <td><span className="text-[10px] font-black uppercase opacity-40">{r.type}</span></td>
+                                <td className="text-xs font-bold">{r.date}</td>
+                                <td className="text-[10px] font-mono opacity-50">{r.size}</td>
+                                <td className="text-right"><button className="action-circle view"><FiDownload /></button></td>
                             </tr>
                         ))}
                     </tbody>
@@ -337,41 +274,56 @@ const AnalyticsReports: React.FC = () => {
         </div>
     );
 
+
+    // Custom helper for icons that might be missing or wrongly named in source
+    const FiDollarSign_Fixed = () => <FiBarChart2 />;
+
     return (
         <Layout>
             <div className="analytics-page">
-                <header className="mb-8 flex justify-between items-start">
-                    <div>
-                        <h1 className="text-4xl font-black text-primary tracking-tighter lowercase">analytics & reports</h1>
-                        <p className="text-secondary font-bold text-sm mt-1 uppercase tracking-widest opacity-60">
-                            (Administrative intelligence terminal & KRA reporting bridge)
-                        </p>
+                <header className="dp-header">
+                    <div className="dp-title-group">
+                        <h1 className="lowercase">intelligence & analytics</h1>
+                        <div className="dp-subtitle">Consolidated Platform Performance & KRA Reporting</div>
                     </div>
-                    <button className="btn-secondary flex items-center gap-2">
-                        <FiDownload /> Unified Export
-                    </button>
+                    
+                    <div className="dp-header-actions">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">
+                            <FiDownload /> Export Archive
+                        </button>
+                    </div>
                 </header>
 
                 <div className="hw-tabs mb-8">
-                    <button className={`hw-tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Business dashboard</button>
-                    <button className={`hw-tab-btn ${activeTab === 'usage' ? 'active' : ''}`} onClick={() => setActiveTab('usage')}>Usage analytics</button>
-                    <button className={`hw-tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>Financial reports</button>
-                    <button className={`hw-tab-btn ${activeTab === 'behavior' ? 'active' : ''}`} onClick={() => setActiveTab('behavior')}>Client behavior</button>
-                    <button className={`hw-tab-btn ${activeTab === 'automation' ? 'active' : ''}`} onClick={() => setActiveTab('automation')}>Automated Reports</button>
+                    {[
+                        { id: 'intelligence', label: 'Business Intelligence' },
+                        { id: 'reporting', label: 'Automated Reporting' }
+                    ].map(tab => (
+                        <button 
+                            key={tab.id}
+                            className={`hw-tab-btn ${activeTab === tab.id ? 'active' : ''}`} 
+                            onClick={() => setActiveTab(tab.id as any)}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 opacity-40">
-                        <div className="animate-spin mb-4"><FiTrendingUp size={32} /></div>
-                        <p className="font-bold tracking-widest uppercase text-xs">Synchronizing Intelligence Engine...</p>
+                    <div className="flex flex-col items-center justify-center py-40">
+                        <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Synchronizing Intelligence Engine...</p>
                     </div>
                 ) : (
                     <>
-                        {activeTab === 'overview' && renderBusinessDashboard()}
-                        {activeTab === 'usage' && renderUsageAnalytics()}
-                        {activeTab === 'reports' && renderFinancialReports()}
-                        {activeTab === 'behavior' && renderBehavior()}
-                        {activeTab === 'automation' && renderAutomation()}
+                        {activeTab === 'intelligence' && (
+                            <div className="space-y-12">
+                                {renderIntelligence()}
+                                <div className="forensic-divider" />
+                                {renderUsageAnalytics()}
+                            </div>
+                        )}
+                        {activeTab === 'reporting' && renderReportingSuite()}
                     </>
                 )}
             </div>

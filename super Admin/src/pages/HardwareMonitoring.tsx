@@ -12,7 +12,7 @@ import {
 import { BackendTab } from '../components/Hardware/BackendTab';
 import './HardwareMonitoring.css';
 
-const HardwareMonitoring: React.FC = () => {
+const HardwareMonitoring: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'registry' | 'detail' | 'firmware' | 'actions' | 'dev' | 'backend'>('overview');
     const [stats, setStats] = useState<any>(null);
     const [devices, setDevices] = useState<Device[]>([]);
@@ -22,6 +22,7 @@ const HardwareMonitoring: React.FC = () => {
     const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
     const [loading, setLoading] = useState(true);
     const [safetyArmed, setSafetyArmed] = useState(false);
+    const [commandLoading, setCommandLoading] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -51,6 +52,33 @@ const HardwareMonitoring: React.FC = () => {
     const handleDeviceClick = (device: Device) => {
         setSelectedDevice(device);
         setActiveTab('detail');
+    };
+
+    const handleExecuteCommand = async (command: string, label: string, targetType: 'fleet' | 'device' = 'fleet') => {
+        const confirmMsg = targetType === 'fleet' 
+            ? `Are you sure you want to broadcast ${label} to the ENTIRE fleet?`
+            : `Send ${label} to device ${selectedDevice?.device_id}?`;
+        
+        if (!window.confirm(confirmMsg)) return;
+
+        setCommandLoading(command);
+        try {
+            if (targetType === 'fleet') {
+                // For fleet commands, we usually iterate or use a special RPC
+                for (const device of devices) {
+                    if (device.status === 'online') {
+                        await hardwareService.sendCommand(device.id, device.device_id, command);
+                    }
+                }
+            } else if (selectedDevice) {
+                await hardwareService.sendCommand(selectedDevice.id, selectedDevice.device_id, command);
+            }
+            alert(`${label} command dispatched successfully.`);
+        } catch (error: any) {
+            alert(`Command Failed: ${error.message}`);
+        } finally {
+            setCommandLoading(null);
+        }
     };
 
     const renderCircularGauge = (value: number, label: string, color: string) => {
@@ -319,37 +347,28 @@ const HardwareMonitoring: React.FC = () => {
                 </div>
 
                 <div className="col-span-12 xl:col-span-4">
-                    <div className="hw-rollout-panel">
-                        <div className="hw-rollout-header">
-                            <span className="status-pill online mb-4">Rollout Monitor</span>
-                            <h4 className="text-xl font-black tracking-tighter lowercase mb-6">{campaigns[0]?.name || 'Global Rollout 2.6.0'}</h4>
-                            <div className="flex justify-center mb-8">
-                                 <div className="hw-metric-ring-large text-emerald-500">
-                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                                        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
-                                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="283" strokeDashoffset={283 - (283 * 0.45)} />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                        <span className="text-3xl font-black">45%</span>
-                                        <span className="text-[10px] font-bold opacity-30 uppercase">Synced</span>
+                        <div className="p-6 bg-[#08081a] flex-1 min-h-[400px]">
+                            <h4 className="text-xs font-black uppercase tracking-widest mb-6 opacity-40">Active Campaigns</h4>
+                            <div className="space-y-4">
+                                {campaigns.length === 0 && <div className="text-[10px] opacity-20 italic">No active rollouts</div>}
+                                {campaigns.map(c => (
+                                    <div key={c.id} className="p-4 bg-white/5 rounded-xl border border-white/5">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-black tracking-tight">{c.name}</span>
+                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${c.status === 'in_progress' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{c.status}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[9px] font-bold opacity-30 uppercase mb-2">
+                                            <span>Progress</span>
+                                            <span>{Math.round((c.updated_devices / (c.total_devices || 1)) * 100)}%</span>
+                                        </div>
+                                        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-500" style={{ width: `${(c.updated_devices / (c.total_devices || 1)) * 100}%` }}></div>
+                                        </div>
                                     </div>
-                                 </div>
+                                ))}
                             </div>
                         </div>
-                        <div className="p-6 bg-[#08081a] flex-1 min-h-[300px]">
-                            <div className="flex items-center gap-2 mb-4 text-neon-cyan opacity-50">
-                                <FiActivity size={12} />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Deployment_Buffer.log</span>
-                            </div>
-                            <div className="font-mono text-[9px] text-[#A2A4B8] space-y-2">
-                                <div>[10:42] HUB_01: ACK SEGMENT 0XFF_READY</div>
-                                <div className="text-neon-emerald">[10:42] HUB_02: DOWNLOAD_START (2.4MB)</div>
-                                <div>[10:43] HUB_05: VERIFYING CHECKSUM...</div>
-                                <div className="text-neon-rose">[10:43] HUB_09: LINK_TIMEOUT (RETRY 2/5)</div>
-                                <div className="animate-pulse">_ EXEC_ROLLOUT_BURST...</div>
-                            </div>
-                        </div>
-                    </div>
+
                 </div>
             </div>
         </div>
@@ -377,13 +396,13 @@ const HardwareMonitoring: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {[
-                    { icon: <FiRefreshCw />, title: 'Bulk System Reboot', desc: 'Propagate graceful restart command across all online nodes in the fleet.', action: 'Broadcast Reboot', risk: 'safe' },
-                    { icon: <FiCloudLightning />, title: 'Force Connectivity Sync', desc: 'Interrupt current radio state and perform a full handshake with Supabase edge.', action: 'Force Sync', risk: 'safe' },
-                    { icon: <FiTerminal />, title: 'Remote Diagnostic Scan', desc: 'Execute comprehensive sensory and radio diagnostic routine on all nodes.', action: 'Trigger Diagnostic', risk: 'safe' },
-                    { icon: <FiShield />, title: 'Clear Security Buffers', desc: 'Flush all local telemetry cache and security event buffers from node flash.', action: 'Flush Buffers', risk: 'warning' },
-                    { icon: <FiDatabase />, title: 'Node Re-Provisioning', desc: 'Securely re-bind node identity keys and infrastructure parameters.', action: 'Re-Provision', risk: 'warning' },
-                    { icon: <FiAlertTriangle />, title: 'Fleet Factory Reset', desc: 'CRITICAL: Wipe all flash segments and return entire fleet to base OS binaries.', action: 'Execute Wipe', risk: 'destructive' }
+                { [
+                    { id: 'REBOOT', icon: <FiRefreshCw />, title: 'Bulk System Reboot', desc: 'Propagate graceful restart command across all online nodes in the fleet.', action: 'Broadcast Reboot', risk: 'safe' },
+                    { id: 'SYNC', icon: <FiCloudLightning />, title: 'Force Connectivity Sync', desc: 'Interrupt current radio state and perform a full handshake with Supabase edge.', action: 'Force Sync', risk: 'safe' },
+                    { id: 'DIAGNOSTIC', icon: <FiTerminal />, title: 'Remote Diagnostic Scan', desc: 'Execute comprehensive sensory and radio diagnostic routine on all nodes.', action: 'Trigger Diagnostic', risk: 'safe' },
+                    { id: 'FLUSH', icon: <FiShield />, title: 'Clear Security Buffers', desc: 'Flush all local telemetry cache and security event buffers from node flash.', action: 'Flush Buffers', risk: 'warning' },
+                    { id: 'PROVISION', icon: <FiDatabase />, title: 'Node Re-Provisioning', desc: 'Securely re-bind node identity keys and infrastructure parameters.', action: 'Re-Provision', risk: 'warning' },
+                    { id: 'FACTORY_RESET', icon: <FiAlertTriangle />, title: 'Fleet Factory Reset', desc: 'CRITICAL: Wipe all flash segments and return entire fleet to base OS binaries.', action: 'Execute Wipe', risk: 'destructive' }
                 ].map((act, i) => (
                     <div key={i} className={`hw-command-plate ${act.risk}`}>
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-xl ${act.risk === 'destructive' ? 'bg-neon-rose/10 text-neon-rose' : 'bg-neon-cyan/10 text-neon-cyan'}`}>
@@ -397,9 +416,10 @@ const HardwareMonitoring: React.FC = () => {
                                     ? (safetyArmed ? 'bg-neon-rose text-white hover:scale-[1.02]' : 'bg-[var(--glass-border)] text-[var(--color-text-disabled)] cursor-not-allowed')
                                     : 'bg-[var(--bg-surface)] border border-[var(--glass-border)] hover:bg-neon-cyan hover:text-white hover:border-neon-cyan'
                             }`}
-                            disabled={act.risk === 'destructive' && !safetyArmed}
+                            disabled={(act.risk === 'destructive' && !safetyArmed) || commandLoading === act.id}
+                            onClick={() => handleExecuteCommand(act.id, act.action, 'fleet')}
                         >
-                            {act.action}
+                            {commandLoading === act.id ? 'Dispatching...' : act.action}
                         </button>
                     </div>
                 ))}
@@ -419,33 +439,32 @@ const HardwareMonitoring: React.FC = () => {
                 </button>
             </div>
 
-            <div className="hw-env-board mb-12">
-                {[
-                    { name: 'Production', url: 'api.iotank.co.ke', status: 'live', uptime: '99.98%', latency: '24ms' },
-                    { name: 'Staging', url: 'stage-v2.iotank.co.ke', status: 'testing', uptime: '98.50%', latency: '42ms' },
-                    { name: 'Development', url: 'dev-local.hub', status: 'down', uptime: '0.00%', latency: 'N/A' }
-                ].map(en => (
-                    <div key={en.name} className="hw-env-card">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h5 className="font-black text-sm uppercase mb-1">{en.name}</h5>
-                                <span className="text-[10px] font-mono opacity-30">{en.url}</span>
+            <div className="hw-node-card p-0 bg-[var(--bg-surface)] mb-12">
+                <div className="p-6 border-b border-[var(--glass-border)] flex justify-between items-center">
+                    <h3 className="text-xs font-black uppercase tracking-widest">System Maintenance Board</h3>
+                    <FiPlus className="opacity-40 hover:opacity-100 cursor-pointer" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 p-6 gap-6">
+                    {tasks.length === 0 && <div className="col-span-full text-center py-20 opacity-20">No active system tasks</div>}
+                    {tasks.map(t => (
+                        <div key={t.id} className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-indigo-500/50 transition-all cursor-pointer group">
+                            <div className="flex justify-between items-start mb-4">
+                                <span className={`text-[8px] font-black uppercase px-2 py-1 rounded ${t.priority === 'critical' ? 'bg-rose-500 text-white' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                                    {t.priority}
+                                </span>
+                                <span className="text-[10px] font-mono opacity-20">#{t.id.substring(0,6)}</span>
                             </div>
-                            <div className={`hw-env-led ${en.status}`}></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 pt-6 border-t border-[var(--glass-border)]">
-                            <div>
-                                <span className="text-[9px] font-black uppercase opacity-20 block">Uptime</span>
-                                <span className="text-xs font-black font-mono">{en.uptime}</span>
-                            </div>
-                            <div>
-                                <span className="text-[9px] font-black uppercase opacity-20 block">Latency</span>
-                                <span className="text-xs font-black font-mono">{en.latency}</span>
+                            <h4 className="font-bold text-sm mb-2 group-hover:text-indigo-400 transition-colors">{t.title}</h4>
+                            <p className="text-[10px] opacity-40 leading-relaxed mb-6">{t.description}</p>
+                            <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                <span className="text-[9px] font-black uppercase tracking-widest opacity-30">{t.status}</span>
+                                <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px]">{t.assignee?.charAt(0) || 'U'}</div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
+
 
             <div className="hw-terminal-wrapper border-none shadow-none">
                 <div className="hw-terminal-header">
@@ -487,8 +506,7 @@ const HardwareMonitoring: React.FC = () => {
         </div>
     );
 
-    return (
-        <Layout>
+    const content = (
             <div className="hardware-page">
                 <header className="hw-header-advanced flex justify-between items-start">
                     <div>
@@ -547,8 +565,10 @@ const HardwareMonitoring: React.FC = () => {
                     </div>
                 )}
             </div>
-        </Layout>
     );
+
+    if (isHubView) return content;
+    return <Layout>{content}</Layout>;
 };
 
 export default HardwareMonitoring;

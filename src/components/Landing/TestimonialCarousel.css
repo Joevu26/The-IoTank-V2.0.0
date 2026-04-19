@@ -1,7 +1,7 @@
 /* TestimonialCarousel.css */
 
 .tc2-section {
-    padding: var(--section-padding-desktop, 140px) 0;
+    padding: 60px 0; /* Compressed from 140px */
     background: #FFFFFF;
     position: relative;
     overflow: hidden;
@@ -15,15 +15,26 @@
 
 
 .tc2-container {
-    max-width: 860px; /* Reduced from 1000px for card compression */
+    max-width: 1200px; /* Increased from 860px to allow side-by-side */
     margin: 0 auto;
     padding: 0 24px;
 }
 
 
-.tc2-header {
-    text-align: center;
-    margin-bottom: 60px;
+.tc2-split-layout {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 40px;
+    align-items: center;
+}
+
+.tc2-header-side {
+    text-align: left;
+}
+
+.tc2-carousel-side {
+    position: relative;
+    min-width: 0; /* Fix flex/grid child overflow */
 }
 
 .tc2-pill {
@@ -40,11 +51,12 @@
 }
 
 .tc2-title {
-    font-size: clamp(2rem, 4vw, 2.75rem);
+    font-size: clamp(2rem, 3.5vw, 2.5rem);
     font-weight: 900;
     color: #1b0a2e;
     margin-bottom: 16px;
     letter-spacing: -0.02em;
+    line-height: 1.1;
 }
 
 .tc2-title-accent {
@@ -52,10 +64,19 @@
 }
 
 .tc2-subtitle {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: #6B297C;
-    max-width: 600px;
-    margin: 0 auto;
+    line-height: 1.6;
+}
+
+@media (max-width: 1024px) {
+    .tc2-split-layout {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+    .tc2-header-side {
+        text-align: center;
+    }
 }
 
 /* Stage & Navigation */
@@ -63,8 +84,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 20px; /* Reduced from 40px */
-    min-height: 400px; /* Reduced from 480px */
+    gap: 16px; 
+    min-height: 320px; /* Further compressed from 400px */
 }
 
 

@@ -4,7 +4,7 @@ import {
     FiClock, FiDroplet, FiDatabase,
     FiUserX, FiThermometer, FiFileText,
     FiCheckCircle, FiXCircle, FiMessageSquare,
-    FiX, FiBarChart2, FiShield
+    FiX, FiBarChart2
 } from 'react-icons/fi';
 import './FuelChallengesSection.css';
 
@@ -404,59 +404,6 @@ export const ProfitKillers: React.FC = () => (
     </div>
 );
 
-export const DecisionPaths: React.FC<{ onGetStarted: () => void }> = ({ onGetStarted }) => (
-    <div className="decision-section-modern">
-        <div className="text-center">
-            <div className="decision-pill">YOUR CHOICE</div>
-            <h2 className="decision-title-modern">Two Paths. <span>One Outcome.</span></h2>
-        </div>
-        
-        <div className="decision-grid-modern">
-            {/* The Risk Path */}
-            <div className="decision-card-modern risk-path">
-                <div className="decision-icon-wrap">
-                    <FiX size={24} />
-                </div>
-                <h3 className="decision-card-title">Continue Manual Guesswork</h3>
-                <div className="decision-feature-list">
-                    <div className="decision-feature-item"><FiX /> Accept hidden losses</div>
-                    <div className="decision-feature-item"><FiX /> React to pricing after announcements</div>
-                    <div className="decision-feature-item"><FiX /> Risk compliance penalties</div>
-                </div>
-                <button className="btn-decision-modern" onClick={() => window.scrollTo(0, 0)}>
-                    STAY BLIND
-                </button>
-            </div>
-
-            {/* The Success Path */}
-            <div className="decision-card-modern success-path">
-                <div className="decision-icon-wrap">
-                    <FiShield size={24} />
-                </div>
-                <h3 className="decision-card-title">Install IoTank</h3>
-                <div className="decision-feature-list">
-                    <div className="decision-feature-item"><FiCheckCircle /> Eliminate invisible shrinkage</div>
-                    <div className="decision-feature-item"><FiCheckCircle /> Receive AI buy alerts</div>
-                    <div className="decision-feature-item"><FiCheckCircle /> Maintain audit-ready compliance</div>
-                </div>
-                <button className="btn-decision-modern" onClick={onGetStarted}>
-                    Stop the bleeding — Get IoTank
-                </button>
-            </div>
-        </div>
-
-        {/* Guarantee Card */}
-        <div className="guarantee-card-modern">
-            <div className="guarantee-badge-wrap">
-                <FiCheckCircle size={20} />
-                <span className="guarantee-badge-text">30-DAY RISK-FREE GUARANTEE</span>
-            </div>
-            <p className="guarantee-content-text">
-                If IoTank doesn't identify at least one money-saving issue in 30 days, we'll refund 100%.
-            </p>
-        </div>
-    </div>
-);
 
 export const FuelProblemsSection: React.FC<{ onShowCalculator: () => void }> = ({ onShowCalculator }) => {
 
@@ -621,9 +568,7 @@ export const FuelProblemsSection: React.FC<{ onShowCalculator: () => void }> = (
 
 
 
-export const FuelChallengesSection: React.FC<{
-    onGetStarted: () => void;
-}> = ({ onGetStarted }) => {
+export const FuelChallengesSection: React.FC = () => {
     return (
         <section id="fuel-intelligence" className="fuel-challenges-section">
             <div className="challenges-container">
@@ -677,7 +622,7 @@ export const FuelChallengesSection: React.FC<{
                 </div>
 
                 {/* SECTION 5: THE CHOICE */}
-                <DecisionPaths onGetStarted={onGetStarted} />
+
 
             </div>
             <SocialProofBar />

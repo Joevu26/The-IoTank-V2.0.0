@@ -90,7 +90,7 @@
 
 .stat-label {
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 400;
     color: #64748b;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -103,7 +103,7 @@
 
 .stat-value-large {
     font-size: 1.4rem;
-    font-weight: 800;
+    font-weight: 400;
     color: #0f172a;
     line-height: 1.2;
     margin-bottom: 0.25rem;
@@ -239,7 +239,7 @@
     padding: 4px 10px;
     border-radius: 16px;
     font-size: 0.85rem;
-    font-weight: 700;
+    font-weight: 400;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     border: 2px solid #fff;
     z-index: 10;
@@ -355,7 +355,7 @@
 
 .intelligence-item .item-value {
     font-size: 1.1rem;
-    font-weight: 700;
+    font-weight: 400;
     color: #1e293b;
 }
 

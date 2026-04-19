@@ -2,7 +2,7 @@
 
 .faq-section {
     padding: var(--section-padding-desktop, 140px) 0;
-    background: #FFFFFF;
+    background: transparent;
     font-family: 'Inter', sans-serif;
 }
 
@@ -40,36 +40,39 @@
 
 .faq-eyebrow {
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #6B7280;
+    color: #111827;
     margin-bottom: 16px;
-    display: block;
-    background: #F3F4F6;
     display: inline-block;
-    padding: 6px 12px;
+    background: var(--vibrant-lavender); /* Deeper Lavender */
+    padding: 6px 14px;
     border-radius: 999px;
+    border: 1.5px solid rgba(0,0,0,0.1);
 }
 
 .faq-title {
     font-size: 42px;
     font-weight: 800;
-    color: #111827;
+    background: linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%); /* Deepened Indigo to Teal */
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     line-height: 1.1;
     margin: 0;
     letter-spacing: -1px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
 }
 
 /* Contact/Query Card */
 .faq-contact-card {
-    background: #111827;
-    /* Dark background per image reference */
+    background: var(--vibrant-lullaby); /* Saturated Lullaby */
     border-radius: 24px;
-    padding: 24px; /* Reduced from 32px */
-    color: #FFFFFF;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 24px;
+    color: #111827;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
 }
 
 
@@ -77,12 +80,12 @@
     font-size: 22px;
     font-weight: 700;
     margin-bottom: 12px;
-    color: #FFFFFF;
+    color: #1E293B;
 }
 
 .contact-card-text {
     font-size: 14px;
-    color: #9CA3AF;
+    color: #475569;
     line-height: 1.6;
     margin-bottom: 24px;
 }
@@ -95,11 +98,11 @@
 
 .contact-textarea {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.1);
     border-radius: 12px;
     padding: 14px;
-    color: #FFFFFF;
+    color: #1E293B;
     font-family: 'Inter', sans-serif;
     font-size: 14px;
     resize: none;
@@ -140,8 +143,8 @@
 
 .faq-item {
     border-radius: 16px;
-    background: #F9FAFB;
-    /* Very light gray default */
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     padding: 0;
     /* Padding handled internally to separate header/content areas */
     cursor: pointer;
@@ -154,17 +157,16 @@
 
 /* Hover state for closed items */
 .faq-item:not(.active):hover {
-    background: #EFF2F6;
-    border-left-color: #CBD5E1;
-    /* Subtle hint on hover */
+    background: rgba(255, 255, 255, 0.8);
+    border-left-color: var(--vibrant-periwinkle);
 }
 
 /* Active Open State */
 .faq-item.active {
     background: #FFFFFF;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-    border-left-color: #6366F1;
-    /* Active Ring Color (Purple/Indigo) */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    border-left-color: var(--vibrant-periwinkle);
+    border: 1px solid var(--vibrant-periwinkle);
 }
 
 /* FAQ Header (Question strip) */
@@ -179,9 +181,8 @@
 
 .faq-question {
     font-size: 16px;
-    /* Reduced from 18px */
     font-weight: 600;
-    color: #1F2937;
+    color: #111827;
     margin: 0;
     flex: 1;
     padding-right: 16px;
@@ -204,10 +205,9 @@
 }
 
 .faq-item.active .faq-toggle-btn {
-    background: #6366F1;
-    color: white;
+    background: var(--vibrant-lavender);
+    color: #111827;
     transform: rotate(45deg);
-    /* Cross via rotation */
 }
 
 /* Answer Content - DIFFERENT BACKGROUND */
@@ -216,7 +216,7 @@
     opacity: 0;
     overflow: hidden;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    background: #F3F4F6;
+    background: rgba(255, 255, 255, 0.02);
     /* Distinct darker gray background for answer */
 }
 

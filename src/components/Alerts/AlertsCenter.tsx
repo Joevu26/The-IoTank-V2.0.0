@@ -103,16 +103,10 @@ const EscalationLadder: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts })
                 </div>
             </div>
             <div className="ladder-bar">
-                <style>{`
-                    .escalation-ladder-container .ladder-segment.critical { width: ${getWidth(counts.CRITICAL)}%; }
-                    .escalation-ladder-container .ladder-segment.high { width: ${getWidth(counts.HIGH)}%; }
-                    .escalation-ladder-container .ladder-segment.watch { width: ${getWidth(counts.WATCH)}%; }
-                    .escalation-ladder-container .ladder-segment.info { width: ${getWidth(counts.INFO)}%; }
-                `}</style>
-                <div className="ladder-segment critical" />
-                <div className="ladder-segment high" />
-                <div className="ladder-segment watch" />
-                <div className="ladder-segment info" />
+                <div className="ladder-segment critical" style={{ width: `${getWidth(counts.CRITICAL)}%` }} />
+                <div className="ladder-segment high" style={{ width: `${getWidth(counts.HIGH)}%` }} />
+                <div className="ladder-segment watch" style={{ width: `${getWidth(counts.WATCH)}%` }} />
+                <div className="ladder-segment info" style={{ width: `${getWidth(counts.INFO)}%` }} />
             </div>
         </div>
     );

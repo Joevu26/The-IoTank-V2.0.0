@@ -112,10 +112,65 @@ export const hardwareService = {
     },
 
     async getOTACampaigns() {
-        return []; // Future implementation
+        const { data, error } = await supabase
+            .from('firmware_campaigns')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) {
+            console.error('Error fetching OTA campaigns:', error);
+            return [];
+        }
+        return data as OTACampaign[];
     },
 
     async getDevTasks() {
-        return []; // Future implementation
+        const { data, error } = await supabase
+            .from('system_tasks')
+            .select('*')
+            .order('priority', { ascending: false });
+        
+        if (error) {
+            console.error('Error fetching dev tasks:', error);
+            return [];
+        }
+        return data as DevTask[];
+    },
+
+    async sendCommand(stationId: string, deviceId: string, command: string, payload: any = {}) {
+        const { data, error } = await supabase
+            .from('device_commands')
+            .insert({
+                station_id: stationId,
+                device_id: deviceId,
+                command: command,
+                payload: payload,
+                status: 'pending'
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Command Dispatch Error:', error);
+            throw error;
+        }
+
+        // Log the administrative action with high-fidelity metadata
+        await supabase.from('unified_events').insert({
+            event_type: 'HARDWARE_COMMAND',
+            event_category: 'HARDWARE',
+            severity: command === 'FACTORY_RESET' ? 'CRITICAL' : 'INFO',
+            description: `Remote command [${command}] dispatched to device ${deviceId}`,
+            metadata: { 
+                command, 
+                payload, 
+                command_id: data.id,
+                station_id: stationId,
+                resource_id: deviceId
+            }
+        });
+
+        return data;
     }
 };
+

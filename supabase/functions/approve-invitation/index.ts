@@ -1,5 +1,5 @@
 // @ts-ignore Deno edge import
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.40.0'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { emitSecurityTelemetry } from '../_shared/telemetry.ts'
 import { requireProxyScope, enforceDurableRateLimit } from '../_shared/auth.ts'

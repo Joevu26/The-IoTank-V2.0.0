@@ -278,7 +278,7 @@ const BillingPage: React.FC = () => {
                         <tbody>
                             {transactions.filter(tx => 
                                 tx.id.includes(searchTerm) || 
-                                tx.fuel_stations?.station_name?.toLowerCase().includes(searchTerm.toLowerCase())
+                                tx.station?.station_name?.toLowerCase().includes(searchTerm.toLowerCase())
                             ).map((tx) => (
                                 <tr key={tx.id}>
                                     <td className="font-mono text-xs opacity-70">
@@ -289,7 +289,7 @@ const BillingPage: React.FC = () => {
                                         <div className="text-xs opacity-50">{new Date(tx.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
                                     </td>
                                     <td>
-                                        <div className="font-bold">{tx.fuel_stations?.station_name || 'System'}</div>
+                                        <div className="font-bold">{tx.station?.station_name || 'System'}</div>
                                     </td>
                                     <td>
                                         <span className="text-xs font-bold uppercase tracking-wider opacity-80">{tx.transaction_type.replace('_', ' ')}</span>
@@ -350,7 +350,7 @@ const BillingPage: React.FC = () => {
                     <tbody>
                         {failedPayments.map(tx => (
                             <tr key={tx.id}>
-                                <td><div className="font-bold">{tx.fuel_stations?.station_name}</div></td>
+                                <td><div className="font-bold">{tx.station?.station_name}</div></td>
                                 <td className="font-bold text-danger">{formatCurrency(tx.amount)}</td>
                                 <td>{new Date(tx.created_at).toLocaleDateString()}</td>
                                 <td className="text-xs opacity-70 italic">{"Insufficient funds / Processor error"}</td>
@@ -394,7 +394,7 @@ const BillingPage: React.FC = () => {
                         {pendingAdjustments.map(adj => (
                             <tr key={adj.id}>
                                 <td className="font-mono text-xs opacity-60">ADJ-{adj.id.slice(0,8).toUpperCase()}</td>
-                                <td><div className="font-bold">{adj.fuel_stations?.station_name}</div></td>
+                                <td><div className="font-bold">{adj.station?.station_name}</div></td>
                                 <td><span className="text-xs font-bold uppercase">{adj.transaction_type}</span></td>
                                 <td className="font-bold text-blue-500">{formatCurrency(adj.amount)}</td>
                                 <td className="text-xs opacity-70">{"Billing error correction"}</td>
@@ -453,11 +453,32 @@ const BillingPage: React.FC = () => {
         </div>
     );
 
+    const handleGenerateInvoices = async () => {
+        if (!window.confirm('Trigger monthly batch generation for the current cycle?')) return;
+        setLoading(true);
+        try {
+            await billingService.generateMonthlyInvoices();
+            const invoiceData = await billingService.getInvoices();
+            setInvoices(invoiceData.data || []);
+            alert('Monthly invoicing session completed successfully.');
+        } catch (error) {
+            console.error('Invoicing Error:', error);
+            alert('Failed to execute invoicing protocol.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const renderInvoices = () => (
         <div className="invoices-view animate-fade-in">
             <div className="flex justify-between items-center mb-6">
                 <h4 className="font-900 uppercase tracking-widest text-sm opacity-70">Official Invoicing Ledger</h4>
-                <button className="btn-primary text-xs flex items-center gap-2"><FiFileText/> Generate Monthly Batch</button>
+                <button 
+                    className="btn-primary text-xs flex items-center gap-2"
+                    onClick={handleGenerateInvoices}
+                >
+                    <FiFileText/> Generate Monthly Batch
+                </button>
             </div>
             <div className="glass-card p-0 overflow-hidden">
                 <table className="billing-table">
@@ -475,16 +496,26 @@ const BillingPage: React.FC = () => {
                     <tbody>
                         {invoices.map(inv => (
                             <tr key={inv.id}>
-                                <td className="font-bold">INV-2024-{inv.id.slice(0,4).toUpperCase()}</td>
-                                <td>{inv.station_name}</td>
-                                <td className="text-xs opacity-70">Oct 2024</td>
+                                <td className="font-bold">{inv.invoice_number}</td>
+                                <td>{inv.station?.station_name}</td>
+                                <td className="text-xs opacity-70">
+                                    {new Date(inv.billing_period_start).toLocaleDateString([], { month: 'short', year: 'numeric' })}
+                                </td>
                                 <td className="font-bold">{formatCurrency(inv.amount_due || 0)}</td>
-                                <td><span className="status-badge bg-warning-soft text-warning">Unpaid</span></td>
-                                <td>{"2024-11-05"}</td>
+                                <td>
+                                    <span className={`status-badge ${
+                                        inv.status === 'paid' ? 'bg-success-soft text-success' : 
+                                        inv.status === 'overdue' ? 'bg-danger-soft text-danger' : 
+                                        'bg-warning-soft text-warning'
+                                    }`}>
+                                        {inv.status}
+                                    </span>
+                                </td>
+                                <td>{new Date(inv.due_date).toLocaleDateString()}</td>
                                 <td className="text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button className="icon-btn"><FiFileText size={14}/></button>
-                                        <button className="icon-btn text-blue-400"><FiArrowUpRight size={14}/></button>
+                                        <button className="icon-btn" title="View PDF"><FiFileText size={14}/></button>
+                                        <button className="icon-btn text-blue-400" title="Send Reminder"><FiArrowUpRight size={14}/></button>
                                     </div>
                                 </td>
                             </tr>

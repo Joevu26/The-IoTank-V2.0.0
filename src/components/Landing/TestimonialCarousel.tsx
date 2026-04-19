@@ -141,113 +141,113 @@ const TestimonialCarousel: React.FC = () => {
     return (
         <section className="tc2-section" id="testimonials" aria-label="Customer Testimonials">
             <div className="tc2-container">
-                {/* Header */}
-                <div className="tc2-header">
-                    <div className="tc2-pill">CUSTOMER RESULTS</div>
-                    <h2 className="tc2-title">
-                        Real Stations. <span className="tc2-title-accent">Real Savings.</span>
-                    </h2>
-                    <p className="tc2-subtitle">
-                        Verified results from IoTank owners across Kenya.
-                    </p>
-                </div>
-
-                {/* Main Card */}
-                <div className="tc2-stage">
-                    {/* Navigation Arrows */}
-                    <button
-                        className="tc2-arrow tc2-arrow-left"
-                        onClick={prev}
-                        aria-label="Previous testimonial"
-                        disabled={isAnimating}
-                    >
-                        <FiChevronLeft />
-                    </button>
-
-                    <div className={`tc2-card ${animClass}`} key={t.id}>
-                        {/* Left: Person Info */}
-                        <div className="tc2-person-panel">
-                            <div className="tc2-avatar-wrapper">
-                                <div
-                                    className="tc2-avatar"
-                                    style={{ background: t.avatarUrl ? 'transparent' : `linear-gradient(135deg, ${t.avatarColor}, ${t.avatarColor}99)` }}
-                                    aria-hidden="true"
-                                >
-                                    {t.avatarUrl ? (
-                                        <img src={t.avatarUrl} alt={t.author} className="tc2-avatar-image" />
-                                    ) : (
-                                        <span className="tc2-avatar-initials">{t.avatarInitials}</span>
-                                    )}
-                                </div>
-                                {t.verified && (
-                                    <div className="tc2-verified-badge" title="Verified Installation">
-                                        <FiShield size={10} />
-                                    </div>
-                                )}
-                            </div>
-                            <div className="tc2-person-info">
-                                <p className="tc2-author-name">{t.author}</p>
-                                <p className="tc2-author-role">{t.role}</p>
-                                <div className="tc2-location">
-                                    <FiMapPin size={11} />
-                                    <span>{t.location}</span>
-                                </div>
-                            </div>
-                            <div className="tc2-rating-row">
-                                <StarRating count={t.stars} />
-                            </div>
-                            
-                            <div className="tc2-compact-tags">
-                                {t.verified && (
-                                    <div className="tc2-verified-tag">
-                                        <FiShield size={12} />
-                                        <span>VERIFIED INSTALLATION</span>
-                                    </div>
-                                )}
-                                <div className="tc2-months-badge">
-                                    ACTIVE {t.monthsActive} MONTHS
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Right: Quote & Result */}
-                        <div className="tc2-content-panel">
-                            <div className="tc2-quote-mark" aria-hidden="true">"</div>
-                            <blockquote className="tc2-quote">{t.quote}</blockquote>
-
-                            {/* Savings Highlight */}
-                            <div className="tc2-savings-card">
-                                <div className="tc2-savings-value" style={{ color: t.avatarColor }}>
-                                    {t.savingsAmount}
-                                </div>
-                                <div className="tc2-savings-label">{t.savingsLabel}</div>
-                            </div>
-                        </div>
+                <div className="tc2-split-layout">
+                    {/* Left: Header */}
+                    <div className="tc2-header-side">
+                        <div className="tc2-pill">CUSTOMER RESULTS</div>
+                        <h2 className="tc2-title">
+                            Real Stations. <br />
+                            <span className="tc2-title-accent">Real Savings.</span>
+                        </h2>
+                        <p className="tc2-subtitle">
+                            Verified results from IoTank owners across Kenya.
+                        </p>
                     </div>
 
-                    <button
-                        className="tc2-arrow tc2-arrow-right"
-                        onClick={next}
-                        aria-label="Next testimonial"
-                        disabled={isAnimating}
-                    >
-                        <FiChevronRight />
-                    </button>
-                </div>
-
-                {/* Dot Navigation + Progress */}
-                <div className="tc2-nav-row">
-                    <div className="tc2-dots" role="tablist" aria-label="Testimonial navigation">
-                        {TESTIMONIALS.map((item, i) => (
+                    {/* Right: Carousel Side */}
+                    <div className="tc2-carousel-side">
+                        <div className="tc2-stage">
+                            {/* Navigation Arrows */}
                             <button
-                                key={item.id}
-                                role="tab"
-                                aria-selected={i === activeIndex}
-                                className={`tc2-dot ${i === activeIndex ? 'tc2-dot-active' : ''}`}
-                                onClick={() => goTo(i, i > activeIndex ? 'next' : 'prev')}
-                                aria-label={`Go to testimonial ${i + 1}: ${item.author}`}
-                            />
-                        ))}
+                                className="tc2-arrow tc2-arrow-left"
+                                onClick={prev}
+                                aria-label="Previous testimonial"
+                                disabled={isAnimating}
+                            >
+                                <FiChevronLeft />
+                            </button>
+
+                            <div className={`tc2-card ${animClass}`} key={t.id}>
+                                {/* Left: Person Info */}
+                                <div className="tc2-person-panel">
+                                    <div className="tc2-avatar-wrapper">
+                                        <div
+                                            className="tc2-avatar"
+                                            style={{ background: t.avatarUrl ? 'transparent' : `linear-gradient(135deg, ${t.avatarColor}, ${t.avatarColor}99)` }}
+                                            aria-hidden="true"
+                                        >
+                                            {t.avatarUrl ? (
+                                                <img src={t.avatarUrl} alt={t.author} className="tc2-avatar-image" />
+                                            ) : (
+                                                <span className="tc2-avatar-initials">{t.avatarInitials}</span>
+                                            )}
+                                        </div>
+                                        {t.verified && (
+                                            <div className="tc2-verified-badge" title="Verified Installation">
+                                                <FiShield size={10} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="tc2-person-info">
+                                        <p className="tc2-author-name">{t.author}</p>
+                                        <p className="tc2-author-role">{t.role}</p>
+                                        <div className="tc2-location">
+                                            <FiMapPin size={11} />
+                                            <span>{t.location}</span>
+                                        </div>
+                                    </div>
+                                    <div className="tc2-rating-row">
+                                        <StarRating count={t.stars} />
+                                    </div>
+                                    
+                                    <div className="tc2-compact-tags">
+                                        {t.verified && (
+                                            <div className="tc2-verified-tag">
+                                                <FiShield size={12} />
+                                                <span>VERIFIED</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Right: Quote & Result */}
+                                <div className="tc2-content-panel">
+                                    <div className="tc2-quote-mark" aria-hidden="true">"</div>
+                                    <blockquote className="tc2-quote">{t.quote}</blockquote>
+
+                                    {/* Savings Highlight */}
+                                    <div className="tc2-savings-card">
+                                        <div className="tc2-savings-value" style={{ color: t.avatarColor }}>
+                                            {t.savingsAmount}
+                                        </div>
+                                        <div className="tc2-savings-label">{t.savingsLabel}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                className="tc2-arrow tc2-arrow-right"
+                                onClick={next}
+                                aria-label="Next testimonial"
+                                disabled={isAnimating}
+                            >
+                                <FiChevronRight />
+                            </button>
+                        </div>
+
+                        {/* Dot Navigation */}
+                        <div className="tc2-dots" role="tablist" aria-label="Testimonial navigation">
+                            {TESTIMONIALS.map((item, i) => (
+                                <button
+                                    key={item.id}
+                                    role="tab"
+                                    aria-selected={i === activeIndex}
+                                    className={`tc2-dot ${i === activeIndex ? 'tc2-dot-active' : ''}`}
+                                    onClick={() => goTo(i, i > activeIndex ? 'next' : 'prev')}
+                                    aria-label={`Go to testimonial ${i + 1}: ${item.author}`}
+                                />
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

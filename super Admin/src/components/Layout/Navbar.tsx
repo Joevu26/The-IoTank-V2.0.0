@@ -16,9 +16,11 @@ import './Navbar.css';
 
 interface NavbarProps {
     onToggleSidebar: () => void;
+    children?: React.ReactNode;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, children }) => {
+
     const { systemUser, signOut, canSee } = useAuth();
     const navigate = useNavigate();
 
@@ -96,7 +98,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             </div>
 
             <div className="navbar-right">
+                {children}
                 <div className="command-palette-trigger hidden md:flex" onClick={() => {/* Future: Open Command Palette */}}>
+
                     <MdSearch className="search-icon-modern" />
                     <span className="search-placeholder">Execute command...</span>
                     <span className="command-shortcut">Ctrl K</span>

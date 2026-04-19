@@ -7,7 +7,8 @@ import {
   FiGlobe, 
   FiInfo, 
   FiChevronRight, 
-  FiAlertCircle
+  FiAlertCircle,
+  FiLoader
 } from 'react-icons/fi';
 import './RegistrationRequestForm.css';
 
@@ -55,8 +56,8 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
     e.preventDefault();
     setError('');
 
-    if (!formData.full_name || !formData.email || !formData.station_name) {
-      setError('please fill in all required fields.');
+    if (!formData.full_name || !formData.email || !formData.phone || !formData.station_name || !formData.county || !formData.notes) {
+      setError('please fill in all fields to proceed with your request.');
       return;
     }
     if (!validateEmail(formData.email)) {
@@ -69,12 +70,25 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
       // Execute reCAPTCHA v3 with 'register' action
       let recaptchaToken = '';
       try {
+        // [HARDENING]: Ensure grecaptcha is ready with a small retry window for slow connections
+        let checkCount = 0;
+        while (!window.grecaptcha && checkCount < 10) {
+            await new Promise(r => setTimeout(r, 500));
+            checkCount++;
+        }
+
         if (window.grecaptcha) {
           // Show reCAPTCHA badge
           document.body.classList.add('show-recaptcha');
           // Execute reCAPTCHA v3
           const siteKey = '6LfgSHgsAAAAAHlWl9ZRVO1IvJGsEkyj8_lYVF2i'; // Your v3 site key
-          recaptchaToken = await window.grecaptcha.execute(siteKey, { action: 'register' });
+          try {
+            recaptchaToken = await window.grecaptcha.execute(siteKey, { action: 'register' });
+          } catch (execError) {
+            console.error('reCAPTCHA execution failed:', execError);
+          }
+        } else {
+            console.warn('reCAPTCHA library failed to initialize within 5 seconds.');
         }
       } catch (recaptchaError) {
         console.warn('reCAPTCHA v3 error (non-blocking):', recaptchaError);
@@ -300,8 +314,17 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
                   className="btn-submit" 
                   disabled={loading}
                 >
-                  {loading ? 'Committing...' : 'Commit Account Request'}
-                  <FiChevronRight />
+                  {loading ? (
+                    <>
+                      <FiLoader className="animate-spin" />
+                      <span>Transmitting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Transmit Request</span>
+                      <FiChevronRight />
+                    </>
+                  )}
                 </button>
             </div>
           </form>

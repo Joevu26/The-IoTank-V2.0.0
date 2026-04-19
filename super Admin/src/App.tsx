@@ -24,6 +24,13 @@ const AnalyticsReports = lazy(() => import('./pages/AnalyticsReports'));
 const AuditCompliance = lazy(() => import('./pages/AuditCompliance'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const SecurityEvents = lazy(() => import('./pages/SecurityEvents'));
+const HelpCenter = lazy(() => import('./pages/HelpCenter'));
+
+// Mission Hubs
+const FleetHub = lazy(() => import('./pages/FleetHub'));
+const GovernanceHub = lazy(() => import('./pages/GovernanceHub'));
+const WorkforceHub = lazy(() => import('./pages/WorkforceHub'));
+const ResourceHub = lazy(() => import('./pages/ResourceHub'));
 
 function App() {
   return (
@@ -54,6 +61,11 @@ function App() {
                   <Route path="/clients/:id" element={<ClientDetails />} />
                   <Route path="/support" element={<SupportTickets />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/help" element={<HelpCenter />} />
+
+                  {/* Operational Hubs (Level 4) */}
+                  <Route path="/workforce" element={<WorkforceHub />} />
+                  <Route path="/resources" element={<ResourceHub />} />
                 </Route>
 
                 {/* Protected Routes - Level 1 (Super Admin Only - 7 Titles) */}
@@ -66,6 +78,10 @@ function App() {
                   <Route path="/announcements" element={<Announcements />} />
                   <Route path="/logs" element={<AdminLogs />} />
                   <Route path="/registrations" element={<PendingRegistrations />} />
+
+                  {/* Strategic Hubs (Level 1) */}
+                  <Route path="/fleet" element={<FleetHub />} />
+                  <Route path="/governance" element={<GovernanceHub />} />
                 </Route>
 
                 {/* Catch all */}

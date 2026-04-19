@@ -30,6 +30,7 @@ export const clientsService = {
     const { data, error } = await supabase
       .from('fuel_stations')
       .select('*, tanks(*)')
+      .not('owner_id', 'is', null) // Filter out ghost stations without owners
       .order('created_at', { ascending: false });
     
     if (error) throw error;
@@ -75,6 +76,34 @@ export const clientsService = {
       .select()
       .single();
     
+    if (error) throw error;
+    return data;
+  },
+
+  async recordExternalPayment(stationId: string, amount: number, method: string, reference: string) {
+    const { data, error } = await supabase.rpc('admin_record_external_payment', {
+      p_station_id: stationId,
+      p_amount: amount,
+      p_method: method,
+      p_reference: reference
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updateProfile(stationId: string, updates: any) {
+    const { data, error } = await supabase.rpc('admin_update_station_profile', {
+      p_station_id: stationId,
+      p_updates: updates
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async reactivateClient(stationId: string) {
+    const { data, error } = await supabase.rpc('admin_reactivate_station', {
+      p_station_id: stationId
+    });
     if (error) throw error;
     return data;
   }

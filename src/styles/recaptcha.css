@@ -1,17 +1,40 @@
 /* src/styles/recaptcha.css */
 
-/* Google reCAPTCHA v3 Badge Controls */
+/* Google reCAPTCHA v3 Badge Controls - Restored for Official Compliance */
 .grecaptcha-badge {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  transform: translateY(20px) !important;
-  transition: opacity 0.6s ease, transform 0.6s ease, visibility 0.6s ease !important;
-  bottom: 24px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+    /* Use transitions that match the internal expansion speed */
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+                width 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
+                box-shadow 0.3s ease !important;
+    
+    bottom: 24px !important;
+    right: 0 !important; /* Align to edge */
+    
+    /* Premium Industrial Glassmorphism */
+    box-shadow: -5px 5px 20px rgba(0, 0, 0, 0.2) !important;
+    border-radius: 8px 0 0 8px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-right: none !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    
+    /* Ensure only the logo shows when retracted */
+    overflow: hidden !important;
 }
 
-/* When body has this class, smoothly reveal the badge */
-body.show-recaptcha .grecaptcha-badge {
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: translateY(0) !important;
+/* Hover effect for interactive "deployment" feel */
+.grecaptcha-badge:hover {
+    box-shadow: -10px 10px 30px rgba(0, 212, 255, 0.2) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border-color: rgba(0, 212, 255, 0.3) !important;
+}
+
+/* Force dark mode compatibility if needed, though glass handles both */
+[data-theme='dark'] .grecaptcha-badge {
+    background: rgba(15, 23, 42, 0.8) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
 }

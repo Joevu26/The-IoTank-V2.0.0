@@ -5,6 +5,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/config/supabase';
 import { User, UserRole } from '@/types';
 import { AuditService } from '@/services/AuditService';
+import { NewsService } from '@/services/NewsService';
 
 const CACHE_KEY = 'iotank_cached_user';
 
@@ -269,7 +270,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             try {
                 // Determine initial session immediately
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError) throw sessionError;
+                
+                // CATCH: Invalid Refresh Token or other session recovery failures
+                if (sessionError) {
+                    const isInvalidToken = sessionError.message?.toLowerCase().includes('refresh token') || 
+                                          sessionError.message?.toLowerCase().includes('invalid token') ||
+                                          (sessionError as any).status === 400;
+                    
+                    if (isInvalidToken) {
+                        console.error("[DEBUG_LOG] BOOT: Session data corrupted or expired. Purging.");
+                        localStorage.removeItem(CACHE_KEY);
+                        await supabase.auth.signOut();
+                        setCurrentUser(null);
+                        updateLoadingState(false);
+                        return;
+                    }
+                    throw sessionError;
+                }
 
                 if (session?.user) {
                     currentUserAuthIdRef.current = session.user.id;
@@ -412,6 +429,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             subscription.unsubscribe();
         };
     }, []);
+
+    // 4. NEWS LIFECYCLE: Only active for logged-in accounts
+    useEffect(() => {
+        if (currentUser && !loading) {
+            NewsService.startListening();
+            return () => NewsService.stopListening();
+        }
+    }, [currentUser, loading]);
 
     const signIn = async (email: string, password: string) => {
         setLoading(true);

@@ -3,7 +3,7 @@
    ============================================================================= */
 
 .excellence-section {
-    padding: var(--section-padding-desktop, 60px) 0;
+    padding: 32px 0; /* Compressed from 60px */
     background-color: transparent;
     width: 100%;
     overflow: hidden;
@@ -11,7 +11,7 @@
 
 @media (max-width: 768px) {
     .excellence-section {
-        padding: var(--section-padding-mobile, 32px) 0;
+        padding: 16px 0; /* Compressed from 32px */
     }
 }
 
@@ -76,8 +76,8 @@
 }
 
 .circle-infographic {
-    width: 450px;
-    height: 450px;
+    width: 320px; /* Compressed from 450px */
+    height: 320px; /* Compressed from 450px */
     position: relative;
     display: flex;
     justify-content: center;
@@ -137,22 +137,22 @@
 }
 
 .ring-1 {
-    width: 220px;
-    height: 220px;
+    width: 160px; /* Scaled down */
+    height: 160px;
     background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0) 70%);
     border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .ring-2 {
-    width: 320px;
-    height: 320px;
+    width: 240px; /* Scaled down */
+    height: 240px;
     background: radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, rgba(245, 158, 11, 0) 70%);
     border: 1px solid rgba(245, 158, 11, 0.15);
 }
 
 .ring-3 {
-    width: 420px;
-    height: 420px;
+    width: 310px; /* Scaled down */
+    height: 310px;
     background: radial-gradient(circle, rgba(245, 158, 11, 0.05) 0%, rgba(245, 158, 11, 0) 70%);
     border: 1px solid rgba(245, 158, 11, 0.1);
 }
@@ -195,22 +195,21 @@
 
 /* Reliability Node - Inner Orbit */
 .node-reliability {
-    offset-path: circle(110px at 50% 50%);
+    offset-path: circle(80px at 50% 50%); /* Scaled down */
     animation: activeOrbit 12s linear infinite;
     transform: none;
-    /* Let animation verify position */
 }
 
 /* Safety Node - Middle Orbit */
 .node-safety {
-    offset-path: circle(160px at 50% 50%);
+    offset-path: circle(120px at 50% 50%); /* Scaled down */
     animation: activeOrbit 18s linear infinite reverse;
     transform: none;
 }
 
 /* Accuracy Node - Outer Orbit (Fixed 3rd Path) */
 .node-accuracy {
-    offset-path: circle(210px at 50% 50%);
+    offset-path: circle(150px at 50% 50%); /* Scaled down */
     animation: activeOrbit 24s linear infinite;
     transform: none;
 }

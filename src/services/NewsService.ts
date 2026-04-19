@@ -12,7 +12,10 @@ export class NewsService {
      * Start listening for live news updates.
      */
     static startListening() {
-        if (this.channel) return;
+        if (this.channel) {
+            console.log('[DEBUG_LOG] NewsService: Listener already active. Skipping.');
+            return;
+        }
 
         console.log('Initializing Real-time News Listener...');
 

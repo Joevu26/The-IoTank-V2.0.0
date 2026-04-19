@@ -132,28 +132,80 @@ export class IntelligenceAIService {
     ): Promise<any> {
         try {
             const headers = await this.getSafeAuthHeaders();
+            let body: any;
+
+            if (provider === 'gemini') {
+                // Map to Google Generative AI format
+                body = {
+                    contents: messages.map(m => ({
+                        role: m.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: m.content }]
+                    })),
+                    tools: tools ? [{
+                        function_declarations: tools.map(t => ({
+                            name: t.function.name,
+                            description: t.function.description,
+                            parameters: t.function.parameters
+                        }))
+                    }] : undefined,
+                    tool_config: tools ? {
+                        function_calling_config: { mode: 'AUTO' }
+                    } : undefined
+                };
+            } else {
+                // OpenAI-compatible format (Groq, DeepSeek)
+                body = {
+                    messages,
+                    tools,
+                    tool_choice: tools ? 'auto' : undefined
+                };
+            }
+
             const response = await fetch(`https://suifvborodwergtrbjez.supabase.co/functions/v1/${provider}-proxy`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
                     action: 'chat',
-                    body: {
-                        messages,
-                        tools,
-                        tool_choice: tools ? 'auto' : undefined
-                    }
+                    body
                 })
             });
 
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => ({}));
-                if (response.status === 401) {
-                    console.error(`[IntelligenceAIService] 401 Unauthorized for ${provider}. Token handling might be out of sync.`);
-                }
                 throw new Error(`${provider} error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
             }
 
-            return await response.json();
+            const data = await response.json();
+            
+            // Normalize Response to OpenAI format
+            if (provider === 'gemini') {
+                const candidate = data.candidates?.[0];
+                const content = candidate?.content;
+                const parts = content?.parts || [];
+                
+                const textPart = parts.find((p: any) => p.text);
+                const callParts = parts.filter((p: any) => p.functionCall);
+                
+                return {
+                    message: {
+                        role: 'assistant',
+                        content: textPart?.text || '',
+                        tool_calls: callParts.length > 0 ? callParts.map((p: any, idx: number) => ({
+                            id: `call_${Date.now()}_${idx}`,
+                            type: 'function',
+                            function: {
+                                name: p.functionCall.name,
+                                arguments: JSON.stringify(p.functionCall.args || {})
+                            }
+                        })) : undefined
+                    }
+                };
+            }
+
+            // OpenAI compatible (Groq, DeepSeek)
+            return {
+                message: data.choices?.[0]?.message || { role: 'assistant', content: '' }
+            };
         } catch (error) {
             console.error(`IntelligenceAIService Chat Error (${provider}):`, error);
             throw error;

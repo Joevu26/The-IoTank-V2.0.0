@@ -2,6 +2,13 @@
 /* "Riley-meets-Industrial" Theme - Professional yet Engaging */
 
 :root {
+    /* Deepened Vibrant Macaron Palette */
+    --vibrant-lullaby: #A5B6D9; /* Saturated */
+    --vibrant-periwinkle: #A5A5FF; /* Deeper */
+    --vibrant-lavender: #D1D1F5; /* Deeper */
+    --vibrant-glacier: #8FD9D9; /* Saturated */
+    --vibrant-mist: #BFF2F2; /* Saturated */
+
     /* Lilac Palette - Modern High-Fidelity */
     --color-subtle: #E2CEF3;
     --color-lilac: #CCAAE6;
@@ -51,8 +58,8 @@
     --font-main: 'Inter', sans-serif;
     
     /* Spacing System - Compressed Layout */
-    --section-padding-desktop: 60px;
-    --section-padding-mobile: 32px;
+    --section-padding-desktop: 40px;
+    --section-padding-mobile: 24px;
     --container-max-width: 1340px;
 }
 
@@ -129,8 +136,8 @@ ul {
 }
 
 .section-bg-mist {
-    background: #F1F5F9;
-    /* Light Slate Problem/Risk */
+    background: linear-gradient(135deg, var(--vibrant-mist) 0%, var(--vibrant-glacier) 100%);
+    color: #1E293B;
 }
 
 .section-bg-solution {
@@ -144,19 +151,8 @@ ul {
 }
 
 .section-bg-offwhite-to-white {
-    background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 15%, #FFFFFF 100%);
-}
-
-.section-bg-white-to-periwinkle {
-    background: linear-gradient(180deg, #FFFFFF 0%, #172554 15%, #172554 100%);
-}
-
-.section-bg-periwinkle-to-white {
-    background: linear-gradient(180deg, #172554 0%, #FFFFFF 15%, #FFFFFF 100%);
-}
-
-.section-bg-white-to-offwhite {
-    background: linear-gradient(180deg, #FFFFFF 0%, #F1F5F9 15%, #F1F5F9 100%);
+    background: linear-gradient(135deg, var(--vibrant-lavender) 0%, var(--vibrant-periwinkle) 100%);
+    color: #0F172A; /* Deeper Navy */
 }
 
 .section-bg-dark-navy {
@@ -184,6 +180,30 @@ ul {
     background: linear-gradient(180deg, #E0F7FA 0%, #FFFFFF 15%, #FFFFFF 100%);
 }
 
+.ai-heading-cyan {
+    background: linear-gradient(135deg, var(--vibrant-mist) 0%, var(--vibrant-periwinkle) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+    filter: drop-shadow(0 0 1px rgba(0,0,0,0.1));
+}
+
+.shimmer-gradient-text {
+    background: linear-gradient(135deg, #10B981 0%, #06B6D4 100%); /* Deepened Shimmer */
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: textShimmer 4s ease infinite;
+}
+
+@keyframes textShimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
 /* Typographic Hierarchy Utilities */
 h1,
 .h1 {
@@ -191,7 +211,7 @@ h1,
     line-height: 1.1;
     font-weight: 900;
     letter-spacing: -0.04em;
-    margin-bottom: 1.25rem; /* Reduced for compression */
+    margin-bottom: 0.75rem; /* Reduced for compression */
 }
 
 
@@ -201,7 +221,7 @@ h2,
     line-height: var(--line-height-heading);
     font-weight: 900;
     letter-spacing: -0.02em;
-    margin-bottom: 1.25rem; /* Reduced for compression */
+    margin-bottom: 0.75rem; /* Reduced for compression */
 }
 
 
@@ -211,7 +231,7 @@ h3,
     font-size: var(--font-size-h3);
     line-height: var(--line-height-heading);
     font-weight: 900;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 p,
@@ -220,7 +240,7 @@ p,
     line-height: 1.65;
     color: var(--color-text-muted);
     max-width: var(--max-content-width);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     font-weight: 400;
 }
 
@@ -487,12 +507,13 @@ p,
 
 /* CTA "Get Started" Button - Neumorphic Elite + Liquid Glow */
 .navbar .btn-primary {
-    background: linear-gradient(135deg, #7C3AED 0%, #00D4FF 100%);
+    /* High Contrast Industrial Blue-to-Emerald Gradient */
+    background: linear-gradient(135deg, #1E40AF 0%, #059669 100%);
     color: white;
-    padding: 8px 18px;
+    padding: 10px 22px;
     border-radius: 999px;
-    font-weight: 700;
-    font-size: 0.85rem;
+    font-weight: 800;
+    font-size: 0.9rem;
     border: none;
     cursor: pointer;
     position: relative;
@@ -501,9 +522,9 @@ p,
     align-items: center;
     gap: 8px;
 
-    /* Glow Shadow */
-    box-shadow: 0 8px 20px rgba(124, 58, 237, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    /* Stronger Glow Shadow for Contrast */
+    box-shadow: 0 8px 24px rgba(30, 64, 175, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2) inset;
 
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     text-transform: capitalize;
@@ -1297,7 +1318,7 @@ section[id="pricing"] .p-8 {
     font-size: 1.25rem;
     line-height: 1.6;
     color: #444;
-    margin-bottom: 40px;
+    margin-bottom: 24px;
     max-width: 700px;
     margin-left: auto;
     margin-right: auto;
@@ -1307,7 +1328,7 @@ section[id="pricing"] .p-8 {
     display: flex;
     justify-content: center;
     gap: 16px;
-    margin-bottom: 60px;
+    margin-bottom: 32px;
 }
 
 .btn-primary {
@@ -1684,7 +1705,7 @@ section[id="pricing"] .p-8 {
     gap: 20px;
     position: relative;
     max-width: 1200px;
-    margin: 40px auto 0;
+    margin: 24px auto 0;
 }
 
 .process-step-card {
@@ -1693,11 +1714,10 @@ section[id="pricing"] .p-8 {
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 20px;
-    padding: 20px 24px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     position: relative;
     z-index: 2;
     transition: all 0.4s ease;
@@ -2097,9 +2117,9 @@ section[id="pricing"] .p-8 {
     background: #F0F4FF;
     /* User requested Lavender #E6E6FA */
     background: linear-gradient(135deg, #F8F8FF 0%, #E6E6FA 100%);
-    padding: 32px 24px;
+    padding: 20px 24px;
     border-radius: 20px;
-    min-height: 280px;
+    min-height: 180px;
     display: flex;
     flex-direction: column;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -2116,7 +2136,7 @@ section[id="pricing"] .p-8 {
     font-weight: 300;
     color: #2563EB;
     line-height: 1;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     opacity: 0.8;
 }
 
@@ -2477,7 +2497,7 @@ section[id="pricing"] .p-8 {
 /* ================= NEW FOOTER ARCHITECTURE ================= */
 .footer-landing {
     background-color: var(--color-plum-deep);
-    padding: 60px 0 30px;
+    padding: 40px 0 20px; /* Reduced from 60px 0 30px */
     color: #ffffff;
     font-family: var(--font-main);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -2486,8 +2506,8 @@ section[id="pricing"] .p-8 {
 .footer-grid {
     display: grid;
     grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-    gap: 30px;
-    margin-bottom: 40px;
+    gap: 24px; /* Reduced from 30px */
+    margin-bottom: 24px; /* Reduced from 40px */
 }
 
 .footer-brand {
@@ -2683,17 +2703,23 @@ section[id="pricing"] .p-8 {
 }
 
 /* ================= MODERN PRICING DESIGN ================= */
-.pricing-pill {
+.pricing-pill, .solution-pill, .ai-pill {
     display: inline-block;
     padding: 6px 18px;
-    background: #E0F7FA;
-    color: #00D2BE;
+    background: var(--vibrant-lullaby);
+    color: #111827;
     border-radius: 50px;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 1.5px;
     text-transform: uppercase;
     margin-bottom: 20px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(201, 212, 236, 0.4);
+}
+
+.ai-pill {
+    background: var(--vibrant-glacier);
 }
 
 .pricing-header-modern {
@@ -2723,9 +2749,10 @@ section[id="pricing"] .p-8 {
 .pricing-card-modern {
     flex: 1;
     border-radius: 20px;
-    padding: 28px 32px;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
+    gap: 8px;
     position: relative;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     border: 1.5px solid transparent;
@@ -2906,7 +2933,7 @@ section[id="pricing"] .p-8 {
 /* ================= MODERN FINAL CTA ================= */
 .final-cta-modern {
     background: var(--color-plum);
-    padding: 60px 0;
+    padding: 40px 0; /* Reduced from 60px */
     position: relative;
     overflow: hidden;
     text-align: center;
@@ -2933,24 +2960,24 @@ section[id="pricing"] .p-8 {
 
 .cta-pill-modern {
     display: inline-block;
-    padding: 8px 24px;
+    padding: 6px 20px; /* Reduced */
     border-radius: 50px;
     border: 1.5px solid rgba(0, 210, 190, 0.3);
     color: #00D2BE;
-    font-size: 12px;
+    font-size: 11px; /* Reduced */
     font-weight: 800;
     letter-spacing: 2px;
-    margin-bottom: 20px;
+    margin-bottom: 12px; /* Reduced from 20px */
     background: rgba(0, 210, 190, 0.05);
 }
 
 .cta-title-modern {
-    font-size: clamp(2.5rem, 5vw, 4.2rem);
+    font-size: clamp(2rem, 4vw, 3.5rem); /* Reduced from 4.2rem */
     font-weight: 900;
     color: #FFFFFF;
-    letter-spacing: -3px;
+    letter-spacing: -2px;
     line-height: 1.1;
-    margin-bottom: 16px;
+    margin-bottom: 12px; /* Reduced from 16px */
 }
 
 .cta-title-modern span {
@@ -2961,10 +2988,10 @@ section[id="pricing"] .p-8 {
 }
 
 .cta-desc-modern {
-    font-size: 18px;
+    font-size: 16px; /* Reduced from 18px */
     color: rgba(255, 255, 255, 0.6);
     max-width: 700px;
-    margin: 0 auto 32px;
+    margin: 0 auto 24px; /* Reduced from 32px */
     font-weight: 500;
 }
 
@@ -2975,30 +3002,24 @@ section[id="pricing"] .p-8 {
 }
 
 .btn-cta-primary {
-    padding: 18px 40px;
-    border-radius: 16px;
+    padding: 14px 32px; /* Reduced from 18px 40px */
+    border-radius: 12px;
     background: linear-gradient(135deg, #06B6D4 0%, #10B981 100%);
     color: #FFFFFF;
     font-weight: 800;
-    font-size: 16px;
+    font-size: 15px;
     border: none;
     cursor: pointer;
     transition: all 0.4s ease;
-    box-shadow: 0 10px 30px rgba(6, 182, 212, 0.25);
-}
-
-.btn-cta-primary:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 15px 40px rgba(6, 182, 212, 0.4);
 }
 
 .btn-cta-outline {
-    padding: 18px 40px;
-    border-radius: 16px;
+    padding: 14px 32px; /* Reduced from 18px 40px */
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.05);
     color: #FFFFFF;
     font-weight: 800;
-    font-size: 16px;
+    font-size: 15px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: all 0.4s ease;
@@ -3020,4 +3041,165 @@ section[id="pricing"] .p-8 {
     background: radial-gradient(circle, rgba(0, 210, 190, 0.08) 0%, transparent 70%);
     z-index: 1;
     pointer-events: none;
+}
+
+/* ============================================================
+   LandingPage Animation Support — Added by ScrollAnimations system
+   ============================================================ */
+
+/* ── Scroll handle: only display when scrolled ──────────────── */
+.scroll-top-handle {
+    opacity: 0;
+    transition: opacity 0.4s ease, width 0.3s ease, background 0.3s ease;
+}
+
+.scroll-top-handle.visible {
+    opacity: 0.9;
+}
+
+/* ── Hero Kinetic H1 sizing override ────────────────────────── */
+.hero-kinetic-h1 {
+    font-size: clamp(2.25rem, 4.5vw, 3rem);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    margin-bottom: 1.25rem;
+}
+
+/* ── Process step connector — connects to step-connector-animated ── */
+.process-grid-modern .step-connector {
+    position: relative;
+    overflow: visible;
+}
+
+.process-grid-modern .step-connector::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0%;
+    height: 2px;
+    background: linear-gradient(90deg, #00D4FF, #7C3AED);
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translateY(-50%);
+}
+
+.stagger-h-container.is-visible .step-connector::before {
+    width: 100%;
+    transition-delay: 0.5s;
+}
+
+/* ── Solution feature cards — hover micro-lift ──────────────── */
+.solution-feature-card {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.35s ease !important;
+}
+
+.solution-feature-card:hover {
+    transform: translateY(-6px) scale(1.04) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* ── AI section terminal card hover ─────────────────────────── */
+.ai-terminal-card {
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.4s ease;
+}
+
+.ai-terminal-card:hover {
+    transform: translateY(-8px) scale(1.01);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Pricing cards — hover lift enhancement ─────────────────── */
+.pricing-card-modern.card-flip-in {
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.35s ease !important;
+}
+
+/* ── Section pill badges — slide in from left ───────────────── */
+.solution-pill,
+.regulatory-pill,
+.ai-pill,
+.pricing-pill,
+.cta-pill-modern {
+    transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Dashboard mockup image hover tilt ──────────────────────── */
+.solution-mockup-img {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.5s ease,
+                filter 0.5s ease !important;
+}
+
+.solution-mockup-img:hover {
+    transform: perspective(1000px) rotateY(-4deg) rotateX(2deg) translateY(-8px) scale(1.02) !important;
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.15) !important;
+    filter: brightness(1.02) !important;
+}
+
+/* ── Process step cards — hover glow ────────────────────────── */
+.process-step-card {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.35s ease !important;
+}
+
+.process-step-card:hover {
+    transform: translateY(-10px) !important;
+    box-shadow: 0 24px 60px rgba(0, 212, 255, 0.15) !important;
+}
+
+.process-step-card:hover .step-icon-frame {
+    background: linear-gradient(135deg, #00D4FF 0%, #7C3AED 100%) !important;
+    box-shadow: 0 0 24px rgba(0, 212, 255, 0.4) !important;
+    color: white !important;
+    transform: scale(1.1);
+}
+
+.step-icon-frame {
+    transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease, color 0.35s ease;
+}
+
+/* ── CTA buttons bounce on hover ────────────────────────────── */
+.btn-cta-primary:hover,
+.btn-cta-outline:hover {
+    animation: none; /* prevent conflict with hover-lift */
+}
+
+/* ── Footer link slide effect (enhanced) ────────────────────── */
+.footer-links a,
+.footer-links .link-btn {
+    position: relative;
+    padding-left: 0;
+    transition: color 0.2s ease, padding-left 0.25s ease !important;
+}
+
+.footer-links a:hover,
+.footer-links .link-btn:hover {
+    color: #FFFFFF !important;
+    padding-left: 8px !important;
+    transform: none !important;
+}
+
+/* ── Smooth text render for kinetic text ────────────────────── */
+.hero-kinetic-h1,
+.kinetic-text,
+.section-heading-split {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+/* ── Scroll indicator: hide when scrolled ───────────────────── */
+.hero-scroll-indicator {
+    transition: opacity 0.5s ease;
+}
+
+@media (max-width: 640px) {
+    .hero-kinetic-h1 {
+        font-size: clamp(1.9rem, 7vw, 2.5rem);
+    }
 }

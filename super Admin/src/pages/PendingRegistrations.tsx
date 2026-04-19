@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../config/supabase';
 import Layout from '../components/Layout';
 import { 
     FiPhone, FiMail, FiCheckCircle, FiXCircle, FiInfo, FiLoader, 
-    FiPlus, FiRefreshCw, FiArrowRight, FiUser, FiUsers, 
-    FiShield, FiMapPin, FiCalendar, FiClock, FiSearch, FiAlertTriangle,
-    FiChevronRight, FiAlertCircle, FiActivity
+    FiPlus, FiRefreshCw, FiUser, FiShield, FiMapPin, FiCalendar, 
+    FiSearch, FiAlertCircle, FiActivity, FiX, FiGlobe, FiZap,
+    FiChevronLeft, FiChevronRight, FiDatabase, FiExternalLink, 
+    FiDownload, FiTrendingUp, FiTrendingDown, FiArchive, FiClock
 } from 'react-icons/fi';
 import './PendingRegistrations.css';
 
@@ -21,21 +22,49 @@ interface PendingReg {
   created_at: string;
 }
 
-interface PendingStaff {
-  id: string;
-  station_id: string;
-  station_name: string;
-  full_name: string;
-  email: string;
-  role: string;
-  status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-}
+// Internal Pagination Component
+const TablePagination = ({ 
+    currentPage, 
+    totalItems, 
+    pageSize, 
+    onPageChange 
+}: { 
+    currentPage: number, 
+    totalItems: number, 
+    pageSize: number, 
+    onPageChange: (p: number) => void 
+}) => {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, totalItems);
 
-const PendingRegistrations: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'admins' | 'staff'>('admins');
+    return (
+        <div className="table-pagination-footer">
+            <div className="pagination-info">
+                Showing <b>{start}</b> to <b>{end}</b> of <b>{totalItems}</b> entries
+            </div>
+            <div className="pagination-controls">
+                <button 
+                    className="pagination-btn" 
+                    disabled={currentPage === 1}
+                    onClick={() => onPageChange(currentPage - 1)}
+                >
+                    Previous
+                </button>
+                <button 
+                    className="pagination-btn" 
+                    disabled={currentPage === totalPages}
+                    onClick={() => onPageChange(currentPage + 1)}
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
   const [registrations, setRegistrations] = useState<PendingReg[]>([]);
-  const [staffRequests, setStaffRequests] = useState<PendingStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [approving, setApproving] = useState(false);
@@ -43,6 +72,10 @@ const PendingRegistrations: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showManualModal, setShowManualModal] = useState(false);
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   // Notification States
   const [toast, setToast] = useState<{show: boolean, type: 'error' | 'success', title: string, message: string, step?: string} | null>(null);
@@ -60,14 +93,6 @@ const PendingRegistrations: React.FC = () => {
       if (regError) throw regError;
       setRegistrations(regData as PendingReg[]);
 
-      const { data: staffData, error: staffError } = await supabase
-        .from('team_member_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (staffError) throw staffError;
-      setStaffRequests(staffData as PendingStaff[]);
-
     } catch (err: any) {
       console.error("Fetch error:", err);
       setError(err.message);
@@ -76,16 +101,12 @@ const PendingRegistrations: React.FC = () => {
     }
   };
 
-  // REALTIME SUBSCRIPTIONS
   useEffect(() => {
     fetchRegistrations();
 
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_registrations' }, () => {
-          fetchRegistrations();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_member_requests' }, () => {
           fetchRegistrations();
       })
       .subscribe((status) => {
@@ -95,7 +116,6 @@ const PendingRegistrations: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // TOAST AUTO-DISMISS
   useEffect(() => {
     if (toast?.show) {
       const duration = toast.type === 'success' ? 10000 : 20000;
@@ -103,6 +123,18 @@ const PendingRegistrations: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  const [selectedReg, setSelectedReg] = useState<PendingReg | null>(null);
+
+  // Intelligence Metrics
+  const metrics = useMemo(() => {
+    const total = registrations.length;
+    const pending = registrations.filter(r => r.status === 'pending').length;
+    const approved = registrations.filter(r => r.status === 'approved').length;
+    const exceptions = registrations.filter(r => r.status === 'rejected').length;
+    
+    return { total, pending, approved, exceptions };
+  }, [registrations]);
 
   const handleApproveAdmin = async (reg: PendingReg) => {
     setApproving(true);
@@ -112,7 +144,6 @@ const PendingRegistrations: React.FC = () => {
         body: { registrationId: reg.id }
       });
       
-      // 1. Handle Logical Failures (returned with 200 but success: false)
       if (data && data.success === false) {
           setToast({
               show: true,
@@ -124,32 +155,13 @@ const PendingRegistrations: React.FC = () => {
           return;
       }
 
-      // 2. Handle HTTP/Network Errors
       if (functionError) {
-        console.error("Function invoke error details:", functionError);
-        
-        let detailedMessage = functionError.message;
-        
-        // Try to extract body from FunctionsHttpError (Supabase JS V2)
-        try {
-          if ((functionError as any).context) {
-            const errorBody = await (functionError as any).context.json();
-            detailedMessage = errorBody.error || errorBody.message || detailedMessage;
-          }
-        } catch (e) {
-            console.warn("Could not parse error context:", e);
-        }
-
-        const isNetworkError = detailedMessage?.toLowerCase().includes('fetch') || 
-                              detailedMessage?.toLowerCase().includes('network') ||
-                              detailedMessage?.toLowerCase().includes('failed to fetch');
-        
         setToast({
             show: true,
             type: 'error',
-            title: isNetworkError ? "Network Unreachable" : "Provisioning Failed",
-            message: detailedMessage || "The provisioning hub could not be reached.",
-            step: isNetworkError ? 'HUB_OFFLINE' : 'SERVER_ERROR'
+            title: "Provisioning Failed",
+            message: functionError.message || "The provisioning hub could not be reached.",
+            step: 'SERVER_ERROR'
         });
         return;
       }
@@ -161,6 +173,7 @@ const PendingRegistrations: React.FC = () => {
           message: `${reg.full_name} has been synchronized as Executive Administrator.`
       });
       await fetchRegistrations();
+      setSelectedReg(null); // Close modal if open
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: "Critical Exception", message: err.message });
     } finally {
@@ -168,174 +181,312 @@ const PendingRegistrations: React.FC = () => {
     }
   };
 
-  const testConnection = async () => {
-    setToast({ show: true, type: 'error', title: "Diagnostic in Progress", message: "Probing hub link...", step: 'DIAGNOSTIC' });
+  const handleReject = async (reg: PendingReg) => {
+    if (!window.confirm(`Are you sure you want to reject ${reg.full_name}'s request?`)) return;
     try {
-        const currentProjectUrl = import.meta.env.VITE_SUPABASE_URL;
-        // FIX: Use the standard Supabase API URL format for Edge Functions.
-        // The .functions.supabase.co host does NOT use the /functions/v1/ prefix.
-        // The correct format is: {SUPABASE_URL}/functions/v1/{function-name}
-        const pingUrl = `${currentProjectUrl}/functions/v1/approve-registration/ping`;
-        
-        const start = Date.now();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-            setToast({
-                show: true,
-                type: 'error',
-                title: "Session Not Found",
-                message: `You are disconnected from the system. Source Project: ${currentProjectUrl}. Please log out and back in.`,
-                step: 'AUTH_MISSING'
-            });
-            return;
-        }
-
-        const resp = await fetch(pingUrl, { 
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${session.access_token}`
-            }
-        });
-        const duration = Date.now() - start;
-        
-        if (resp.ok) {
-            const data = await resp.json();
-            const serverTime = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'N/A';
-            setToast({
-                show: true,
-                type: 'success',
-                title: "Link Active",
-                message: `Connection established in ${duration}ms. Active Project: ${currentProjectUrl}. Hub Online and responding to diagnostic probes.`,
-                step: 'STABLE'
-            });
-        } else {
-            const errorBody = await resp.json().catch(() => ({}));
-            setToast({
-                show: true,
-                type: 'error',
-                title: `Hub Refused Connection (${resp.status})`,
-                message: `The infrastructure is visible but rejected the handshake. Project: ${currentProjectUrl}. Details: ${errorBody.error || errorBody.message || 'No detail provided.'}`,
-                step: 'PROBE_FAILED'
-            });
-        }
-    } catch (err: any) {
-        setToast({
-            show: true,
-            type: 'error',
-            title: "Network Block Detected",
-            message: `Raw fetch failed: ${err.message}. Your local environment or firewall is blocking the provisioning cluster.`,
-            step: 'HARD_OFFLINE'
-        });
-    }
-  };
-
-  const handleApproveStaff = async (req: PendingStaff) => {
-    setApproving(true);
-    setToast(null);
-    try {
-      const { data, error: functionError } = await supabase.functions.invoke('approve-staff-request', {
-        body: { requestId: req.id }
-      });
-      
-      if (data && data.success === false) {
-          setToast({
-              show: true,
-              type: 'error',
-              title: "Staff Authorization Failed",
-              message: data.error || data.details?.message || "Logical failure during personnel sync."
-          });
-          return;
-      }
-
-      if (functionError) {
-          console.error("Staff Function error details:", functionError);
-          
-          let detailedMessage = functionError.message;
-          try {
-            if ((functionError as any).context) {
-              const errorBody = await (functionError as any).context.json();
-              detailedMessage = errorBody.error || errorBody.message || detailedMessage;
-            }
-          } catch (e) {
-              console.warn("Could not parse staff error context:", e);
-          }
-
-          setToast({
-              show: true,
-              type: 'error',
-              title: "Network/Server Error",
-              message: detailedMessage || "Failed to reach authorization service."
-          });
-          return;
-      }
-      
-      setToast({
-          show: true,
-          type: 'success',
-          title: 'Authorization Success',
-          message: `${req.full_name} is now synchronized for ${req.role} operations.`
-      });
-      await fetchRegistrations();
-    } catch (err: any) {
-      setToast({ show: true, type: 'error', title: "Operation Failure", message: err.message });
-    } finally {
-      setApproving(false);
-    }
-  };
-
-  const handleReject = async (table: 'pending_registrations' | 'team_member_requests', id: string) => {
-    if (!window.confirm('Are you sure you want to reject this request?')) return;
-    try {
-      const { error } = await supabase.from(table).update({ status: 'rejected' }).eq('id', id);
+      const { error } = await supabase.from('pending_registrations').update({ status: 'rejected' }).eq('id', reg.id);
       if (error) throw error;
-      setToast({ show: true, type: 'success', title: 'Request Rejected', message: 'Identity has been blacklisted.' });
+      setToast({ 
+          show: true, 
+          type: 'error', 
+          title: 'Request Rejected', 
+          message: `Administrative access for ${reg.full_name} has been formally declined and archived.` 
+      });
       await fetchRegistrations();
+      setSelectedReg(null); // Close modal if open
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: "Rejection Logic Failed", message: err.message });
     }
   };
 
-  const pendingAdminCount = registrations.filter(r => r.status === 'pending').length;
-  const pendingStaffCount = staffRequests.filter(s => s.status === 'pending').length;
+  const handleExport = () => {
+    const csvRows = [
+      ['Full Name', 'Email', 'Phone', 'Station Name', 'County', 'Status', 'Date'],
+      ...registrations.map(r => [
+        r.full_name,
+        r.email,
+        r.phone,
+        r.station_name,
+        r.county || 'N/A',
+        r.status,
+        new Date(r.created_at).toLocaleDateString()
+      ])
+    ];
 
-  const filterAndSearch = (list: any[]) => {
-    return list.filter(item => {
-      const matchesStatus = filterStatus === 'all' ? true : item.status === filterStatus;
-      const term = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || 
-          item.full_name?.toLowerCase().includes(term) || 
-          item.email?.toLowerCase().includes(term) || 
-          item.station_name?.toLowerCase().includes(term);
-      return matchesStatus && matchesSearch;
-    });
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `IoTank_Registration_Log_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setToast({ show: true, type: 'success', title: 'Export Generated', message: 'Registry has been compiled into CSV format.' });
   };
 
-  const filteredAdmins = filterAndSearch(registrations);
-  const filteredStaff = filterAndSearch(staffRequests);
+  const filteredAdmins = registrations.filter(item => {
+    const matchesStatus = filterStatus === 'all' ? true : item.status === filterStatus;
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+        item.full_name?.toLowerCase().includes(term) || 
+        item.email?.toLowerCase().includes(term) || 
+        item.station_name?.toLowerCase().includes(term);
+    return matchesStatus && matchesSearch;
+  });
 
-  return (
-    <Layout>
-      <div className="pending-reg-container animate-in fade-in slide-in-from-bottom-6 duration-1000">
+  // Calculate Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredAdmins.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
+
+  const ManualProvisionModal = () => {
+    const [formData, setFormData] = useState({
+        full_name: '',
+        email: '',
+        phone: '',
+        station_name: '',
+        county: '',
+        notes: ''
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [localError, setLocalError] = useState('');
+
+    const counties = [
+        'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Kiambu', 'Machakos',
+        'Nyeri', 'Meru', 'Kakamega', 'Kisii', 'Kilifi', 'Garissa', 'Other',
+    ];
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLocalError('');
+
+        if (!formData.full_name || !formData.email || !formData.phone || !formData.station_name || !formData.county || !formData.notes) {
+            setLocalError('All fields must be filled before direct deployment.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const { data: reg, error: regError } = await supabase
+                .from('pending_registrations')
+                .insert([{ ...formData, status: 'pending' }])
+                .select()
+                .single();
+
+            if (regError) throw regError;
+
+            await handleApproveAdmin(reg as PendingReg);
+            setShowManualModal(false);
+        } catch (err: any) {
+            setLocalError(err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="registration-overlay">
+            <div className="registration-modal-content">
+                <header className="modal-header">
+                    <div className="header-text-container">
+                        <h2>Provision Executive Identity</h2>
+                        <p>Direct system-level deployment of administrative credentials.</p>
+                        <div className="modal-header-badges">
+                            <span className="modal-badge amethyst">Kernel Direct</span>
+                            <span className="modal-badge violet">SECURE_DEPLOY</span>
+                        </div>
+                    </div>
+                <button className="close-btn" onClick={() => setShowManualModal(false)}>
+                        <FiX size={18} />
+                    </button>
+                </header>
+
+                <div className="modal-body-scroll">
+                    {localError && (
+                        <div className="error-banner mb-4">
+                            <div className="error-icon-container">
+                                <FiAlertCircle className="error-icon" />
+                            </div>
+                            <div className="error-content">
+                                <strong>Deployment Error</strong>
+                                <p>{localError}</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <form onSubmit={handleSubmit} className="premium-compact-form">
+                        {/* SECTION 1: IDENTITY */}
+                        <div className="atm-section amethyst">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon"><FiUser size={14} /></div>
+                                <span className="atm-section-title">Executive Identity</span>
+                            </div>
+                            <div className="atm-section-body atm-grid atm-grid-2">
+                                <div className="form-group">
+                                    <label>Full Legal Name</label>
+                                    <input required type="text" placeholder="John Kamau" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Business Email Address</label>
+                                    <input required type="email" placeholder="you@company.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Official Contact Number</label>
+                                    <input required type="tel" placeholder="+254..." value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                </div>
+                                <div className="form-group">
+                                    <label>Station / Company Name</label>
+                                    <input required type="text" placeholder="e.g. Nairobi Central Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SECTION 2: LOCATION */}
+                        <div className="atm-section violet">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon"><FiGlobe size={14} /></div>
+                                <span className="atm-section-title">Administrative Region</span>
+                            </div>
+                            <div className="atm-section-body">
+                                <div className="form-group">
+                                    <label>County / Region Headquarters</label>
+                                    <select required value={formData.county} onChange={e => setFormData({...formData, county: e.target.value})}>
+                                        <option value="">Select County</option>
+                                        {counties.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SECTION 3: DIRECTIVES */}
+                        <div className="atm-section plum">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon"><FiInfo size={14} /></div>
+                                <span className="atm-section-title">Special Directives</span>
+                            </div>
+                            <div className="atm-section-body">
+                                <div className="form-group">
+                                    <label>Technical Requirements (Optional)</label>
+                                    <textarea 
+                                        rows={2}
+                                        placeholder="Any specific installation notes or equipment needs..." 
+                                        value={formData.notes} 
+                                        onChange={e => setFormData({...formData, notes: e.target.value})} 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="form-actions mt-8">
+                            <button type="button" className="btn-cancel" onClick={() => setShowManualModal(false)}>Cancel</button>
+                            <button type="submit" className="btn-submit" disabled={submitting}>
+                                {submitting ? <FiLoader className="animate-spin" /> : <FiZap />}
+                                <span>Provision Executive Account</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+  };
+
+  const DetailAuditModal = ({ reg, onClose }: { reg: PendingReg; onClose: () => void }) => {
+    return (
+        <div className="registration-overlay" onClick={onClose}>
+            <div className="registration-modal-content audit-mode animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <header className="modal-header audit">
+                    <div className="header-text-container">
+                        <div className="flex items-center gap-3">
+                            <FiActivity size={20} className="text-indigo-400" />
+                            <h2>Forensic Audit: {reg.full_name}</h2>
+                        </div>
+                        <p>Identity bundle verification and station deployment metadata.</p>
+                    </div>
+                    <button className="close-btn" onClick={onClose}>
+                        <FiX size={18} />
+                    </button>
+                </header>
+
+                <div className="modal-body-scroll">
+                    <div className="audit-grid">
+                        <div className="audit-section">
+                            <label><FiUser size={12} /> Executive Identity</label>
+                            <div className="audit-field">
+                                <span className="label">Legal Name</span>
+                                <span className="value font-bold">{reg.full_name}</span>
+                            </div>
+                            <div className="audit-field">
+                                <span className="label">Primary Email</span>
+                                <span className="value font-mono text-indigo-600">{reg.email}</span>
+                            </div>
+                            <div className="audit-field">
+                                <span className="label">Contact Phone</span>
+                                <span className="value font-mono">{reg.phone}</span>
+                            </div>
+                        </div>
+
+                        <div className="audit-section">
+                            <label><FiMapPin size={12} /> Station Deployment</label>
+                            <div className="audit-field">
+                                <span className="label">Station Entity</span>
+                                <span className="value font-bold text-slate-700">{reg.station_name}</span>
+                            </div>
+                            <div className="audit-field">
+                                <span className="label">Assigned County</span>
+                                <span className="value region-tag inline-block mt-1">{reg.county}</span>
+                            </div>
+                        </div>
+
+                        <div className="audit-section full-width">
+                            <label><FiInfo size={12} /> Technical Objectives & Notes</label>
+                            <div className="audit-notes-box">
+                                {reg.notes || "No additional technical directives provided."}
+                            </div>
+                        </div>
+
+                        <div className="audit-section full-width">
+                            <label><FiClock size={12} /> Protocol History</label>
+                            <div className="flex justify-between items-center py-2 border-b border-slate-50">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase">Initial Handshake</span>
+                                <span className="text-[11px] font-mono text-slate-500">{new Date(reg.created_at).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase">Current Status</span>
+                                <span className={`status-badge-premium status--${reg.status}`}>{reg.status}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {reg.status === 'pending' && (
+                        <div className="form-actions mt-8">
+                            <button className="btn-audit-reject" onClick={() => handleReject(reg)}>Reject Identity</button>
+                            <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving}>
+                                {approving ? <FiLoader className="animate-spin" /> : <FiZap />}
+                                <span>Provision Executive Account</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+  };
+
+  const content = (
+      <div className="pending-reg-container animate-in fade-in duration-500">
         
-        {/* TOAST SYSTEM */}
         {toast?.show && (
             <div className="toast-container">
                 <div className={`premium-toast type--${toast.type} shadow-2xl`}>
                     <div className={`toast-icon-wrapper ${toast.type}`}>
-                        {toast.type === 'error' ? <FiAlertCircle size={24} /> : <FiCheckCircle size={24} />}
+                        {toast.type === 'error' ? <FiXCircle size={24} /> : <FiCheckCircle size={24} />}
                     </div>
                     <div className="toast-content">
                         <h4 className="toast-title">{toast.title}</h4>
                         <p className="toast-msg">{toast.message}</p>
-                        <div className="flex items-center gap-3">
-                            {toast.step && <span className="toast-diagnostic-pill">{toast.step}</span>}
-                            {toast.step === 'HUB_OFFLINE' && (
-                                <button onClick={testConnection} className="text-[10px] font-black uppercase text-indigo-600 hover:underline">
-                                    Run Deep Diagnostic
-                                </button>
-                            )}
-                        </div>
                     </div>
                     <button className="absolute top-4 right-4 text-slate-300 hover:text-slate-600 transition-colors" onClick={() => setToast(null)}>
                         <FiXCircle size={18} />
@@ -345,184 +496,203 @@ const PendingRegistrations: React.FC = () => {
             </div>
         )}
 
-        <header className="pending-reg-header">
-          <div>
-            <h1>Registration Hub</h1>
-            <p className="header-subtitle">Continuous multi-client provisioning with real-time intelligence enabled.</p>
+        {showManualModal && <ManualProvisionModal />}
+        {selectedReg && <DetailAuditModal reg={selectedReg} onClose={() => setSelectedReg(null)} />}
+
+        {/* Cloned Header */}
+        <header className="dp-header">
+          <div className="dp-header-left">
+            <div className="dp-icon-box">
+                <FiShield size={24} />
+            </div>
+            <div>
+                <h1>Fleet Intelligence Hub</h1>
+                <p className="dp-subtitle">Continuous registration audit and forensic headquarters provisioning.</p>
+            </div>
           </div>
           
-          <div className="flex gap-3 items-center mt-4">
-             <button className="btn-action-pill group" onClick={() => setShowManualModal(true)}>
-                <FiPlus className="group-hover:rotate-90 transition-transform duration-300" size={18} /> 
+          <div className="dp-header-actions">
+             <button className="dp-btn dp-btn--primary" onClick={handleExport}>
+                <FiDownload /> Export Bulk Registry (.csv)
+             </button>
+             <button className="dp-btn btn-provision-trigger" onClick={() => setShowManualModal(true)}>
+                <FiPlus />
                 <span>Provision Identity</span>
              </button>
-             <button className="btn-action-pill bg-slate-100 hover:bg-slate-200" onClick={() => testConnection()}>
-                <FiActivity size={16} />
-                <span>Diagnostic Ping</span>
-             </button>
-             <button className={`sync-trigger ${loading ? 'is-loading' : ''}`} onClick={() => fetchRegistrations()} title="Manual Identity Sync">
+             <button className={`sync-refresher ${loading ? 'is-syncing' : ''}`} onClick={() => fetchRegistrations()} title="Sync Registry">
                 <FiRefreshCw size={18} />
-                {isRealtimeActive && <div className="realtime-dot"></div>}
+                {isRealtimeActive && <div className="active-dot"></div>}
              </button>
           </div>
         </header>
 
-        <div className="intelligence-bar shadow-indigo-100/30">
-            <div className="tab-navigation">
-              <button className={`tab-link ${activeTab === 'admins' ? 'active' : ''}`} onClick={() => setActiveTab('admins')}>
-                <FiShield size={16} />
-                <span>Executives</span>
-                {(pendingAdminCount > 0) && <span className="tab-badge">{pendingAdminCount}</span>}
-              </button>
-              <button className={`tab-link ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
-                <FiUsers size={16} />
-                <span>Staff</span>
-                {(pendingStaffCount > 0) && <span className="tab-badge">{pendingStaffCount}</span>}
-              </button>
+        {/* Intelligence Stats Grid (Cloned) */}
+        <section className="dp-stats-grid">
+            <div className="dp-premium-stat-card card-blue">
+                <div className="dp-stat-icon-wrapper"><FiDatabase size={22} className="text-indigo-600" /></div>
+                <div className="dp-stat-content">
+                   <span className="dp-stat-label">Total Fleet</span>
+                   <span className="dp-stat-value">{metrics.total} Entities</span>
+                   <span className="dp-stat-footer">Active Archive</span>
+                </div>
+            </div>
+            <div className="dp-premium-stat-card card-amber">
+                <div className="dp-stat-icon-wrapper"><FiTrendingUp size={22} className="text-amber-600" /></div>
+                <div className="dp-stat-content">
+                   <span className="dp-stat-label">Pending Clearance</span>
+                   <span className="stat-value">{metrics.pending} Requests</span>
+                   <span className="dp-stat-footer">Audit Required</span>
+                </div>
+            </div>
+            <div className="dp-premium-stat-card card-emerald">
+                <div className="dp-stat-icon-wrapper"><FiCheckCircle size={22} className="text-emerald-600" /></div>
+                <div className="dp-stat-content">
+                   <span className="dp-stat-label">Sync Success</span>
+                   <span className="dp-stat-value">{metrics.approved} Synced</span>
+                   <span className="dp-stat-footer">Operational Hubs</span>
+                </div>
+            </div>
+            <div className="dp-premium-stat-card card-rose">
+                <div className="dp-stat-icon-wrapper"><FiArchive size={22} className="text-rose-600" /></div>
+                <div className="dp-stat-content">
+                   <span className="dp-stat-label">Audit Exceptions</span>
+                   <span className="dp-stat-value">{metrics.exceptions} Entries</span>
+                   <span className="dp-stat-footer">Blacklisted Logs</span>
+                </div>
+            </div>
+        </section>
+
+        {/* Forensic Table Card */}
+        <div className="tdv-section-card mt-6">
+            <div className="section-header flex items-center justify-between p-6">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                        <FiActivity className="text-indigo-600" />
+                        <h3 className="section-title">Pending Registrations Registry</h3>
+                    </div>
+                    
+                    <div className="header-search-box">
+                        <FiSearch className="search-icon" />
+                        <input 
+                          type="text" 
+                          placeholder="Find identity, email or station..." 
+                          value={searchTerm}
+                          onChange={(e) => {setSearchTerm(e.target.value); setCurrentPage(1);}}
+                        />
+                    </div>
+                </div>
+
+                <div className="filter-pill-cloud">
+                    {['pending', 'approved', 'rejected', 'all'].map(s => (
+                        <button 
+                            key={s} 
+                            className={`filter-btn ${filterStatus === s ? `active type--${s}` : ''}`} 
+                            onClick={() => {setFilterStatus(s); setCurrentPage(1);}}
+                        >
+                            {s}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            <div className="search-wrapper">
-                <FiSearch className="search-icon" size={16} />
-                <input 
-                  type="text" 
-                  className="search-input"
-                  placeholder="Seach identities, emails, or stations..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
-
-            <div className="segmented-control-wrapper shadow-inner">
-              {['pending', 'approved', 'rejected', 'all'].map(s => (
-                  <button key={s} className={`segment-btn ${filterStatus === s ? 'active' : ''}`} onClick={() => setFilterStatus(s)}>
-                      {s}
-                  </button>
-              ))}
-            </div>
-        </div>
-
-        {loading && !registrations.length ? (
-            <div className="flex flex-col items-center justify-center py-52 animate-pulse">
-                <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-8"></div>
-                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">Syncing identity clusters...</p>
-            </div>
-        ) : (
-            <div className="reg-grid">
-                {activeTab === 'admins' ? (
-                    filteredAdmins.length > 0 ? (
-                      filteredAdmins.map((reg) => (
-                        <div key={reg.id} className="reg-card group shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all">
-                            <div className="reg-card-main">
-                                <div className="reg-status-section">
-                                    <span className={`reg-badge status--${reg.status}`}>{reg.status}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 flex items-center gap-2 mt-2">
-                                        <FiCalendar size={11} /> {new Date(reg.created_at).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <div className="reg-identity-section">
-                                    <h3 className="group-hover:text-indigo-600 transition-colors">{reg.full_name}</h3>
-                                    <div className="reg-org-info font-bold">
-                                      <FiMapPin className="text-indigo-400" size={12} /> {reg.station_name} <span className="opacity-20">|</span> <span className="uppercase text-[11px] text-slate-400">{reg.county}</span>
+            <div className="table-responsive">
+                <table className="tdv-transaction-table">
+                    <thead>
+                        <tr>
+                            <th>IDENTITY</th>
+                            <th>STATION ENTITY</th>
+                            <th>REGION</th>
+                            <th>CONTACT</th>
+                            <th>INITIATED</th>
+                            <th>STATUS</th>
+                            <th className="text-right">COMMAND</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr>
+                                <td colSpan={7} className="py-24 text-center">
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-10 h-10 border-2 border-indigo-100 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Synchronizing Archive...</p>
                                     </div>
-                                </div>
-                                <div className="reg-contact-section border-l border-slate-50 pl-6">
-                                    <div className="contact-item"><FiMail size={12} className="text-slate-300" /> {reg.email}</div>
-                                    <div className="contact-item"><FiPhone size={12} className="text-slate-300" /> {reg.phone}</div>
-                                </div>
-                                <div className="reg-actions-section">
-                                    {reg.status === 'pending' ? (
-                                        <>
-                                            <button className="btn-approve-premium" onClick={() => handleApproveAdmin(reg)} disabled={approving}>
-                                                {approving ? <FiRefreshCw className="animate-spin" /> : <FiCheckCircle />} 
-                                                <span>Approve Access</span>
-                                            </button>
-                                            <button className="btn-reject-slim" onClick={() => handleReject('pending_registrations', reg.id)}>
-                                                <FiXCircle size={18} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <div className="px-5 py-3 bg-emerald-50/50 border border-emerald-100 rounded-xl flex items-center gap-3">
-                                          <FiCheckCircle className="text-emerald-500" size={16} />
-                                          <span className="text-emerald-700 font-extrabold text-[10px] uppercase tracking-widest">{reg.status}</span>
+                                </td>
+                            </tr>
+                        ) : currentItems.length > 0 ? (
+                            currentItems.map((reg) => (
+                                <tr key={reg.id} onClick={() => setSelectedReg(reg)}>
+                                    <td>
+                                        <div className="flex flex-col">
+                                            <span className="td-bold">{reg.full_name}</span>
+                                            <span className="text-[10px] font-mono text-slate-400">{reg.email}</span>
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                            {reg.notes && (
-                                <div className="reg-notes-footer">
-                                    <p className="notes-text !text-slate-400">
-                                        <FiInfo className="text-slate-300" size={14} /> 
-                                        "{reg.notes}"
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                      ))
-                    ) : (
-                        <div className="empty-state-luxury border-dashed">
-                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mb-6">
-                                <FiRefreshCw size={32} />
-                            </div>
-                            <h3>Intelligence Pool Empty</h3>
-                            <p>No registration requests found in the current directive.</p>
-                        </div>
-                    )
-                ) : (
-                    filteredStaff.length > 0 ? (
-                        filteredStaff.map((req) => (
-                          <div key={req.id} className="reg-card group">
-                              <div className="reg-card-main">
-                                  <div className="reg-status-section">
-                                      <span className={`reg-badge status--${req.status}`}>{req.status}</span>
-                                      <span className="text-[10px] font-bold text-slate-400 flex items-center gap-2 mt-2">
-                                          <FiCalendar size={11} /> {new Date(req.created_at).toLocaleDateString()}
-                                      </span>
-                                  </div>
-                                  <div className="reg-identity-section">
-                                      <h3 className="group-hover:text-indigo-600 transition-colors uppercase text-sm">{req.full_name}</h3>
-                                      <div className="reg-org-info">
-                                        <FiShield className="text-indigo-400" size={12} /> {req.role} <span className="opacity-20">|</span> <span>{req.station_name}</span>
-                                      </div>
-                                  </div>
-                                  <div className="reg-contact-section border-l border-slate-50 pl-6">
-                                      <div className="contact-item"><FiMail size={12} className="text-slate-300" /> {req.email}</div>
-                                  </div>
-                                  <div className="reg-actions-section">
-                                      {req.status === 'pending' ? (
-                                          <>
-                                              <button className="btn-approve-premium" onClick={() => handleApproveStaff(req)} disabled={approving}>
-                                                  {approving ? <FiRefreshCw className="animate-spin" /> : <FiCheckCircle />} 
-                                                  <span>Authorize</span>
-                                              </button>
-                                              <button className="btn-reject-slim" onClick={() => handleReject('team_member_requests', req.id)}>
-                                                  <FiXCircle size={18} />
-                                              </button>
-                                          </>
-                                      ) : (
-                                          <div className="px-5 py-3 bg-slate-50 border border-slate-100 rounded-xl flex items-center gap-3">
-                                            <FiCheckCircle className="text-emerald-500" size={16} />
-                                            <span className="text-slate-400 font-extrabold text-[10px] uppercase tracking-widest">{req.status}</span>
-                                          </div>
-                                      )}
-                                  </div>
-                              </div>
-                          </div>
-                        ))
-                    ) : (
-                        <div className="empty-state-luxury border-dashed">
-                             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mb-6">
-                                <FiUsers size={32} />
-                            </div>
-                            <h3>Operations Nominal</h3>
-                            <p>No personnel requests matching current sync targets.</p>
-                        </div>
-                    )
-                )}
+                                    </td>
+                                    <td>
+                                        <span className="td-bold">{reg.station_name}</span>
+                                    </td>
+                                    <td>
+                                        <span className="td-region">{reg.county}</span>
+                                    </td>
+                                    <td>
+                                        <span className="td-mono">{reg.phone}</span>
+                                    </td>
+                                    <td>
+                                        <div className="forensic-time-cell">
+                                            <span className="date-part">{new Date(reg.created_at).toLocaleDateString()}</span>
+                                            <span className="time-part"><FiClock size={8} /> {new Date(reg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span className={`dp-status-badge dp-status-badge--${reg.status === 'pending' ? 'pending' : reg.status === 'approved' ? 'approved' : 'rejected'}`}>
+                                            {reg.status}
+                                        </span>
+                                    </td>
+                                    <td className="text-right">
+                                        {reg.status === 'pending' ? (
+                                            <div className="flex justify-end gap-2 pr-2">
+                                                <button className="action-circle approve" onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} disabled={approving} title="Approve Request">
+                                                    {approving ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
+                                                </button>
+                                                <button className="action-circle reject" onClick={(e) => { e.stopPropagation(); handleReject(reg); }} title="Reject Request">
+                                                    <FiXCircle size={18} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex justify-end pr-4">
+                                                <button className="action-circle view" title="View Details">
+                                                    <FiExternalLink size={16} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan={7} className="py-24 text-center">
+                                    <div className="flex flex-col items-center opacity-30">
+                                        <FiDatabase size={40} className="mb-4" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">No procurement records found.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
-        )}
+
+            <TablePagination 
+                currentPage={currentPage}
+                totalItems={filteredAdmins.length}
+                pageSize={itemsPerPage}
+                onPageChange={setCurrentPage}
+            />
+        </div>
       </div>
-    </Layout>
   );
+
+  if (isHubView) return content;
+  return <Layout>{content}</Layout>;
 };
 
 export default PendingRegistrations;

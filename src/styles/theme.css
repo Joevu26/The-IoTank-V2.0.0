@@ -150,10 +150,10 @@
   --font-size-3xl: clamp(2rem, 1.6rem + 1.25vw, 2.75rem);
 
   --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-black: 900;
+  --font-weight-medium: 400;
+  --font-weight-semibold: 400;
+  --font-weight-bold: 400;
+  --font-weight-black: 500;
 
   --line-height-tight: 1.15;
   --line-height-normal: 1.6;

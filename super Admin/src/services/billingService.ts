@@ -117,9 +117,7 @@ export const billingService = {
     getTransactions: async (filters: any) => {
         let query = supabase.from('transactions').select(`
             *,
-            fuel_stations (
-                station_name
-            )
+            station:fuel_stations!inner(station_name)
         `).order('created_at', { ascending: false });
 
         if (filters.status) query = query.eq('payment_status', filters.status);
@@ -133,7 +131,19 @@ export const billingService = {
     },
 
     getInvoices: async () => {
-        // Mocking invoices based on fuel_stations for now as the table might not exist
-        return await supabase.from('fuel_stations').select('id, station_name, current_debt').limit(50);
+        return await supabase
+            .from('invoices')
+            .select(`
+                *,
+                station:fuel_stations!inner(station_name)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(50);
     },
+
+
+    generateMonthlyInvoices: async () => {
+        return await supabase.rpc('process_monthly_invoicing');
+    }
 };
+

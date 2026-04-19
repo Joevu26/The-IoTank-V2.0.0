@@ -13,6 +13,7 @@ import '@/styles/global.css';
 import '@/styles/modules.css';
 import '@/styles/mobile.css';
 import '@/styles/tour.css';
+import '@/styles/recaptcha.css';
 
 export const LandingPageFactory = () => import('@/components/Landing/LandingPage').then(module => ({ default: module.LandingPage }));
 const LandingPage = lazy(LandingPageFactory);
@@ -65,10 +66,6 @@ import { useEffect } from 'react';
 import { NewsService } from '@/services/NewsService';
 
 function App() {
-    useEffect(() => {
-        NewsService.startListening();
-        return () => NewsService.stopListening();
-    }, []);
 
     return (
         <ErrorBoundary>

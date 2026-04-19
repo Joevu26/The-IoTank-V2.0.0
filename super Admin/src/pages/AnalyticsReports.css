@@ -1,170 +1,367 @@
 .analytics-page {
-    background: var(--bg-primary);
-    min-height: 100vh;
-    color: var(--text-primary);
-    padding: 32px;
+    background: transparent;
+    padding: 2.5rem;
 }
 
-/* KPI Grid */
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 32px;
-}
-
-.kpi-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    padding: 20px;
+/* ── Standard Header Strategy ── */
+.dp-header {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 2.5rem;
 }
 
-.kpi-label {
-    font-size: 0.6rem;
+.dp-title-group h1 {
+    font-size: 2.5rem;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+.dp-subtitle {
+    font-size: 0.75rem;
     font-weight: 800;
     text-transform: uppercase;
-    color: var(--text-secondary);
-    opacity: 0.5;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.15em;
+    color: #94a3b8;
 }
 
-.kpi-value {
-    font-size: 1.5rem;
+.dp-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+/* ── Intelligence Stats Grid ── */
+.dp-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+}
+
+.dp-premium-stat-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.dp-premium-stat-card:hover {
+    transform: translateY(-4px);
+    border-color: #8b5cf6;
+    box-shadow: 0 12px 24px rgba(139, 92, 246, 0.08);
+}
+
+.stat-icon-blob {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    background: #f5f3ff;
+    color: #8b5cf6;
+}
+
+.stat-content label {
+    display: block;
+    font-size: 0.65rem;
     font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.stat-content h3 {
+    font-size: 1.25rem;
+    font-weight: 950;
+    color: #0f172a;
     letter-spacing: -0.02em;
 }
 
-.kpi-growth {
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-.kpi-growth.positive { color: #10b981; }
-.kpi-growth.negative { color: #ef4444; }
-
-/* Business Chart Layouts */
+/* ── Intelligence Charts ── */
 .analytics-dashboard-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: 24px;
-    margin-bottom: 32px;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
 }
 
-.chart-container {
-    background: rgba(255, 255, 255, 0.015);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.dp-intelligence-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
     border-radius: 24px;
-    padding: 24px;
-    min-height: 300px;
+    padding: 1.5rem;
+    position: relative;
 }
 
-/* Usage Stats */
-.usage-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.usage-card {
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.adoption-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
-}
-
-.progress-track {
-    flex: 1;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 2px;
-}
-
-.progress-bar {
-    height: 100%;
-    border-radius: 2px;
-}
-
-/* Financial Reports */
-.report-template-card {
-    background: #0a0a0a;
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    border-radius: 16px;
-    padding: 24px;
+.card-label-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.card-label-row h4 {
+    font-size: 0.7rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #64748b;
+}
+
+/* ── Business Chart Visuals ── */
+.bar-chart-container {
+    height: 180px;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    padding-top: 2rem;
+}
+
+.bar-segment {
+    flex: 1;
+    background: #ede9fe;
+    border-radius: 4px 4px 0 0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.bar-segment:hover {
+    background: #8b5cf6;
+}
+
+.bar-segment:hover::after {
+    content: attr(data-value);
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    font-weight: 950;
+    color: #1e293b;
+    background: #fff;
+    padding: 2px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* ── Regional Metrics ── */
+.regional-distribution-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.region-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.region-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #334155;
+}
+
+.region-bar-bg {
+    height: 6px;
+    background: #f1f5f9;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.region-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Tab Bar Standard ── */
+.hw-tabs {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 4px;
+    display: inline-flex;
+    gap: 4px;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+    max-width: 100%;
+}
+
+.hw-tab-btn {
+    padding: 0.6rem 1.25rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.hw-tab-btn.active {
+    background: #8b5cf6;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+/* ── Report Archives Table ── */
+.tdv-transaction-table-container {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.table-header-toolbar {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fafafa;
+}
+
+.tdv-transaction-table th {
+    padding: 1rem 1.5rem;
+    background: #f8fafc;
+    text-align: left;
+    font-size: 0.62rem;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #475569;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.tdv-transaction-table td {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    color: #334155;
+    vertical-align: middle;
+}
+
+/* ── Adoption Matrix ── */
+.adoption-matrix {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+}
+
+.adoption-segment {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 1.25rem;
+    border: 1px solid #f1f5f9;
+}
+
+.adoption-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: #1e293b;
+    margin-bottom: 0.75rem;
+}
+
+.adoption-bar-bg {
+    height: 8px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+
+.adoption-fill {
+    height: 100%;
+    background: #a855f7;
+    border-radius: 99px;
+}
+
+/* ── Tab Consolidation Utilities ── */
+.forensic-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+    margin: 3rem 0;
+    position: relative;
+}
+
+.forensic-divider::after {
+    content: 'MODULE TRANSITION';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #f8fafc;
+    padding: 0.5rem 1rem;
+    font-size: 9px;
+    font-weight: 900;
+    color: #94a3b8;
+    letter-spacing: 0.3em;
+    border-radius: 99px;
+    border: 1px solid #e2e8f0;
+}
+
+/* ── Report Card Lib ── */
+.report-template-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: #fff;
     transition: all 0.2s ease;
 }
 
 .report-template-card:hover {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(var(--primary-rgb), 0.2);
+    border-color: #8b5cf6;
+    background: #fdfcff;
 }
 
-/* Custom Builder Sidebar */
-.builder-layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 24px;
-}
-
-.builder-controls {
-    background: rgba(255, 255, 255, 0.02);
-    border-radius: 20px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-/* Behavioral Funnel */
+/* ── Funnel Visuals ── */
 .funnel-container {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    max-width: 600px;
-    margin: 40px auto;
+    gap: 0.5rem;
+    padding: 2rem 0;
 }
 
 .funnel-step {
-    height: 60px;
-    background: linear-gradient(90deg, var(--primary-color), rgba(var(--primary-rgb), 0.3));
+    height: 50px;
+    background: #f5f3ff;
+    border: 1px solid #ede9fe;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 24px;
-    border-radius: 8px;
-    position: relative;
+    padding: 0 1.5rem;
+    border-radius: 12px;
 }
 
-.funnel-step::after {
-    content: '';
-    position: absolute;
-    bottom: -8px;
-    left: 10%;
-    width: 80%;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
-}
-
-/* Scheduled Reports */
-.scheduler-list {
-    margin-top: 24px;
-}
-
-.schedule-item {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    padding: 16px 0;
+.funnel-step span {
+    font-size: 0.75rem;
+    font-weight: 950;
+    color: #5b21b6;
+    text-transform: uppercase;
 }

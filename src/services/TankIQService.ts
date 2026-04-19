@@ -63,22 +63,8 @@ export class TankIQService {
                 continue;
             }
 
-            const choice = response.choices?.[0] || response.candidates?.[0]; // Handle both formats
-            if (!choice) throw new Error('Invalid AI response format.');
-
-            // Normalize choice for tool calls
-            const message = choice.message || { 
-                role: 'assistant', 
-                content: choice.content?.parts?.[0]?.text || '',
-                tool_calls: choice.content?.parts?.filter((p: any) => p.functionCall).map((p: any) => ({
-                    id: `call_${Date.now()}_${p.functionCall.name}`,
-                    type: 'function',
-                    function: {
-                        name: p.functionCall.name,
-                        arguments: JSON.stringify(p.functionCall.args)
-                    }
-                }))
-            };
+            const message = response.message;
+            if (!message) throw new Error('Invalid AI response format.');
 
             // Add assistant message to history
             this.history.push(message);

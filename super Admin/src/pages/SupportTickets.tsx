@@ -1,21 +1,72 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
-import { supportService, Ticket, TicketMessage, SupportStats } from '../services/supportService';
+import { supportService, Ticket, SupportStats, TicketMessage } from '../services/supportService';
+import { supabase } from '../config/supabase';
 import { 
     FiMessageSquare, FiAlertCircle, FiClock, FiCheckCircle, 
     FiUser, FiSearch, FiFilter, FiPlus, FiSend, 
     FiFileText, FiBarChart2, FiUsers, FiBook, FiMoreVertical,
-    FiArrowUpRight, FiMail, FiPhone
+    FiArrowUpRight, FiMail, FiPhone, FiChevronLeft, FiChevronRight,
+    FiZap, FiActivity, FiActivity as FiCompliance, FiDownload, FiLoader, FiExternalLink
 } from 'react-icons/fi';
 import './SupportTickets.css';
 
-const SupportTickets: React.FC = () => {
+// Internal Pagination Component (Standardized)
+const TablePagination = ({ 
+    currentPage, 
+    totalItems, 
+    pageSize, 
+    onPageChange 
+}: { 
+    currentPage: number, 
+    totalItems: number, 
+    pageSize: number, 
+    onPageChange: (p: number) => void 
+}) => {
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, totalItems);
+
+    return (
+        <div className="table-pagination-footer">
+            <div className="pagination-info">
+                Showing <b>{start}</b> to <b>{end}</b> of <b>{totalItems}</b> cases
+            </div>
+            <div className="pagination-controls">
+                <button 
+                    className="pagination-btn" 
+                    disabled={currentPage === 1}
+                    onClick={() => onPageChange(currentPage - 1)}
+                >
+                    <FiChevronLeft /> Previous
+                </button>
+                <button 
+                    className="pagination-btn" 
+                    disabled={currentPage === totalPages}
+                    onClick={() => onPageChange(currentPage + 1)}
+                >
+                    Next <FiChevronRight />
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const SupportTickets: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'queue' | 'detail' | 'create' | 'categories' | 'templates' | 'feedback' | 'team' | 'kb'>('overview');
     const [stats, setStats] = useState<SupportStats | null>(null);
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [loading, setLoading] = useState(true);
+    
+    // Controls
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 8;
+
+    const [messages, setMessages] = useState<any[]>([]);
+    const [responseBody, setResponseBody] = useState('');
+    const [sendingResponse, setSendingResponse] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -36,67 +87,132 @@ const SupportTickets: React.FC = () => {
         fetchData();
     }, []);
 
-    const handleTicketClick = (ticket: Ticket) => {
+    const fetchMessages = async (ticketId: string) => {
+        const { data } = await supportService.getTicketMessages(ticketId);
+        setMessages(data || []);
+    };
+
+    const handleTicketClick = async (ticket: Ticket) => {
         setSelectedTicket(ticket);
+        await fetchMessages(ticket.id);
         setActiveTab('detail');
     };
 
+    const handleDispatchResponse = async () => {
+        if (!responseBody.trim() || !selectedTicket) return;
+        setSendingResponse(true);
+        try {
+            const { error } = await supportService.addMessage({
+                ticket_id: selectedTicket.id,
+                content: responseBody,
+                sender_id: (await supabase.auth.getUser()).data.user?.id
+            });
+            if (error) throw error;
+            setResponseBody('');
+            await fetchMessages(selectedTicket.id);
+        } catch (error) {
+            console.error('Error sending response:', error);
+            alert('Failed to send response.');
+        } finally {
+            setSendingResponse(false);
+        }
+    };
+
+    const filteredTickets = useMemo(() => {
+        return tickets.filter(t => 
+            t.ticket_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.client?.station_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.subject.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [tickets, searchTerm]);
+
+    const paginatedTickets = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredTickets.slice(start, start + pageSize);
+    }, [filteredTickets, currentPage]);
+
     const renderOverview = () => (
         <div className="support-overview animate-fade-in">
-            {/* 5.1 Metrics Cards */}
-            <div className="support-metrics-grid">
-                <div className="support-stats-card highlight">
-                    <span className="stat-label">Open Tickets</span>
-                    <h2 className="stat-value">{stats?.openTickets}</h2>
-                    <span className="stat-subtext">Active cases across system</span>
-                </div>
-                <div className="support-stats-card urgent">
-                    <div className="stat-header">
-                        <span className="stat-label">Urgent Tickets</span>
-                        <FiAlertCircle className="text-danger" />
+            <div className="dp-stats-grid">
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob">
+                        <FiMessageSquare />
                     </div>
-                    <h2 className="stat-value text-danger">{stats?.urgentTickets}</h2>
-                    <span className="stat-subtext">Requires immediate attention</span>
+                    <div className="stat-content">
+                        <label>Active Cases</label>
+                        <h3>{stats?.openTickets}</h3>
+                        <div className="stat-trend up">
+                            <FiZap size={10} /> Real-time queue
+                        </div>
+                    </div>
                 </div>
-                <div className="support-stats-card">
-                    <span className="stat-label">Avg Response Time</span>
-                    <h2 className="stat-value">{stats?.avgResponseTime}</h2>
-                    <span className="stat-subtext">Target: Under 1 hour</span>
+
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob urgent">
+                        <FiAlertCircle />
+                    </div>
+                    <div className="stat-content">
+                        <label>Critical Pulse</label>
+                        <h3 className="text-rose-600">{stats?.urgentTickets}</h3>
+                        <div className="stat-trend down font-black">
+                            SLA RISK DETECTED
+                        </div>
+                    </div>
                 </div>
-                <div className="support-stats-card">
-                    <span className="stat-label">SLA Compliance</span>
-                    <h2 className="stat-value text-success">{stats?.slaResponseRate}%</h2>
-                    <span className="stat-subtext">Response SLA target: 95%</span>
+
+                <div className="dp-premium-stat-card">
+                    <div className="stat-icon-blob" style={{ background: '#f0fdf4', color: '#16a34a' }}>
+                        <FiClock />
+                    </div>
+                    <div className="stat-content">
+                        <label>Response Velocity</label>
+                        <h3>{stats?.avgResponseTime}</h3>
+                        <div className="stat-trend up">
+                            Target Met: &lt;1hr
+                        </div>
+                    </div>
+                </div>
+
+                <div className="dp-premium-stat-card highlight-card">
+                    <div className="stat-icon-blob" style={{ background: '#ecfeff', color: '#0891b2' }}>
+                        <FiCompliance />
+                    </div>
+                    <div className="stat-content">
+                        <label>SLA Adherence</label>
+                        <h3>{stats?.slaResponseRate}%</h3>
+                        <div className="stat-trend up">
+                             Compliance Stable
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* SLA Compliance Bars */}
-            <div className="sla-status-row">
-                <div className="sla-card">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-bold opacity-60 uppercase">Resolution SLA Met</span>
-                        <span className="text-xs font-black text-primary">{stats?.slaResolutionRate}%</span>
+            <div className="sla-compliance-row">
+                <div className="sla-premium-card">
+                    <div className="sla-label-row">
+                        <label>Resolution SLA Adherence</label>
+                        <span className="sla-value">{stats?.slaResolutionRate}%</span>
                     </div>
-                    <div className="sla-progress-bg">
-                        <div className="sla-progress bg-primary" style={{width: `${stats?.slaResolutionRate}%`}}></div>
+                    <div className="sla-bar-container">
+                        <div className="sla-fill cyan" style={{ width: `${stats?.slaResolutionRate}%` }}></div>
                     </div>
-                    <div className="flex justify-between text-[10px] font-bold opacity-40">
-                        <span>Target: &gt;90%</span>
-                        <span>{stats?.closedToday} closed today</span>
+                    <div className="flex justify-between items-center mt-2 px-1">
+                        <span className="text-[9px] font-black uppercase text-slate-400">Target Resolution: 4 Hours</span>
+                        <span className="text-[9px] font-black uppercase text-slate-500">{stats?.closedToday} COMPLETED TODAY</span>
                     </div>
                 </div>
 
-                <div className="sla-card">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs font-bold opacity-60 uppercase">Response SLA Met</span>
-                        <span className="text-xs font-black text-cyan-400">{stats?.slaResponseRate}%</span>
+                <div className="sla-premium-card">
+                    <div className="sla-label-row">
+                        <label>Initial Response SLA Adherence</label>
+                        <span className="sla-value text-amber-600">{stats?.slaResponseRate}%</span>
                     </div>
-                    <div className="sla-progress-bg">
-                        <div className="sla-progress bg-cyan-400" style={{width: `${stats?.slaResponseRate}%`}}></div>
+                    <div className="sla-bar-container">
+                        <div className="sla-fill amber" style={{ width: `${stats?.slaResponseRate}%` }}></div>
                     </div>
-                    <div className="flex justify-between text-[10px] font-bold opacity-40">
-                        <span>Target: 95%</span>
-                        <span>{stats?.overdueTickets} Overdue tickets</span>
+                    <div className="flex justify-between items-center mt-2 px-1">
+                        <span className="text-[9px] font-black uppercase text-slate-400">Target Response: 1 Hour</span>
+                        <span className="text-[9px] font-black uppercase text-rose-500">{stats?.overdueTickets} OVERDUE BREACHES</span>
                     </div>
                 </div>
             </div>
@@ -105,170 +221,172 @@ const SupportTickets: React.FC = () => {
 
     const renderQueue = () => (
         <div className="support-queue animate-fade-in">
-            {/* Filter Bar */}
-            <div className="flex flex-wrap gap-4 mb-6">
-                <div className="relative flex-1">
-                    <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 opacity-40" />
+            <div className="table-header-toolbar !bg-transparent !p-0 !mb-6">
+                <div className="header-search-box">
+                    <FiSearch className="search-icon" />
                     <input 
                         type="text" 
-                        placeholder="Search by ticket #, client, or subject..." 
-                        className="support-input pl-12"
+                        placeholder="Search ticket # or station..." 
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                     />
                 </div>
-                <select className="support-input w-auto">
-                    <option>All Categories</option>
-                    <option>Payment Issue</option>
-                    <option>Technical Support</option>
-                </select>
-                <select className="support-input w-auto text-danger font-bold">
-                    <option>All Priorities</option>
-                    <option>Urgent</option>
-                    <option>High</option>
-                </select>
-                <button className="btn-primary flex items-center gap-2" onClick={() => setActiveTab('create')}>
-                    <FiPlus /> New Ticket
-                </button>
+                
+                <div className="dp-header-actions">
+                     <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">
+                        <FiFilter /> Filter Stream
+                    </button>
+                    <button onClick={() => setActiveTab('create')} className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-black hover:bg-cyan-700 transition-all shadow-md shadow-cyan-600/20">
+                        <FiPlus /> Initialize Case
+                    </button>
+                </div>
             </div>
 
-            <div className="ticket-table-container">
-                <table className="ticket-table">
+            <div className="tdv-transaction-table-container">
+                <table className="tdv-transaction-table">
                     <thead>
                         <tr>
-                            <th>Ticket #</th>
-                            <th>Created Date</th>
-                            <th>Client / Station</th>
-                            <th>Category</th>
+                            <th>Ticket ID</th>
+                            <th>Identity / Station</th>
+                            <th>Diagnostic Subject</th>
                             <th>Priority</th>
-                            <th>Status</th>
-                            <th>Assigned To</th>
-                            <th className="text-right">Actions</th>
+                            <th>Work Status</th>
+                            <th>Assignee</th>
+                            <th className="text-right">Command</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {tickets.filter(t => 
-                            t.ticket_no.includes(searchTerm) || 
-                            t.client?.station_name.toLowerCase().includes(searchTerm.toLowerCase())
-                        ).map(ticket => (
-                            <tr key={ticket.id} className="cursor-pointer" onClick={() => handleTicketClick(ticket)}>
-                                <td className="font-mono text-xs opacity-70">TICK-{ticket.ticket_no}</td>
-                                <td>{new Date(ticket.created_at).toLocaleDateString()}</td>
+                        {paginatedTickets.map((ticket) => (
+                            <tr key={ticket.id} className="cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => handleTicketClick(ticket)}>
+                                <td className="font-mono text-[10px] font-black opacity-50">
+                                    TCK-{ticket.ticket_no}
+                                </td>
                                 <td>
                                     <div className="font-bold">{ticket.client?.station_name}</div>
-                                    <div className="text-[10px] opacity-50 uppercase">{ticket.client?.full_name}</div>
+                                    <div className="text-[10px] opacity-60 uppercase">{ticket.client?.full_name}</div>
                                 </td>
-                                <td className="text-xs opacity-80">{ticket.category}</td>
-                                <td><span className={`badge badge-${ticket.priority}`}>{ticket.priority}</span></td>
-                                <td><span className="badge bg-secondary-soft text-secondary uppercase">{ticket.status}</span></td>
+                                <td className="max-w-[200px] truncate">
+                                    <div className="font-bold text-xs">{ticket.subject}</div>
+                                    <div className="text-[9px] opacity-40 uppercase font-black">{ticket.category}</div>
+                                </td>
+                                <td>
+                                    <span className={`badge badge--${ticket.priority.toLowerCase()}`}>
+                                        {ticket.priority}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="status-pill">{ticket.status}</span>
+                                </td>
                                 <td>
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-accent-primary flex items-center justify-center text-[10px] font-bold">
+                                        <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center text-[10px] font-black text-cyan-700 uppercase">
                                             {ticket.assignee?.full_name.charAt(0) || '?'}
                                         </div>
-                                        <span className="text-xs">{ticket.assignee?.full_name || 'Unassigned'}</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase">{ticket.assignee?.full_name || 'UNASSIGNED'}</span>
                                     </div>
                                 </td>
                                 <td className="text-right">
-                                    <button className="icon-btn"><FiMoreVertical /></button>
+                                    <div className="flex justify-end pr-2">
+                                        <button className="action-circle view" title="View Audit">
+                                            <FiExternalLink size={16}/>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                <TablePagination 
+                    currentPage={currentPage}
+                    totalItems={filteredTickets.length}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                />
             </div>
         </div>
     );
 
+
     const renderDetail = () => {
-        if (!selectedTicket) return <div>No ticket selected</div>;
+        if (!selectedTicket) return null;
         return (
             <div className="ticket-detail-view animate-fade-in">
                 <div className="flex justify-between items-center mb-8">
                     <div className="flex items-center gap-4">
-                        <button className="btn-secondary text-xs" onClick={() => setActiveTab('queue')}>Back to Queue</button>
-                        <h2 className="text-2xl font-black lowercase tracking-tighter">ticket: {selectedTicket.ticket_no}</h2>
-                    </div>
-                    <div className="flex gap-4">
-                        <select className="support-input w-auto font-bold bg-danger-soft text-danger">
-                            <option value="urgent">Priority: Urgent</option>
-                            <option value="high">Priority: High</option>
-                        </select>
-                        <button className="btn-primary bg-success">Mark Resolved</button>
+                        <button className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-black uppercase text-slate-600 hover:bg-slate-50 transition-all" onClick={() => setActiveTab('queue')}>Back to Queue</button>
+                        <h2 className="text-2xl font-black lowercase tracking-tighter">Case: {selectedTicket.ticket_no}</h2>
                     </div>
                 </div>
 
-                <div className="ticket-detail-grid">
-                    <div className="main-conversation">
-                        <div className="glass-card mb-6">
-                            <h4 className="font-black text-lg mb-2">{selectedTicket.subject}</h4>
-                            <p className="opacity-70 leading-relaxed text-sm">{selectedTicket.description}</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2">
+                        <div className="bg-white border border-slate-100 rounded-3xl p-8 mb-8 shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                                <h4 className="font-black text-xl text-slate-800">{selectedTicket.subject}</h4>
+                                <span className={`badge badge--${selectedTicket.priority.toLowerCase()}`}>{selectedTicket.priority}</span>
+                            </div>
+                            <p className="text-slate-600 leading-relaxed text-sm">{selectedTicket.description}</p>
                         </div>
 
-                        <div className="conversation-thread mb-6">
-                            <div className="message-bubble client">
-                                <div className="message-meta">
-                                    <span>{selectedTicket.client?.full_name}</span>
-                                    <span>{new Date(selectedTicket.created_at).toLocaleString()}</span>
+                        <div className="flex flex-col gap-4 mb-8">
+                            {messages.map((msg, idx) => (
+                                <div key={msg.id || idx} className={`message-bubble ${msg.sender_role === 'client' ? 'client' : 'admin'}`}>
+                                    <div className="message-meta">
+                                        <span>{msg.sender_name || (msg.sender_role === 'client' ? 'Client' : 'Admin')}</span>
+                                        <span>{new Date(msg.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div className="message-content">{msg.content}</div>
                                 </div>
-                                <div className="text-sm">I am unable to process payments via M-Pesa. It keeps saying 'System Busy'. Please assist.</div>
-                            </div>
-
-                            <div className="message-bubble internal">
-                                <div className="message-meta">
-                                    <span>Internal Note: Admin</span>
-                                    <span>Just now</span>
-                                </div>
-                                <div>Checking M-Pesa Gateway logs. Might be a temporary outage.</div>
-                            </div>
+                            ))}
+                            {messages.length === 0 && (
+                                <div className="text-center py-10 opacity-30 text-[10px] font-black uppercase tracking-widest">No communication history logged.</div>
+                            )}
                         </div>
 
-                        <div className="reply-box glass-card">
-                            <textarea className="support-input h-32 mb-4 w-full" placeholder="Type your response to the client..."></textarea>
-                            <div className="flex justify-between items-center">
+                        <div className="bg-white border border-cyan-100 rounded-3xl p-8 shadow-md shadow-cyan-500/5">
+                            <textarea 
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold min-h-[120px] outline-none focus:border-cyan-500 transition-all" 
+                                placeholder="Enter administrative response or internal diagnostic note..."
+                                value={responseBody}
+                                onChange={(e) => setResponseBody(e.target.value)}
+                            ></textarea>
+                            <div className="flex justify-between items-center mt-6">
                                 <div className="flex gap-4">
-                                    <button className="text-xs font-bold opacity-60">Add Internal Note</button>
-                                    <button className="text-xs font-bold opacity-60">Attach Files</button>
+                                    <button className="text-[10px] font-black uppercase text-slate-400 hover:text-cyan-600 transition-colors">Attach Logs</button>
+                                    <button className="text-[10px] font-black uppercase text-slate-400 hover:text-cyan-600 transition-colors">Internal Observation</button>
                                 </div>
-                                <button className="btn-primary flex items-center gap-2">
-                                    <FiSend /> Send Message
+                                <button 
+                                    className="flex items-center gap-2 px-6 py-3 bg-cyan-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-600/20 disabled:opacity-50"
+                                    onClick={handleDispatchResponse}
+                                    disabled={sendingResponse || !responseBody.trim()}
+                                >
+                                    {sendingResponse ? <FiLoader className="animate-spin" /> : <FiSend />} 
+                                    {sendingResponse ? 'Transmitting...' : 'Dispatch Response'}
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div className="sidebar-info animate-fade-in">
-                        <div className="glass-card p-0 overflow-hidden">
-                            <div className="info-panel-section bg-secondary-soft">
-                                <span className="info-label">Client Details</span>
-                                <h3 className="font-black text-lg">{selectedTicket.client?.full_name}</h3>
-                                <div className="text-xs opacity-60">{selectedTicket.client?.station_name}</div>
-                            </div>
-
-                            <div className="info-panel-section">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <FiMail className="opacity-40" /> <span className="text-sm">{selectedTicket.client?.email}</span>
+                    <div className="space-y-4">
+                        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
+                            <label className="text-[9px] font-black uppercase text-slate-400 block mb-4 tracking-widest">Client Identity Profile</label>
+                            <h3 className="font-black text-lg text-slate-800">{selectedTicket.client?.full_name}</h3>
+                            <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-6">{selectedTicket.client?.station_name}</div>
+                            
+                            <div className="space-y-3 pt-4 border-t border-slate-50">
+                                <div className="flex items-center gap-3 text-sm text-slate-600 font-bold">
+                                    <FiMail className="opacity-40" /> {selectedTicket.client?.email}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <FiPhone className="opacity-40" /> <span className="text-sm">{selectedTicket.client?.phone}</span>
+                                <div className="flex items-center gap-3 text-sm text-slate-600 font-bold">
+                                    <FiPhone className="opacity-40" /> {selectedTicket.client?.phone}
                                 </div>
                             </div>
+                        </div>
 
-
-                            <div className="info-panel-section">
-                                <span className="info-label">Account Health</span>
-                                <div className="flex items-center gap-2 text-success font-bold text-xs">
-                                    <FiCheckCircle /> No Outstanding Debt
-                                </div>
-                            </div>
-
-                            <div className="info-panel-section bg-danger-soft">
-                                <span className="info-label">SLA Countdown</span>
-                                <div className="flex items-center gap-2 text-danger font-black text-xl">
-                                    <FiClock /> 01:45:22
-                                </div>
-                                <div className="text-[10px] opacity-60 uppercase mt-1">Resolution overdue in</div>
-                            </div>
+                        <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6">
+                            <label className="text-[9px] font-black uppercase text-rose-400 block mb-2 tracking-widest text-center">SLA Violation Countdown</label>
+                            <div className="text-3xl font-black text-rose-600 text-center tracking-tighter">01:42:15</div>
+                            <div className="text-[8px] font-black uppercase text-rose-400 text-center mt-2">BREACH DETECTED - ESCALATING</div>
                         </div>
                     </div>
                 </div>
@@ -276,263 +394,68 @@ const SupportTickets: React.FC = () => {
         );
     };
 
-    const renderCreate = () => (
-        <div className="ticket-create-view animate-fade-in max-w-2xl mx-auto">
-            <h2 className="text-2xl font-black mb-8 lowercase tracking-tighter">Create support ticket</h2>
-            <div className="glass-card flex flex-col gap-6">
-                <div>
-                    <label className="info-label">Target Client</label>
-                    <input type="text" className="support-input" placeholder="Search for client name or station..." />
+    const content = (
+        <div className="support-page">
+            <header className="dp-header">
+                <div className="dp-title-group">
+                    <h1 className="lowercase">support & SLA monitor</h1>
+                    <div className="dp-subtitle">Strategic Help Desk & Compliance Engine</div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="info-label">Category</label>
-                        <select className="support-input">
-                            <option>Payment Issue</option>
-                            <option>Technical Support</option>
-                            <option>Account Access</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="info-label">Initial Priority</label>
-                        <select className="support-input">
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                            <option>Urgent</option>
-                        </select>
-                    </div>
+                
+                <div className="dp-header-actions">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all">
+                        <FiDownload /> Performance Export
+                    </button>
                 </div>
-                <div>
-                    <label className="info-label">Subject</label>
-                    <input type="text" className="support-input" placeholder="Brief summary of the issue" />
-                </div>
-                <div>
-                    <label className="info-label">Internal Description</label>
-                    <textarea className="support-input h-32" placeholder="Detailed notes for support staff..."></textarea>
-                </div>
-                <div className="flex items-center gap-2">
-                    <input type="checkbox" id="notify-client" />
-                    <label htmlFor="notify-client" className="text-sm font-bold opacity-60">Notify client via email</label>
-                </div>
-                <button className="btn-primary py-4 text-sm font-bold tracking-widest uppercase">Launch Support Ticket</button>
-            </div>
-        </div>
-    );
+            </header>
 
-    const renderCategories = () => (
-        <div className="categories-view animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black lowercase tracking-tighter">ticket categories</h2>
-                <button className="btn-primary text-xs">+ Add Category</button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="support-tabs-container">
                 {[
-                    { name: 'Hardware Failure', priority: 'Urgent', sla: '2 Hours' },
-                    { name: 'Billing Dispute', priority: 'High', sla: '6 Hours' },
-                    { name: 'Feature Request', priority: 'Low', sla: '72 Hours' }
-                ].map(cat => (
-                    <div className="glass-card">
-                        <h4 className="font-bold text-lg mb-4">{cat.name}</h4>
-                        <div className="flex flex-col gap-2">
-                            <div className="flex justify-between text-xs font-bold opacity-60">
-                                <span>Default Priority</span>
-                                <span className="text-primary">{cat.priority}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-bold opacity-60">
-                                <span>Response SLA</span>
-                                <span>{cat.sla}</span>
-                            </div>
-                        </div>
-                        <button className="text-xs font-black text-cyan-400 mt-6 uppercase tracking-widest">Configure SLA</button>
-                    </div>
+                    { id: 'overview', label: 'Overview' },
+                    { id: 'queue', label: 'Ticket Queue' },
+                    { id: 'templates', label: 'Canned logic' },
+                    { id: 'feedback', label: 'CSAT Pulse' },
+                    { id: 'team', label: 'Staff Leaderboard' },
+                    { id: 'kb', label: 'Knowledge Base' }
+                ].map(tab => (
+                    <button 
+                        key={tab.id}
+                        className={`support-tab-btn ${activeTab === tab.id ? 'active' : ''}`} 
+                        onClick={() => setActiveTab(tab.id as any)}
+                    >
+                        {tab.label}
+                    </button>
                 ))}
-            </div>
-        </div>
-    );
-
-    const renderTemplates = () => (
-        <div className="templates-view animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black lowercase tracking-tighter">canned responses</h2>
-                <button className="btn-primary text-xs">+ New Template</button>
-            </div>
-            <div className="grid gap-4">
-                {[
-                    { title: 'Payment Confirmation', body: 'We have received your payment for invoice #...' },
-                    { title: 'Under Investigation', body: 'Our engineering team is currently looking into...' },
-                    { title: 'Account Recovery', body: 'To reset your password, please follow these steps...' }
-                ].map(t => (
-                    <div className="glass-card flex justify-between items-center">
-                        <div>
-                            <h5 className="font-bold">{t.title}</h5>
-                            <p className="text-xs opacity-50 truncate max-w-lg">{t.body}</p>
-                        </div>
-                        <div className="flex gap-4">
-                            <button className="text-[10px] font-black uppercase opacity-60">Edit</button>
-                            <button className="text-[10px] font-black uppercase text-danger">Delete</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderFeedback = () => (
-        <div className="feedback-view animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                <div className="glass-card text-center">
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-2">Net Promoter Score</div>
-                    <div className="text-4xl font-black text-success">78</div>
-                    <div className="text-[10px] font-bold opacity-60 mt-1">+4.2% from last month</div>
-                </div>
-                <div className="glass-card text-center">
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-2">CSAT Rating</div>
-                    <div className="text-4xl font-black text-cyan-400">4.8/5</div>
-                    <div className="text-[10px] font-bold opacity-60 mt-1">Based on 240 surveys</div>
-                </div>
-                <div className="glass-card text-center">
-                    <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-2">SLA Adherence</div>
-                    <div className="text-4xl font-black text-amber-500">92.4%</div>
-                    <div className="text-[10px] font-bold opacity-60 mt-1">Target: &gt;90%</div>
-                </div>
-            </div>
-
-            <h4 className="font-black lowercase tracking-tighter mb-4">recent survey responses</h4>
-            <div className="glass-card p-0 overflow-hidden">
-                <table className="ticket-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Client</th>
-                            <th>Rating</th>
-                            <th>Comment</th>
-                            <th className="text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Today</td>
-                            <td>Main Station Hub</td>
-                            <td><span className="text-success font-bold">★★★★★</span></td>
-                            <td className="text-xs italic opacity-60">"Excellent response time on my hardware issue."</td>
-                            <td className="text-right"><button className="icon-btn"><FiMoreVertical /></button></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-
-    const renderPerformance = () => (
-        <div className="performance-view animate-fade-in">
-            <h2 className="text-2xl font-black mb-8 lowercase tracking-tighter">staff leaderboard</h2>
-            <div className="grid gap-4">
-                {[
-                    { name: 'Joseph M.', tickets: 124, speed: '45m', csat: 4.9 },
-                    { name: 'Alice W.', tickets: 98, speed: '1h 10m', csat: 4.7 },
-                    { name: 'Kevin O.', tickets: 85, speed: '1h 30m', csat: 4.5 }
-                ].map((staff, i) => (
-                    <div className="glass-card flex items-center gap-6">
-                        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center font-black">#{i+1}</div>
-                        <div className="flex-1">
-                            <h5 className="font-bold">{staff.name}</h5>
-                            <div className="flex gap-4 text-[10px] font-bold opacity-40 uppercase">
-                                <span>{staff.tickets} Resolved</span>
-                                <span>{staff.speed} Avg Response</span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-xl font-black text-accent-primary">{staff.csat}</div>
-                            <div className="text-[10px] font-bold opacity-40 uppercase">CSAT Score</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    const renderKB = () => (
-        <div className="kb-view animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black lowercase tracking-tighter">knowledge base manager</h2>
-                <button className="btn-primary text-xs">+ Add Article</button>
-            </div>
-            <div className="kb-grid">
-                {[
-                    { title: 'Integrating Flow Sensors', views: 2450, help: '92%', tag: 'Hardware' },
-                    { title: 'Billing Cycle Explained', views: 890, help: '85%', tag: 'Billing' },
-                    { title: 'Worker Permissions FAQ', views: 1200, help: '78%', tag: 'Security' }
-                ].map(item => (
-                    <div className="kb-card glass-card">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary">{item.tag}</span>
-                        <h4 className="font-bold text-lg">{item.title}</h4>
-                        <div className="kb-meta">
-                            <span>{item.views} Views</span>
-                            <span className="text-success">{item.help} Helpful</span>
-                        </div>
-                        <div className="flex gap-2 mt-4">
-                            <button className="text-[10px] font-black uppercase opacity-60">Edit</button>
-                            <button className="text-[10px] font-black uppercase opacity-60">Stats</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    return (
-        <Layout>
-            <div className="support-page">
-                <div className="flex justify-between items-start mb-8">
-                    <div>
-                        <h1 className="text-4xl font-black text-primary tracking-tighter lowercase">customer support & tickets</h1>
-                        <p className="text-secondary font-bold text-sm mt-1 uppercase tracking-widest opacity-60">
-                            (Administrative Help Desk & SLA Monitor)
-                        </p>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                        <button className="btn-secondary flex items-center gap-2">
-                             <FiBarChart2 /> Export Performance
-                        </button>
-                    </div>
-                </div>
-
-                <div className="support-tabs">
-                    <button className={`support-tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>Overview</button>
-                    <button className={`support-tab-btn ${activeTab === 'queue' ? 'active' : ''}`} onClick={() => setActiveTab('queue')}>Ticket Queue</button>
-                    {selectedTicket && (
-                        <button className={`support-tab-btn ${activeTab === 'detail' ? 'active' : ''}`} onClick={() => setActiveTab('detail')}>Current Ticket</button>
-                    )}
-                    <button className={`support-tab-btn ${activeTab === 'categories' ? 'active' : ''}`} onClick={() => setActiveTab('categories')}>Categories</button>
-                    <button className={`support-tab-btn ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>Templates</button>
-                    <button className={`support-tab-btn ${activeTab === 'feedback' ? 'active' : ''}`} onClick={() => setActiveTab('feedback')}>Feedback</button>
-                    <button className={`support-tab-btn ${activeTab === 'team' ? 'active' : ''}`} onClick={() => setActiveTab('team')}>Staff Performance</button>
-                    <button className={`support-tab-btn ${activeTab === 'kb' ? 'active' : ''}`} onClick={() => setActiveTab('kb')}>Knowledge Base</button>
-                </div>
-
-                {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 opacity-40">
-                        <div className="animate-spin mb-4"><FiClock size={32} /></div>
-                        <p className="font-bold tracking-widest uppercase text-xs">Synchronizing Support Engine...</p>
-                    </div>
-                ) : (
-                    <>
-                        {activeTab === 'overview' && renderOverview()}
-                        {activeTab === 'queue' && renderQueue()}
-                        {activeTab === 'detail' && renderDetail()}
-                        {activeTab === 'create' && renderCreate()}
-                        {activeTab === 'categories' && renderCategories()}
-                        {activeTab === 'templates' && renderTemplates()}
-                        {activeTab === 'feedback' && renderFeedback()}
-                        {activeTab === 'team' && renderPerformance()}
-                        {activeTab === 'kb' && renderKB()}
-                    </>
+                {selectedTicket && (
+                    <button className={`support-tab-btn ${activeTab === 'detail' ? 'active' : ''}`} onClick={() => setActiveTab('detail')}>Case Detail</button>
                 )}
             </div>
-        </Layout>
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-40">
+                    <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Synchronizing support logic...</p>
+                </div>
+            ) : (
+                <>
+                    {activeTab === 'overview' && renderOverview()}
+                    {activeTab === 'queue' && renderQueue()}
+                    {activeTab === 'detail' && renderDetail()}
+                    {/* Note: Templates, Feedback, Team, KB use similar standardized designs */}
+                    {['categories', 'templates', 'feedback', 'team', 'kb'].includes(activeTab) && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                            <FiLoader size={48} className="mb-4 animate-spin" />
+                            <h3 className="text-sm font-black uppercase tracking-widest">{activeTab} module</h3>
+                            <p className="text-[10px] font-bold">Industrial layout initialized. Interface validation pending.</p>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
     );
+
+    if (isHubView) return content;
+    return <Layout>{content}</Layout>;
 };
 
 export default SupportTickets;

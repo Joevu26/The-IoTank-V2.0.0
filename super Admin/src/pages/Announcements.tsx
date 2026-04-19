@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { communicationService, Announcement, DashboardBanner, NewsletterTemplate } from '../services/communicationService';
+import { communicationService, DashboardBanner, NewsletterTemplate } from '../services/communicationService';
+import { supabase } from '../config/supabase';
 import { 
     FiSend, FiMail, FiMessageSquare, FiMonitor, 
     FiBell, FiCalendar, FiUsers, FiBarChart2, 
@@ -8,36 +9,43 @@ import {
     FiCheckCircle, FiAlertCircle, FiClock, FiEye,
     FiTrash2, FiEdit3, FiChevronRight, FiChevronDown,
     FiSmartphone, FiFileText, FiLayers, FiType,
-    FiImage, FiMinusCircle, FiMove, FiTarget
+    FiImage, FiMinusCircle, FiMove, FiTarget,
+    FiInfo, FiSearch
 } from 'react-icons/fi';
 import './Announcements.css';
 
-const Announcements: React.FC = () => {
+const Announcements: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
+
     const [activeTab, setActiveTab] = useState<'build' | 'history' | 'banners' | 'newsletters'>('build');
-    const [history, setHistory] = useState<Announcement[]>([]);
+    const [history, setHistory] = useState<any[]>([]);
     const [banners, setBanners] = useState<DashboardBanner[]>([]);
     const [templates, setTemplates] = useState<NewsletterTemplate[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedChannels, setSelectedChannels] = useState<string[]>(['Email']);
+    const [selectedChannels, setSelectedChannels] = useState<string[]>(['Dashboard']);
+    const [subject, setSubject] = useState('');
+    const [body, setBody] = useState('');
+    const [targetAudience, setTargetAudience] = useState('All Active Clients');
+    const [isSending, setIsSending] = useState(false);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [annData, bannerData, templateData] = await Promise.all([
+                supabase.from('global_announcements').select('*').order('created_at', { ascending: false }),
+                communicationService.getActiveBanners(),
+                communicationService.getNewsletterTemplates()
+            ]);
+            setHistory(annData.data || []);
+            setBanners(bannerData || []);
+            setTemplates(templateData || []);
+        } catch (error) {
+            console.error('Error fetching communication data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [histData, bannerData, templateData] = await Promise.all([
-                    communicationService.getAnnouncements(),
-                    communicationService.getActiveBanners(),
-                    communicationService.getNewsletterTemplates()
-                ]);
-                setHistory(histData);
-                setBanners(bannerData);
-                setTemplates(templateData);
-            } catch (error) {
-                console.error('Error fetching communication data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
     }, []);
 
@@ -47,52 +55,96 @@ const Announcements: React.FC = () => {
         );
     };
 
+    const handleSend = async () => {
+        if (!subject || !body) {
+            alert("Please provide both a subject and a message body.");
+            return;
+        }
+        if (selectedChannels.length === 0) {
+            alert("Select at least one delivery channel.");
+            return;
+        }
+        setIsSending(true);
+        try {
+            const { error } = await supabase.from('global_announcements').insert({
+                subject,
+                body,
+                channels: selectedChannels,
+                target_audience: targetAudience,
+                status: 'sent',
+                created_by: (await supabase.auth.getUser()).data.user?.id
+            });
+            if (error) throw error;
+            
+            alert("Announcement broadcasted successfully!");
+            setSubject('');
+            setBody('');
+            await fetchData();
+            setActiveTab('history');
+        } catch (error: any) {
+            alert("Broadcast Failed: " + error.message);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
     const renderBuildAnnouncement = () => (
         <div className="builder-studio animate-fade-in">
-            {/* 10.1 Announcement Builder */}
             <div className="builder-main">
                 <div className="mb-8">
-                    <label className="info-label mb-2">Announcement Subject</label>
-                    <input type="text" placeholder="e.g., Scheduled Maintenance: System Upgrade" className="support-input text-lg font-bold" />
+                    <label className="info-label">Announcement Subject</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g., Scheduled Maintenance: System Upgrade v2.4.0" 
+                        className="support-input font-bold text-lg" 
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                    />
                 </div>
 
                 <div className="mb-8">
-                    <div className="flex justify-between items-end mb-2">
-                        <label className="info-label">Message Body (Rich Text)</label>
-                        <div className="flex gap-2 text-[10px] font-black uppercase opacity-40">
+                    <div className="flex justify-between items-end mb-4">
+                        <label className="info-label">Broadcast Payload (Body)</label>
+                        <div className="flex gap-2 text-[10px] font-black uppercase text-slate-400">
                             <span>Markdown Supported</span>
-                            <span>| 1250 Characters Max</span>
                         </div>
                     </div>
                     <div className="rich-text-editor">
                         <textarea 
-                            className="w-full h-full bg-transparent border-none outline-none text-white resize-none font-medium"
-                            placeholder="Compose your broadcast message here..."
+                            placeholder="Compose your high-fidelity broadcast message here..."
+                            value={body}
+                            onChange={(e) => setBody(e.target.value)}
                         ></textarea>
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center gap-6 mt-12 bg-white bg-opacity-5 p-6 rounded-2xl border border-white border-opacity-5">
+                <div className="flex justify-between items-center gap-6 mt-12 bg-slate-50 p-8 rounded-3xl border border-slate-100">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-primary bg-opacity-10 flex items-center justify-center text-primary text-2xl">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600 text-2xl">
                             <FiSend />
                         </div>
                         <div>
-                            <h4 className="font-bold text-sm">Ready to Broadcast?</h4>
-                            <p className="text-[10px] opacity-40 font-bold uppercase tracking-widest">Messages will be queued for delivery immediately</p>
+                            <h4 className="font-black text-slate-800 tracking-tight lowercase">ready to deploy broadcast?</h4>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">transmissions are queued for immediate execution</p>
                         </div>
                     </div>
-                    <div className="flex gap-3">
-                         <button className="btn-secondary text-xs px-8">Preview</button>
-                         <button className="btn-primary text-xs px-10">Send Now</button>
-                    </div>
+                     <div className="flex gap-3">
+                          <button className="px-6 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-white transition-all">Dry Run Preview</button>
+                          <button 
+                            className="px-8 py-3 bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                            disabled={isSending}
+                            onClick={handleSend}
+                          >
+                            {isSending ? 'Transmitting...' : 'Execute Broadcast'}
+                          </button>
+                     </div>
                 </div>
             </div>
 
-            <div className="builder-sidebar">
-                <div className="glass-card">
-                    <h5 className="font-black lowercase tracking-tighter text-lg mb-4">Delivery Channels</h5>
-                    <div className="channel-pill-group flex-wrap">
+            <aside className="builder-sidebar">
+                <div className="builder-main" style={{ padding: '1.5rem' }}>
+                    <h5 className="font-black lowercase tracking-tighter text-2xl mb-6">Delivery Channels</h5>
+                    <div className="channel-pill-group">
                         {[
                             { id: 'Email', icon: <FiMail /> },
                             { id: 'SMS', icon: <FiMessageSquare /> },
@@ -105,112 +157,102 @@ const Announcements: React.FC = () => {
                                 onClick={() => toggleChannel(ch.id)}
                             >
                                 <div className="text-xl">{ch.icon}</div>
-                                <span className="text-[9px] font-black uppercase tracking-widest">{ch.id}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">{ch.id}</span>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                <div className="glass-card">
-                    <h5 className="font-black lowercase tracking-tighter text-lg mb-4">Target Audience</h5>
-                    <div className="flex flex-col gap-3">
-                        <select className="support-input text-xs font-bold py-3 bg-white bg-opacity-5">
+                <div className="builder-main" style={{ padding: '1.5rem' }}>
+                    <h5 className="font-black lowercase tracking-tighter text-2xl mb-6">Target Parameters</h5>
+                    <div className="space-y-4">
+                        <select 
+                            className="support-input font-bold"
+                            value={targetAudience}
+                            onChange={(e) => setTargetAudience(e.target.value)}
+                        >
                             <option>All Active Clients</option>
                             <option>Specific Tier: Enterprise</option>
-                            <option>Trial Users Only</option>
                             <option>County: Nairobi</option>
-                            <option>Specific IDs (CSV Upload)</option>
                         </select>
-                        <div className="p-4 bg-white bg-opacity-5 rounded-xl border border-white border-opacity-5">
-                             <div className="flex justify-between text-[10px] font-bold uppercase opacity-40 mb-2">
-                                 <span>Estimated Reach</span>
-                                 <span>1,250 Clients</span>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                             <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-2">
+                                 <span>Audience Coverage</span>
+                                 <span className="text-blue-600">~1,250 Nodes</span>
                              </div>
-                             <div className="h-1 bg-white bg-opacity-5 rounded-full overflow-hidden">
-                                 <div className="h-full bg-primary" style={{width: '65%'}}></div>
+                             <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                 <div className="h-full bg-blue-600" style={{width: '65%'}}></div>
                              </div>
                         </div>
                     </div>
                 </div>
-
-                <div className="glass-card">
-                    <h5 className="font-black lowercase tracking-tighter text-lg mb-4">Scheduling</h5>
-                    <div className="flex flex-col gap-3">
-                        <div className="flex items-center gap-3 p-3 bg-white bg-opacity-5 rounded-xl">
-                            <input type="radio" name="timing" defaultChecked />
-                            <span className="text-xs font-bold">Send Immediately</span>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-white bg-opacity-5 rounded-xl opacity-40">
-                            <input type="radio" name="timing" />
-                            <span className="text-xs font-bold">Schedule for Later</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            </aside>
         </div>
     );
 
     const renderHistory = () => (
         <div className="history-section animate-fade-in">
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+             <div className="dp-stats-grid">
                  {[
-                    { label: 'Total Sent', val: '42', icon: <FiSend /> },
-                    { label: 'Avg Open Rate', val: '58.4%', icon: <FiBarChart2 /> },
-                    { label: 'Avg Click Rate', val: '12.8%', icon: <FiTarget /> },
-                    { label: 'Scheduled', val: '3', icon: <FiCalendar /> }
+                    { label: 'Total Deployments', val: history.length, icon: <FiSend />, color: '#f59e0b' },
+                    { label: 'Avg Open Rate', val: '58.4%', icon: <FiBarChart2 />, color: '#10b981' },
+                    { label: 'Engagement Index', val: '12.8%', icon: <FiTarget />, color: '#06b6d4' },
+                    { label: 'Scheduled Queue', val: '3', icon: <FiClock />, color: '#8b5cf6' }
                  ].map(k => (
-                    <div key={k.label} className="engagement-card glass-card">
-                         <div className="text-primary text-xl mb-2 flex justify-center">{k.icon}</div>
-                         <div className="text-[10px] font-black uppercase opacity-40 tracking-widest">{k.label}</div>
-                         <div className="text-3xl font-black mt-1">{k.val}</div>
+                    <div key={k.label} className="dp-premium-stat-card">
+                         <div className="stat-icon-blob" style={{ background: `${k.color}10`, color: k.color }}>{k.icon}</div>
+                         <div className="stat-content">
+                            <label>{k.label}</label>
+                            <h3>{k.val}</h3>
+                         </div>
                     </div>
                  ))}
              </div>
 
-             <div className="ticket-table-container">
+             <div className="tdv-transaction-table-container mt-12">
                 <table className="ticket-table">
                     <thead>
                         <tr>
-                            <th>Date / Time</th>
-                            <th>Subject & Channels</th>
-                            <th>Recipients</th>
-                            <th>Engagement</th>
+                            <th>Deployment Date</th>
+                            <th>Subject & Transmission Vector</th>
+                            <th>Node Coverage</th>
+                            <th>Interaction Metrics</th>
                             <th>Status</th>
-                            <th className="text-right">Action</th>
+                            <th className="text-right">Audit</th>
                         </tr>
                     </thead>
                     <tbody>
                         {history.map(h => (
                             <tr key={h.id}>
-                                <td className="text-xs font-bold opacity-40">{h.date_sent}</td>
+                                <td className="text-xs font-mono opacity-40">{new Date(h.created_at).toLocaleDateString()}</td>
                                 <td>
-                                    <div className="font-bold text-sm">{h.subject}</div>
-                                    <div className="flex gap-2 mt-1">
-                                        {h.methods.map(m => (
-                                            <span key={m} className="text-[8px] font-black uppercase tracking-widest opacity-30">{m}</span>
+                                    <div className="font-bold text-sm tracking-tight">{h.subject}</div>
+                                    <div className="flex gap-2 mt-1.5">
+                                        {(h.channels || []).map((m: string) => (
+                                            <span key={m} className="text-[9px] font-black uppercase text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded-md">{m}</span>
                                         ))}
                                     </div>
                                 </td>
-                                <td className="font-mono font-bold text-sm text-primary">{h.recipients_count.toLocaleString()}</td>
+                                <td className="font-black text-sm text-blue-600">{(h.recipients_count || 0).toLocaleString()} <span className="text-[10px] opacity-40">nodes</span></td>
                                 <td>
-                                    <div className="flex gap-4">
+                                    <div className="flex gap-6">
                                         <div className="text-center">
-                                             <div className="text-[9px] font-bold opacity-30 uppercase">Open</div>
-                                             <div className="text-xs font-black text-success">{h.open_rate}%</div>
+                                             <div className="text-[9px] font-black text-slate-400 uppercase">Open</div>
+                                             <div className="text-xs font-black text-emerald-600">{h.open_rate || 0}%</div>
                                         </div>
                                         <div className="text-center">
-                                             <div className="text-[9px] font-bold opacity-30 uppercase">Click</div>
-                                             <div className="text-xs font-black text-amber-500">{h.click_rate}%</div>
+                                             <div className="text-[9px] font-black text-slate-400 uppercase">Click</div>
+                                             <div className="text-xs font-black text-amber-500">{h.click_rate || 0}%</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td>
-                                    <span className={`badge text-[8px] bg-opacity-10 border border-opacity-20 ${h.status === 'sent' ? 'text-success border-success' : 'text-amber-500 border-amber-500'}`}>
+                                    <span className={`su-status-badge ${h.status === 'sent' ? 'su-active' : 'su-pending'}`}>
                                         {h.status}
                                     </span>
                                 </td>
                                 <td className="text-right">
-                                    <button className="icon-btn hover:text-primary"><FiEye /></button>
+                                    <button className="action-circle view"><FiEye size={16}/></button>
                                 </td>
                             </tr>
                         ))}
@@ -223,37 +265,33 @@ const Announcements: React.FC = () => {
     const renderBanners = () => (
         <div className="banners-section animate-fade-in">
             <div className="flex justify-between items-end mb-8">
-                 <div>
-                    <h3 className="text-2xl font-black lowercase tracking-tighter">Live Dashboard Banners</h3>
-                    <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Active persistent notifications on client dashboards</p>
+                 <div className="dp-title-group">
+                    <h3 className="text-2xl font-black lowercase tracking-tighter">Live dashboard banners</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">active persistent notifications across the platform ecosystem</p>
                  </div>
-                 <button className="btn-primary text-xs flex items-center gap-2"><FiPlus /> Create Banner</button>
+                 <button className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2">
+                    <FiPlus /> Initialize Banner
+                </button>
             </div>
 
-            <div className="banner-preview-stack">
+            <div className="space-y-3">
                 {banners.map(b => (
-                    <div key={b.id} className={`banner-item ${b.type} glass-card`}>
+                    <div key={b.id} className={`banner-item ${b.type === 'warning' ? 'warning' : 'critical'}`}>
                          <div className="flex items-center gap-6">
-                            <div className="w-10 h-10 rounded-full bg-white bg-opacity-5 flex items-center justify-center text-xl">
-                                {b.type === 'warning' ? <FiAlertCircle className="text-amber-500" /> : <FiAlertCircle className="text-danger" />}
+                            <div className="w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-xl">
+                                {b.type === 'warning' ? <FiAlertCircle className="text-amber-500" /> : <FiAlertCircle className="text-rose-600" />}
                             </div>
                             <div>
-                                <div className="text-xs font-bold text-white">{b.message}</div>
-                                <div className="text-[9px] font-black uppercase opacity-40 mt-1">Target: {b.target} Audience • {b.is_dismissible ? 'Dismissible' : 'Persistent'}</div>
+                                <div className="text-sm font-bold text-slate-700">{b.message}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Vector: {b.target} Nodes • {b.is_dismissible ? 'Dismissible' : 'Immutable'}</div>
                             </div>
                          </div>
-                         <div className="flex gap-3">
-                             <button className="icon-btn hover:text-primary"><FiEdit3 /></button>
-                             <button className="icon-btn hover:text-danger"><FiTrash2 /></button>
+                         <div className="flex gap-2">
+                             <button className="action-circle view"><FiEdit3 size={14}/></button>
+                             <button className="action-circle delete"><FiTrash2 size={14}/></button>
                          </div>
                     </div>
                 ))}
-            </div>
-
-            <div className="glass-card p-8 bg-white bg-opacity-5 border-dashed border-2 border-white border-opacity-10 text-center">
-                 <FiLayout size={32} className="mx-auto mb-4 opacity-20" />
-                 <h4 className="font-bold opacity-40 mb-2">No Historical Banners found</h4>
-                 <p className="text-xs opacity-20">Recently expired or deleted banners will appear here</p>
             </div>
         </div>
     );
@@ -262,106 +300,99 @@ const Announcements: React.FC = () => {
         <div className="newsletters-section animate-fade-in">
              <div className="builder-studio">
                  <div className="builder-main">
-                     <div className="flex justify-between items-center mb-10 pb-6 border-b border-white border-opacity-5">
-                          <h3 className="text-2xl font-black lowercase tracking-tighter">Newsletter Studio</h3>
-                          <div className="flex gap-4">
-                               <button className="btn-secondary text-[10px] flex items-center gap-2 font-black uppercase tracking-widest">Save Draft</button>
-                               <button className="btn-primary text-[10px] flex items-center gap-2 font-black uppercase tracking-widest"><FiSend /> Deploy Newsletter</button>
-                          </div>
-                     </div>
-
-                     <div className="newsletter-editor-space flex flex-col gap-4">
-                          <div className="newsletter-block flex justify-between items-center group">
-                               <div className="flex items-center gap-4">
-                                   <FiMove className="opacity-20 translate-[-10px] group-hover:opacity-100 transition-opacity" />
-                                   <div className="text-xs font-black uppercase opacity-40 tracking-widest text-primary">Header / Logo Block</div>
-                               </div>
-                               <FiMinusCircle className="opacity-0 group-hover:opacity-100 text-danger" />
-                          </div>
-                          <div className="newsletter-block flex justify-between items-center group">
-                               <div className="flex items-center gap-4">
-                                   <FiMove className="opacity-20 group-hover:opacity-100 transition-opacity" />
-                                   <div className="text-xs font-black uppercase opacity-40 tracking-widest">Feature Spotlight: 3D Mapping</div>
-                               </div>
-                               <FiMinusCircle className="opacity-0 group-hover:opacity-100 text-danger" />
-                          </div>
-                          <div className="newsletter-block min-h-[150px] border-dashed flex items-center justify-center opacity-40 hover:opacity-100 transition-all">
-                               <div className="text-center">
-                                    <FiPlus size={24} className="mx-auto mb-2" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Drag Block Here to Append Content</span>
-                               </div>
-                          </div>
-                     </div>
+                      <div className="newsletter-editor-space flex flex-col gap-4">
+                           <div className="newsletter-block flex justify-between items-center group">
+                                <div className="flex items-center gap-4">
+                                    <FiMove className="opacity-20 group-hover:opacity-100 transition-opacity" />
+                                    <div className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Global Header Node</div>
+                                </div>
+                                <FiMinusCircle className="opacity-0 group-hover:opacity-100 text-rose-500 cursor-pointer" />
+                           </div>
+                           <div className="newsletter-block flex justify-between items-center group">
+                                <div className="flex items-center gap-4">
+                                    <FiMove className="opacity-20 group-hover:opacity-100 transition-opacity" />
+                                    <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Intelligence Spotlight: AI Forensics</div>
+                                </div>
+                                <FiMinusCircle className="opacity-0 group-hover:opacity-100 text-rose-500 cursor-pointer" />
+                           </div>
+                           <div className="newsletter-block border-dashed border-2 py-12 flex items-center justify-center opacity-40 hover:opacity-100 transition-all cursor-pointer">
+                                <div className="text-center">
+                                     <FiPlus size={24} className="mx-auto mb-2 text-blue-600" />
+                                     <span className="text-[10px] font-black uppercase tracking-widest">Append Content Block</span>
+                                </div>
+                           </div>
+                      </div>
                  </div>
 
-                 <div className="builder-sidebar">
-                      <div className="glass-card">
-                           <h5 className="font-black lowercase tracking-tighter text-lg mb-6">Component Library</h5>
-                           <div className="grid grid-cols-2 gap-4">
+                 <aside className="builder-sidebar">
+                      <div className="builder-main" style={{ padding: '1.5rem' }}>
+                           <h5 className="font-black lowercase tracking-tighter text-2xl mb-6">Component Library</h5>
+                           <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { label: 'Sub-Head', icon: <FiType /> },
-                                    { label: 'Image', icon: <FiImage /> },
-                                    { label: 'Text Body', icon: <FiFileText /> },
-                                    { label: 'CTA Button', icon: <FiTarget /> },
-                                    { label: 'KPI Chart', icon: <FiBarChart2 /> },
+                                    { label: 'Headline', icon: <FiType /> },
+                                    { label: 'Visual', icon: <FiImage /> },
+                                    { label: 'Copytext', icon: <FiFileText /> },
+                                    { label: 'Action', icon: <FiTarget /> },
+                                    { label: 'Stat Grid', icon: <FiBarChart2 /> },
                                     { label: 'Footer', icon: <FiLayers /> }
                                 ].map(lib => (
-                                    <div key={lib.label} className="p-4 bg-white bg-opacity-5 rounded-xl flex flex-col items-center gap-2 cursor-grab hover:bg-white hover:bg-opacity-10 transition-colors">
-                                         <div className="text-xl opacity-60">{lib.icon}</div>
-                                         <span className="text-[8px] font-black uppercase tracking-[0.2em]">{lib.label}</span>
+                                    <div key={lib.label} className="p-4 bg-slate-50 rounded-2xl flex flex-col items-center gap-2 cursor-grab hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
+                                         <div className="text-xl text-slate-400">{lib.icon}</div>
+                                         <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">{lib.label}</span>
                                     </div>
                                 ))}
                            </div>
                       </div>
 
-                      <div className="glass-card">
-                           <h5 className="font-black lowercase tracking-tighter text-lg mb-6">Template Presets</h5>
-                           <div className="flex flex-col gap-4">
+                      <div className="builder-main" style={{ padding: '1.5rem' }}>
+                           <h5 className="font-black lowercase tracking-tighter text-2xl mb-6">Presets</h5>
+                           <div className="space-y-3">
                                 {templates.map(t => (
-                                    <div key={t.id} className="p-4 rounded-xl border border-white border-opacity-10 bg-black hover:border-primary transition-all group cursor-pointer">
-                                         <div className="text-xs font-bold text-white group-hover:text-primary transition-colors">{t.name}</div>
-                                         <div className="flex justify-between items-center mt-2">
-                                              <span className="text-[8px] font-black uppercase opacity-30">{t.category}</span>
+                                    <div key={t.id} className="p-4 rounded-2xl border border-slate-100 bg-white hover:border-blue-600 transition-all group cursor-pointer shadow-sm">
+                                         <div className="text-xs font-black text-slate-800 tracking-tight lowercase">{t.name}</div>
+                                         <div className="flex justify-between items-center mt-3">
+                                              <span className="text-[8px] font-black uppercase text-blue-600/50">{t.category}</span>
                                               <span className="text-[8px] font-mono opacity-20">{t.last_modified}</span>
                                          </div>
                                     </div>
                                 ))}
                            </div>
                       </div>
-                 </div>
+                 </aside>
              </div>
         </div>
     );
 
-    return (
-        <Layout>
-            <div className="announcements-page">
-                <header className="mb-8 flex justify-between items-start">
-                    <div>
-                        <h1 className="text-4xl font-black text-primary tracking-tighter lowercase">announcements & communications</h1>
-                        <p className="text-secondary font-bold text-sm mt-1 uppercase tracking-widest opacity-60">
-                            (System broadcasting & client engagement terminal)
-                        </p>
-                    </div>
-                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-6 py-3 bg-[#0a0a0a] border border-primary border-opacity-20 rounded-2xl">
-                            <FiBell className="text-primary animate-bounce-slow" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Live Broadcast Engine</span>
-                        </div>
+    const content = (
+        <div className="announcements-page">
+            <header className="dp-header">
+                    <div className="dp-title-group">
+                        <h1 className="lowercase">announcements & communications</h1>
+                        <div className="dp-subtitle">Strategic System Broadcasting & Engagement Logistics Console</div>
                     </div>
                 </header>
 
                 <div className="hw-tabs mb-8">
-                    <button className={`hw-tab-btn ${activeTab === 'build' ? 'active' : ''}`} onClick={() => setActiveTab('build')}>Send announcement</button>
-                    <button className={`hw-tab-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>Announcement history</button>
-                    <button className={`hw-tab-btn ${activeTab === 'banners' ? 'active' : ''}`} onClick={() => setActiveTab('banners')}>Dashboard banners</button>
-                    <button className={`hw-tab-btn ${activeTab === 'newsletters' ? 'active' : ''}`} onClick={() => setActiveTab('newsletters')}>Client newsletters</button>
+                    {[
+                        { id: 'build', label: 'Broadcast Studio' },
+                        { id: 'history', label: 'Deployment Logs' },
+                        { id: 'banners', label: 'Platform Banners' },
+                        { id: 'newsletters', label: 'Engagement Engine' }
+                    ].map(tab => (
+                        <button 
+                            key={tab.id}
+                            className={`hw-tab-btn ${activeTab === tab.id ? 'active' : ''}`} 
+                            onClick={() => setActiveTab(tab.id as any)}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 opacity-40">
-                        <div className="animate-spin mb-4"><FiMonitor size={32} /></div>
-                        <p className="font-bold tracking-widest uppercase text-xs">Synchronizing Global Airwaves...</p>
+                    <div className="flex flex-col items-center justify-center py-40">
+                         <div className="w-10 h-10 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                         <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Synchronizing Global Airwaves...</p>
                     </div>
                 ) : (
                     <>
@@ -372,8 +403,10 @@ const Announcements: React.FC = () => {
                     </>
                 )}
             </div>
-        </Layout>
     );
+
+    if (isHubView) return content;
+    return <Layout>{content}</Layout>;
 };
 
 export default Announcements;

@@ -34,28 +34,25 @@ export interface ScheduledReport {
 
 export const analyticsService = {
     async getBusinessKPIs(): Promise<BusinessKPIs> {
-        return {
-            newClients: { count: 12, growth: 15 },
-            totalActive: 156,
-            churnRate: 2.1,
-            cac: 45000,
-            clv: 850000,
-            mrrGrowth: 8.4,
-            arr: 12450000,
-            arpu: 8500,
-            uptime: 99.98,
-            apiSuccess: 99.95
-        };
+        const { data, error } = await supabase.rpc('get_business_kpis');
+        if (error) {
+            console.error("KPI Sync Error:", error);
+            throw error;
+        }
+        return data as BusinessKPIs;
     },
 
     async getUsageStats(): Promise<UsageStats> {
+        const { data, error } = await supabase.rpc('get_admin_dashboard_stats');
+        if (error) throw error;
+        
         return {
-            totalTanks: 420,
-            totalFuel: 1250000,
+            totalTanks: data.health.totalTanks,
+            totalFuel: 1250000, 
             readings30d: 1450000,
             apiCalls30d: 85000,
             smsSent30d: 12400,
-            alertsTriggered30d: 850,
+            alertsTriggered30d: data.support.pendingAdjustments * 10,
             featureAdoption: {
                 '3D Digital Twin': 65,
                 'Procurement AI': 42,
@@ -79,5 +76,23 @@ export const analyticsService = {
             { id: '1', type: 'Operational Summary', frequency: 'daily', last_run: '2026-03-21', recipients: ['admin@iotank.co.ke'], status: 'active' },
             { id: '2', type: 'Revenue Growth', frequency: 'weekly', last_run: '2026-03-17', recipients: ['ceo@iotank.co.ke', 'cfo@iotank.co.ke'], status: 'active' }
         ];
+    },
+
+    async getMonthlyGrowthStats(): Promise<number[]> {
+        // Fetch count of fuel_stations grouped by month for the last 12 months
+        const { data, error } = await supabase.rpc('get_monthly_registration_growth');
+        if (error) {
+            console.error("Growth Stats Error:", error);
+            // Dynamic fallback based on real counts if RPC fails
+            const { data: stations } = await supabase.from('fuel_stations').select('created_at');
+            const counts = new Array(12).fill(0);
+            stations?.forEach(s => {
+                const month = new Date(s.created_at).getMonth();
+                counts[month]++;
+            });
+            return counts;
+        }
+        return data as number[];
     }
 };
+

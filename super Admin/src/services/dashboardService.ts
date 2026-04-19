@@ -65,14 +65,31 @@ export const dashboardService = {
 
             return data as DashboardStats;
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Dashboard Data Error:', error);
+            
+            // Check for 404 (Missing RPC), 401 (Auth Issue), 42P01 (Schema Mismatch), or 42703 (Column Mismatch)
+            const isInfraMissing = error?.code === 'PGRST104' || error?.status === 404 || error?.message?.includes('404');
+            const isAuthError = error?.status === 401 || error?.message?.includes('401');
+            const isSchemaMismatch = error?.code === '42P01' || error?.message?.includes('42P01');
+            const isColumnMismatch = error?.code === '42703' || error?.message?.includes('42703') || error?.message?.includes('column') && error?.message?.includes('does not exist');
+
             return {
-                health: { totalUsers: 0, totalTanks: 0, totalStations: 0, uptime: '0%', espDevices: { online: 0, total: 0 }, apiStatus: { supabase: 'red', twilio: 'red' }, dbSize: '0', alertRate: '0', dataIngestionRate: '0', queryLatency: '0', totalOperators: 0 },
+                health: { 
+                    totalUsers: 0, totalTanks: 0, totalStations: 0, uptime: '0%', 
+                    espDevices: { online: 0, total: 0 }, 
+                    apiStatus: { supabase: 'red', twilio: 'red' }, 
+                    dbSize: '0', alertRate: '0', dataIngestionRate: '0', 
+                    queryLatency: '0', totalOperators: 0 
+                },
                 financial: { mrr: 0, arr: 0, outstandingDebt: 0, dailySpend: [], billChanges: { increased: [], decreased: [] } },
                 support: { openTickets: 0, urgentTickets: 0, pendingRequests: 0, pendingAdjustments: 0 },
-                recentActivity: []
-            };
+                recentActivity: [],
+                error: {
+                    type: isColumnMismatch ? 'COLUMN_MISMATCH' : isSchemaMismatch ? 'SCHEMA_MISMATCH' : isInfraMissing ? 'INFRA_MISSING' : isAuthError ? 'AUTH_FAILURE' : 'UNKNOWN',
+                    message: error?.message || 'Connection failed'
+                }
+            } as any;
         }
     }
 };

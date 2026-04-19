@@ -1,0 +1,586 @@
+/* ============================================================
+   ScrollAnimations.css — IoTank Advanced Scrollytelling System
+   Kinetic Typography · Parallax · Sticky Pin · Stagger · Scrub
+   ============================================================ */
+
+/* ── 1. BASE: reveal-on-scroll (all variants start here) ───── */
+
+.reveal-on-scroll {
+  opacity: 0;
+  will-change: opacity, transform;
+  transition-property: opacity, transform;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  transition-duration: 0.35s; /* Snappier duration */
+}
+
+/* Default: float up */
+.reveal-on-scroll {
+  transform: translateY(24px); /* Smaller offset for snappier feel */
+}
+
+/* Direction variants */
+.reveal-left  { transform: translateX(-60px); }
+.reveal-right { transform: translateX(60px); }
+.reveal-scale { transform: scale(0.88) translateY(24px); }
+.reveal-zoom  { transform: scale(0.72); opacity: 0; }
+.reveal-flip  { transform: perspective(700px) rotateY(24deg) translateX(40px); }
+
+/* Active state */
+.reveal-on-scroll.is-visible,
+.reveal-left.is-visible,
+.reveal-right.is-visible,
+.reveal-scale.is-visible,
+.reveal-zoom.is-visible,
+.reveal-flip.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── 2. STAGGER — child delay cascade ─────────────────────── */
+
+.stagger-container .stagger-item {
+  opacity: 0;
+  transform: translateY(20px); /* Compressed */
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stagger-container.is-visible .stagger-item:nth-child(1)  { opacity: 1; transform: none; transition-delay: 0.03s; }
+.stagger-container.is-visible .stagger-item:nth-child(2)  { opacity: 1; transform: none; transition-delay: 0.09s; }
+.stagger-container.is-visible .stagger-item:nth-child(3)  { opacity: 1; transform: none; transition-delay: 0.15s; }
+.stagger-container.is-visible .stagger-item:nth-child(4)  { opacity: 1; transform: none; transition-delay: 0.21s; }
+.stagger-container.is-visible .stagger-item:nth-child(5)  { opacity: 1; transform: none; transition-delay: 0.27s; }
+.stagger-container.is-visible .stagger-item:nth-child(6)  { opacity: 1; transform: none; transition-delay: 0.33s; }
+.stagger-container.is-visible .stagger-item:nth-child(7)  { opacity: 1; transform: none; transition-delay: 0.39s; }
+.stagger-container.is-visible .stagger-item:nth-child(8)  { opacity: 1; transform: none; transition-delay: 0.45s; }
+
+/* Horizontal stagger (for process steps) */
+.stagger-h-container .stagger-h-item {
+  opacity: 0;
+  transform: translateY(15px); /* Changed to translateY for cleaner horizontal flow */
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stagger-h-container.is-visible .stagger-h-item:nth-child(odd)  { transform: translateX(30px); }
+
+.stagger-h-container.is-visible .stagger-h-item:nth-child(1)  { opacity: 1; transform: none; transition-delay: 0.0s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(2)  { opacity: 1; transform: none; transition-delay: 0.12s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(3)  { opacity: 1; transform: none; transition-delay: 0.24s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(4)  { opacity: 1; transform: none; transition-delay: 0.36s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(5)  { opacity: 1; transform: none; transition-delay: 0.48s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(6)  { opacity: 1; transform: none; transition-delay: 0.60s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(7)  { opacity: 1; transform: none; transition-delay: 0.72s; }
+.stagger-h-container.is-visible .stagger-h-item:nth-child(8)  { opacity: 1; transform: none; transition-delay: 0.84s; }
+
+/* ── 3. KINETIC TYPOGRAPHY ─────────────────────────────────── */
+
+/* Split Text: wrapper class, each word gets .split-word */
+.kinetic-text {
+  overflow: hidden;
+  display: block;
+}
+
+.kinetic-text .split-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(110%);
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kinetic-text.is-visible .split-word:nth-child(1)  { opacity: 1; transform: none; transition-delay: 0.00s; }
+.kinetic-text.is-visible .split-word:nth-child(2)  { opacity: 1; transform: none; transition-delay: 0.07s; }
+.kinetic-text.is-visible .split-word:nth-child(3)  { opacity: 1; transform: none; transition-delay: 0.14s; }
+.kinetic-text.is-visible .split-word:nth-child(4)  { opacity: 1; transform: none; transition-delay: 0.21s; }
+.kinetic-text.is-visible .split-word:nth-child(5)  { opacity: 1; transform: none; transition-delay: 0.28s; }
+.kinetic-text.is-visible .split-word:nth-child(6)  { opacity: 1; transform: none; transition-delay: 0.35s; }
+.kinetic-text.is-visible .split-word:nth-child(7)  { opacity: 1; transform: none; transition-delay: 0.42s; }
+.kinetic-text.is-visible .split-word:nth-child(8)  { opacity: 1; transform: none; transition-delay: 0.49s; }
+.kinetic-text.is-visible .split-word:nth-child(9)  { opacity: 1; transform: none; transition-delay: 0.56s; }
+.kinetic-text.is-visible .split-word:nth-child(10) { opacity: 1; transform: none; transition-delay: 0.63s; }
+.kinetic-text.is-visible .split-word:nth-child(n+11) { opacity: 1; transform: none; transition-delay: 0.70s; }
+
+/* Typewriter underline reveal */
+.text-underline-reveal {
+  position: relative;
+  display: inline-block;
+}
+
+.text-underline-reveal::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #00D4FF, #7C3AED);
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.4s;
+}
+
+.is-visible .text-underline-reveal::after {
+  width: 100%;
+}
+
+/* ── 4. CARD FLIP ENTRANCE ─────────────────────────────────── */
+
+.card-flip-in {
+  opacity: 0;
+  transform: perspective(800px) rotateX(20deg) translateY(40px) scale(0.96);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.is-visible .card-flip-in,
+.card-flip-in.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Stagger card flips inside a container */
+.cards-animate-container .card-flip-in:nth-child(1) { transition-delay: 0.00s; }
+.cards-animate-container .card-flip-in:nth-child(2) { transition-delay: 0.10s; }
+.cards-animate-container .card-flip-in:nth-child(3) { transition-delay: 0.20s; }
+.cards-animate-container .card-flip-in:nth-child(4) { transition-delay: 0.30s; }
+.cards-animate-container .card-flip-in:nth-child(5) { transition-delay: 0.40s; }
+.cards-animate-container .card-flip-in:nth-child(6) { transition-delay: 0.50s; }
+
+/* ── 5. STICKY SECTION (Scrollytelling "pin") ─────────────── */
+
+/* Outer scroll-track: controls how long the section "pins" */
+.scroll-track {
+  position: relative;
+}
+
+/* The pinned content panel */
+.scroll-pin {
+  position: sticky;
+  top: 72px; /* below fixed navbar */
+  height: calc(100vh - 72px);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+/* Content that swaps inside pinned area */
+.pinned-slides {
+  width: 100%;
+}
+
+.pinned-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(30px);
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.pinned-slide.active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* ── 6. PARALLAX LAYERS ────────────────────────────────────── */
+
+/* Used on decorative BG elements, set --parallax-speed via JS */
+.parallax-layer {
+  will-change: transform;
+}
+
+/* Floating orbs for section backgrounds */
+.parallax-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform;
+  filter: blur(60px);
+  opacity: 0.35;
+}
+
+.parallax-orb.orb-cyan {
+  background: radial-gradient(circle, #00D4FF 0%, transparent 70%);
+}
+
+.parallax-orb.orb-violet {
+  background: radial-gradient(circle, #7C3AED 0%, transparent 70%);
+}
+
+.parallax-orb.orb-teal {
+  background: radial-gradient(circle, #10B981 0%, transparent 70%);
+}
+
+/* ── 7. COUNTER-UP NUMBERS ─────────────────────────────────── */
+
+.counter-stat {
+  display: inline-block;
+}
+
+.counter-stat .stat-number {
+  display: inline-block;
+  transition: opacity 0.3s ease;
+}
+
+/* ── 8. SLIDE-IN PILLS / BADGE REVEAL ─────────────────────── */
+
+.badge-reveal {
+  opacity: 0;
+  transform: translateX(-20px) scale(0.9);
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: 0.1s;
+}
+
+.is-visible .badge-reveal,
+.badge-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── 9. PROGRESS LINE (Process flow connector animation) ────── */
+
+.step-connector-animated {
+  position: relative;
+  overflow: hidden;
+}
+
+.step-connector-animated::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, #00D4FF, #7C3AED);
+  transform: translateY(-50%);
+  border-radius: 2px;
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.is-visible .step-connector-animated::before,
+.step-connector-animated.is-visible::before {
+  width: 100%;
+}
+
+/* Vertical connector variant */
+.step-connector-animated.vertical::before {
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 0%;
+  transform: none;
+  transition: height 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.is-visible .step-connector-animated.vertical::before,
+.step-connector-animated.vertical.is-visible::before {
+  height: 100%;
+}
+
+/* ── 10. GLOW PULSE ON ENTRY ───────────────────────────────── */
+
+@keyframes glow-pulse-entry {
+  0%   { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+  70%  { box-shadow: 0 0 0 18px rgba(0,212,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,212,255,0); }
+}
+
+.glow-on-reveal {
+  transition-delay: 0.3s;
+}
+
+.is-visible .glow-on-reveal,
+.glow-on-reveal.is-visible {
+  animation: glow-pulse-entry 1s ease-out 0.4s both;
+}
+
+/* ── 11. HERO KINETIC H1 ───────────────────────────────────── */
+
+.hero-kinetic-h1 {
+  overflow: hidden;
+}
+
+.hero-kinetic-h1 .word-line {
+  display: block;
+  overflow: hidden;
+}
+
+.hero-kinetic-h1 .word-line span {
+  display: block;
+  transform: translateY(110%);
+  animation: slideUpWord 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.hero-kinetic-h1 .word-line:nth-child(1) span { animation-delay: 0.1s; }
+.hero-kinetic-h1 .word-line:nth-child(2) span { animation-delay: 0.25s; }
+.hero-kinetic-h1 .word-line:nth-child(3) span { animation-delay: 0.4s; }
+.hero-kinetic-h1 .word-line:nth-child(4) span { animation-delay: 0.55s; }
+
+@keyframes slideUpWord {
+  from {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ── 12. HERO SUBTITLE FADE-SLIDE ──────────────────────────── */
+
+.hero-subtitle-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.8s forwards;
+}
+
+.hero-cta-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) 1.1s forwards;
+}
+
+@keyframes fadeSlideUp {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 13. SECTION HEADING SPLIT ─────────────────────────────── */
+
+.section-heading-split {
+  overflow: hidden;
+}
+
+.section-heading-split .line-mask {
+  overflow: hidden;
+  display: block;
+}
+
+.section-heading-split .line-mask .line-inner {
+  display: block;
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.7s ease;
+}
+
+.is-visible .section-heading-split .line-mask:nth-child(1) .line-inner {
+  transform: none;
+  opacity: 1;
+  transition-delay: 0s;
+}
+
+.is-visible .section-heading-split .line-mask:nth-child(2) .line-inner {
+  transform: none;
+  opacity: 1;
+  transition-delay: 0.12s;
+}
+
+.is-visible .section-heading-split .line-mask:nth-child(3) .line-inner {
+  transform: none;
+  opacity: 1;
+  transition-delay: 0.24s;
+}
+
+/* ── 14. FEATURE CARD HOVER LIFT ───────────────────────────── */
+
+.hover-lift {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.35s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14);
+}
+
+/* ── 15. TEXT GRADIENT SHIMMER (on headings) ────────────────── */
+
+@keyframes gradient-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.shimmer-gradient-text {
+  background: linear-gradient(270deg, #00D4FF, #7C3AED, #10B981, #00D4FF);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shimmer 5s ease infinite;
+}
+
+/* ── 16. SLIDE OVER PANEL (single-screen feel) ─────────────── */
+
+.side-scroll-track {
+  position: relative;
+  height: 400vh; /* 4 panels × 100vh */
+}
+
+.side-scroll-pin {
+  position: sticky;
+  top: 72px;
+  height: calc(100vh - 72px);
+  overflow: hidden;
+}
+
+.side-scroll-panels {
+  display: flex;
+  height: 100%;
+  width: 400%; /* 4 panels */
+  transition: transform 0s linear; /* JS drives this */
+}
+
+.side-panel {
+  width: 25%;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* ── 17. SCROLL PROGRESS BAR ───────────────────────────────── */
+
+.scroll-progress-bar {
+  position: fixed;
+  top: 72px;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  background: linear-gradient(90deg, #00D4FF 0%, #7C3AED 50%, #10B981 100%);
+  z-index: 1001;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+}
+
+/* ── 18. ENTRANCE: BLUR FOCUS ──────────────────────────────── */
+
+.blur-focus-reveal {
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(0.96);
+  transition: opacity 0.7s ease,
+              filter 0.7s ease,
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.blur-focus-reveal.is-visible,
+.is-visible .blur-focus-reveal {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+}
+
+/* ── 19. BOUNCY ICON POP ────────────────────────────────────── */
+
+.icon-pop {
+  opacity: 0;
+  transform: scale(0) rotate(-10deg);
+  transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.is-visible .icon-pop,
+.icon-pop.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.stagger-container.is-visible .stagger-item .icon-pop { opacity: 1; transform: none; }
+
+/* ── 20. GRADIENT LINE SEPARATOR DRAW ─────────────────────── */
+
+.line-draw-reveal {
+  display: block;
+  height: 2px;
+  width: 0%;
+  background: linear-gradient(90deg, #00D4FF, #7C3AED);
+  border-radius: 2px;
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1) 0.2s;
+  margin: 0 auto;
+}
+
+.is-visible .line-draw-reveal,
+.line-draw-reveal.is-visible {
+  width: 60px;
+}
+
+/* ── 21. MORPHING BG ORBS (always-on ambient) ──────────────── */
+
+@keyframes orb-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(40px, -30px) scale(1.08); }
+  66%       { transform: translate(-20px, 20px) scale(0.95); }
+}
+
+@keyframes orb-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(-50px, 30px) scale(1.1); }
+  66%       { transform: translate(30px, -20px) scale(0.92); }
+}
+
+.orb-ambient-1 {
+  animation: orb-drift-1 12s ease-in-out infinite;
+}
+
+.orb-ambient-2 {
+  animation: orb-drift-2 16s ease-in-out infinite;
+}
+
+/* ── 22. HORIZONTAL SCROLL HINT ARROW ─────────────────────── */
+
+@keyframes bounce-right {
+  0%, 100% { transform: translateX(0); }
+  50%       { transform: translateX(8px); }
+}
+
+.scroll-hint-arrow {
+  display: inline-block;
+  animation: bounce-right 1.4s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+/* ── 23. MEDIA: Reduce motion ─────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .reveal-left,
+  .reveal-right,
+  .reveal-scale,
+  .reveal-zoom,
+  .reveal-flip,
+  .stagger-container .stagger-item,
+  .stagger-h-container .stagger-h-item,
+  .kinetic-text .split-word,
+  .card-flip-in,
+  .badge-reveal,
+  .blur-focus-reveal,
+  .icon-pop {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+    filter: none !important;
+  }
+
+  .hero-kinetic-h1 .word-line span,
+  .hero-subtitle-reveal,
+  .hero-cta-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .scroll-progress-bar { display: none; }
+}

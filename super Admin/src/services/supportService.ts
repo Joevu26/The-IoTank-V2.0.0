@@ -89,12 +89,12 @@ export const supportService = {
             .from('support_tickets')
             .select(`
                 *,
-                client:fuel_stations(full_name, station_name, email, phone),
+                client:fuel_stations!inner(full_name, station_name, email, phone),
                 assignee:admin_users(full_name, avatar_url)
             `)
             .order('created_at', { ascending: false });
 
-        if (filters?.status) query = query.eq('status', filters.status);
+        if (filters?.status && filters.status !== 'all') query = query.eq('status', filters.status);
         if (filters?.priority) query = query.eq('priority', filters.priority);
         if (filters?.assigned_to) query = query.eq('assigned_to', filters.assigned_to);
 
@@ -106,17 +106,30 @@ export const supportService = {
             .from('support_tickets')
             .select(`
                 *,
-                client:fuel_stations(*),
+                client:fuel_stations!inner(*),
                 messages:ticket_messages(*)
             `)
             .eq('id', ticketId)
+            .order('created_at', { foreignTable: 'ticket_messages', ascending: true })
             .single();
     },
 
     async addMessage(message: Partial<TicketMessage>) {
         return supabase
             .from('ticket_messages')
-            .insert(message);
+            .insert({
+                ...message,
+                sender_role: 'admin',
+                created_at: new Date().toISOString()
+            });
+    },
+
+    async getTicketMessages(ticketId: string) {
+        return supabase
+            .from('ticket_messages')
+            .select('*')
+            .eq('ticket_id', ticketId)
+            .order('created_at', { ascending: true });
     },
 
     async updateTicket(ticketId: string, updates: Partial<Ticket>) {

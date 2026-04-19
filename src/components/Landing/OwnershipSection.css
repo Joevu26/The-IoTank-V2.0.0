@@ -20,8 +20,9 @@
 
 
 .ownership-card {
-    background-color: #0F172A; /* Deep Dark Navy */
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.7); /* Translucent White */
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.05);
     border-radius: 24px;
     width: 100%;
     max-width: 1100px;
@@ -33,50 +34,58 @@
 
 /* Left Side: Error Header */
 .ownership-header-side {
-    padding: 40px; /* Reduced from 80px */
+    padding: 40px; 
     display: flex;
     flex-direction: column;
     justify-content: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 
 
 .ownership-header-side .eyebrow {
-    color: #EAB308; /* Industrial Yellow */
-    font-size: 12px;
-    font-weight: 700;
+    color: #111827;
+    background: #E0FFFF; /* Mist */
+    padding: 6px 14px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 800;
     letter-spacing: 2px;
     text-transform: uppercase;
     margin-bottom: 24px;
+    display: inline-block;
 }
 
 .ownership-header-side .main-title {
     font-size: 48px;
     font-weight: 800;
-    color: #FFFFFF;
+    background: linear-gradient(135deg, #7C3AED 0%, #06B6D4 100%); /* Deepened Indigo to Cyan */
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
     margin-bottom: 20px;
     letter-spacing: -1.5px;
     line-height: 1.1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
 }
 
 .ownership-header-side .subtitle {
     font-size: 16px;
-    color: #94A3B8; /* Muted Slate */
+    color: #1E293B; /* Much Darker Navy */
     line-height: 1.6;
-    font-weight: 400;
+    font-weight: 500;
     max-width: 400px;
     margin: 0;
 }
 
 /* Right Side: Status List */
 .ownership-status-side {
-    padding: 40px; /* Reduced from 80px */
+    padding: 40px; 
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 24px; /* Reduced from 32px */
-    background: rgba(255, 255, 255, 0.01);
+    gap: 24px; 
+    background: rgba(0, 0, 0, 0.02);
 }
 
 
@@ -106,21 +115,21 @@
 
 /* Specific Status Colors */
 .status-item.signal .status-icon-box {
-    background: rgba(234, 179, 8, 0.1);
-    border-color: rgba(234, 179, 8, 0.2);
-    color: #EAB308;
+    background: #B3E2E2; /* Glacier */
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #1E293B;
 }
 
 .status-item.module .status-icon-box {
-    background: rgba(244, 63, 94, 0.1);
-    border-color: rgba(244, 63, 94, 0.2);
-    color: #F43F5E;
+    background: #CCCCFF; /* Periwinkle */
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #1E293B;
 }
 
 .status-item.fallback .status-icon-box {
-    background: rgba(148, 163, 184, 0.1);
-    border-color: rgba(148, 163, 184, 0.2);
-    color: #94A3B8;
+    background: #E0FFFF; /* Mist */
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #1E293B;
 }
 
 .status-content {
@@ -132,13 +141,13 @@
 .status-title {
     font-size: 17px;
     font-weight: 700;
-    color: #FFFFFF;
+    color: #1E293B;
     margin: 0;
 }
 
 .status-desc {
     font-size: 14px;
-    color: #94A3B8;
+    color: #334155; /* Darker Slate */
     line-height: 1.5;
     margin: 0;
     max-width: 320px;
