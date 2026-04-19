@@ -36,7 +36,9 @@ export type EventType =
     | 'ORDER_REQUESTED'
     | 'ORDER_CANCELLED'
     | 'THEFT_DETECTED'
-    | 'LEAK_DETECTED';
+    | 'LEAK_DETECTED'
+    | 'ALERTS_BULK_RESOLVED'
+    | 'ALERTS_BULK_DISMISSED';
 
 export interface UnifiedEvent {
     category: EventCategory;
