@@ -3,12 +3,10 @@ import React from 'react';
 import { 
     FiTrendingUp, FiAlertTriangle, FiDownload, 
     FiShield, FiActivity, FiTarget, 
-    FiDollarSign, FiDroplet, FiRefreshCw, FiPercent 
+    FiDollarSign, FiDroplet, FiPercent 
 } from 'react-icons/fi';
 import { PageHeader } from '../Common/PageHeader';
 import { WetstockReconciliation } from './WetstockReconciliation';
-import { ShrinkageHeatmap } from './ShrinkageHeatmap';
-import { ShiftAnalyticsTable } from './ShiftAnalyticsTable';
 import { LazyComponent } from '../Common/LazyComponent';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -38,7 +36,8 @@ export const AnalyticsPage: React.FC = () => {
     const { transactions } = useTransactions(stationId);
 
     // Aggregate stats from the materialized view data
-    const stats = (analyticsData || []).reduce((acc: any, tank: any) => {
+    const analytics = (analyticsData as any)?.summary || [];
+    const stats = analytics.reduce((acc: any, tank: any) => {
         acc.totalVolume += tank.avg_volume; 
         acc.readingCount += tank.reading_count;
         return acc;
@@ -55,7 +54,7 @@ export const AnalyticsPage: React.FC = () => {
 
     stats.totalProfit = stats.totalSale - stats.totalPurchase;
     const marginPercent = stats.totalSale > 0 ? (stats.totalProfit / stats.totalSale) * 100 : 0;
-    const revenuePerLitre = stats.litersSold > 0 ? stats.totalSale / stats.litersSold : 0;
+    // const revenuePerLitre = stats.litersSold > 0 ? stats.totalSale / stats.litersSold : 0;
 
     // [ONE TRUTH]: Calculate Overall Station Variance matching the WRe module
     const startVolumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
@@ -66,7 +65,7 @@ export const AnalyticsPage: React.FC = () => {
     const totalExpected = totalOpening + totalDeliveries - totalSales;
     const totalVariance = totalMeasured - totalExpected;
     const totalVariancePct = totalExpected > 0 ? (totalVariance / totalExpected) * 100 : 0;
-    const inventoryTurnover = totalOpening > 0 ? (totalSales / totalOpening) : 0;
+    // const inventoryTurnover = totalOpening > 0 ? (totalSales / totalOpening) : 0;
 
     const chartData = transactions
         .filter(t => t.timestamp)
@@ -108,57 +107,42 @@ export const AnalyticsPage: React.FC = () => {
                 }
             />
 
-            {/* ── KPI Strip ────────────────────────────────────── */}
+            {/* ── KPI Summary Strip ───────────────────────────────────────── */}
             <div className="acp-kpi-grid">
                 <div className="acp-kpi-card">
                     <div className="acp-kpi-icon green"><FiDollarSign /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Net Revenue</span>
                         <span className="acp-kpi-value">Ksh {stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        <span className="acp-kpi-sub acp-icon-trend-up">↑ +3.4% vs prev</span>
+                        <span className="acp-kpi-sub acp-metric-trend-positive">↑ +3.4% Operational</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
                     <div className="acp-kpi-icon blue"><FiDroplet /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Fuel Sold (L)</span>
-                        <span className="acp-kpi-value">{stats.litersSold.toLocaleString()}</span>
-                        <span className="acp-kpi-sub">90-day window</span>
+                        <span className="acp-kpi-value">{stats.litersSold.toLocaleString()} L</span>
+                        <span className="acp-kpi-sub opacity-60">Volumetric Drawdown</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
-                    <div className="acp-kpi-icon green"><FiPercent /></div>
+                    <div className="acp-kpi-icon purple"><FiPercent /></div>
                     <div className="acp-kpi-body">
-                        <span className="acp-kpi-label">Margin</span>
+                        <span className="acp-kpi-label">Margin %</span>
                         <span className="acp-kpi-value">{marginPercent.toFixed(1)}%</span>
-                        <span className="acp-kpi-sub acp-icon-trend-up">↑ +0.8% optimal</span>
+                        <span className="acp-kpi-sub acp-metric-trend-accent">Target: Opti-Max</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
-                    <div className="acp-kpi-icon amber"><FiDollarSign /></div>
-                    <div className="acp-kpi-body">
-                        <span className="acp-kpi-label">Rev / Litre</span>
-                        <span className="acp-kpi-value">Ksh {revenuePerLitre.toFixed(2)}</span>
-                        <span className="acp-kpi-sub">per litre avg.</span>
-                    </div>
-                </div>
-                <div className="acp-kpi-card">
-                    <div className="acp-kpi-icon purple"><FiRefreshCw /></div>
-                    <div className="acp-kpi-body">
-                        <span className="acp-kpi-label">Inv. Turnover</span>
-                        <span className="acp-kpi-value">{inventoryTurnover.toFixed(1)}x</span>
-                        <span className="acp-kpi-sub acp-metric-trend-accent">Target: 4.5x</span>
-                    </div>
-                </div>
-                <div className="acp-kpi-card">
-                    <div className={`acp-kpi-icon ${Math.abs(totalVariancePct) > 0.5 ? 'red' : 'green'}`}><FiShield /></div>
+                    <div className={`acp-kpi-icon ${Math.abs(totalVariancePct) > 0.5 ? 'red' : 'cyan'}`}><FiShield /></div>
                     <div className="acp-kpi-body">
                         <span className="acp-kpi-label">Variance</span>
                         <span className="acp-kpi-value">{totalVariancePct.toFixed(2)}%</span>
-                        <span className="acp-kpi-sub">{Math.abs(totalVariancePct) <= 0.5 ? 'Operational Sync' : 'Drift Detected'}</span>
+                        <span className="acp-kpi-sub">{Math.abs(totalVariancePct) <= 0.5 ? 'Synchronized' : 'Drift Detected'}</span>
                     </div>
                 </div>
             </div>
+
 
             {/* ── Main Grid ────────────────────────────────────── */}
             <div className="acp-grid">
@@ -187,70 +171,8 @@ export const AnalyticsPage: React.FC = () => {
                                 </LazyComponent>
                             </div>
 
-                            {/* Forensic Heatmap Sub-card */}
-                            <div className="acp-hub-card">
-                                <LazyComponent minHeight="400px">
-                                    <ShrinkageHeatmap />
-                                </LazyComponent>
-                            </div>
                         </div>
 
-                        <div className="acp-two-col mt-8 border-t border-slate-100 pt-6">
-                            {/* Revenue Intelligence */}
-                            <div>
-                                <div className="acp-col-label">
-                                    <span className="acp-col-dot acp-dot-revenue"></span>
-                                    Revenue Intelligence
-                                </div>
-                                <div className="acp-metric-list">
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Net Revenue</span>
-                                        <div className="text-right">
-                                            <div className="acp-metric-val">Ksh {stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                                            <span className="acp-metric-badge acp-metric-trend-positive"><FiTrendingUp size={8} /> +3.4%</span>
-                                        </div>
-                                    </div>
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Revenue / Litre</span>
-                                        <span className="acp-metric-val">Ksh {revenuePerLitre.toFixed(2)}</span>
-                                    </div>
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Sales Growth</span>
-                                        <div className="text-right">
-                                            <div className="acp-metric-val">+12.4%</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Inventory Intelligence */}
-                            <div>
-                                <div className="acp-col-label">
-                                    <span className="acp-col-dot acp-dot-inventory"></span>
-                                    Inventory Intelligence
-                                </div>
-                                <div className="acp-metric-list">
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Fuel Sold (L)</span>
-                                        <span className="acp-metric-val">{stats.litersSold.toLocaleString()} L</span>
-                                    </div>
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Inv. Turnover</span>
-                                        <div className="text-right">
-                                            <div className="acp-metric-val">{inventoryTurnover.toFixed(1)}x</div>
-                                            <span className="acp-metric-badge acp-metric-trend-accent">Target: 4.5x</span>
-                                        </div>
-                                    </div>
-                                    <div className="acp-metric-row">
-                                        <span className="acp-metric-name">Margin %</span>
-                                        <div className="text-right">
-                                            <div className="acp-metric-val">{marginPercent.toFixed(1)}%</div>
-                                            <span className="acp-metric-badge acp-metric-trend-positive"><FiTrendingUp size={8} /> +0.8%</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Demand Forecast */}
@@ -272,9 +194,9 @@ export const AnalyticsPage: React.FC = () => {
                                 <div className="flex justify-between items-end">
                                     <span className="acp-tile-val !text-sm">12,450 L</span>
                                     <div className="acp-tile-spark">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                             <AreaChart data={displayData.slice(-7)}>
-                                                <Area type="monotone" dataKey="sales" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.25} strokeWidth={1.5} />
+                                                <Area type="monotone" dataKey="sales" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.25} strokeWidth={1.5} isAnimationActive={false} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -435,47 +357,11 @@ export const AnalyticsPage: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Model Transparency */}
-                    <div className="acp-card">
-                        <div className="acp-card-header">
-                            <div className="acp-card-title">
-                                <div className="acp-section-icon acp-icon-accent-purple"><FiShield /></div>
-                                <h3>Model Transparency</h3>
-                            </div>
-                        </div>
-
-                        <div className="acp-model-rows">
-                            <div className="acp-model-row">
-                                <span className="acp-model-key">Model Version</span>
-                                <span className="acp-model-val">v1.5-Pro (Flash Core)</span>
-                            </div>
-                            <div className="acp-model-row">
-                                <span className="acp-model-key">Last Retrain</span>
-                                <span className="acp-model-val">Mar 01, 00:15</span>
-                            </div>
-                            <div className="acp-model-row">
-                                <span className="acp-model-key">Data Window</span>
-                                <span className="acp-model-val">90 Days Deep</span>
-                            </div>
-                            <div className="acp-model-row">
-                                <span className="acp-model-key">Calibration</span>
-                                <span className="acp-model-val success">Optimal</span>
-                            </div>
-                        </div>
-                        <p className="acp-model-note">
-                            Gemini-driven inference using Bayesian multi-site demand forecasting.
-                        </p>
-                    </div>
 
                 </aside>
             </div>
 
-            {/* Shift Archive: Absolute Bottom Strategy */}
-            <div className="mt-8 mb-12">
-                <LazyComponent minHeight="600px">
-                    <ShiftAnalyticsTable />
-                </LazyComponent>
-            </div>
+
 
         </div>
     );

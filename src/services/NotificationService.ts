@@ -1,6 +1,8 @@
 /**
  * Service to handle browser native notifications
  */
+import { sanitizeIds } from '@/utils/formatUtils';
+
 export class NotificationService {
     private static storageKey = 'iotank_notifications_enabled';
 
@@ -58,10 +60,16 @@ export class NotificationService {
         if (!this.isEnabled()) return;
 
         try {
-            const notification = new Notification(title, {
-                icon: '/favicon.ico', // Default icon
+            const sanitizedTitle = sanitizeIds(title);
+            const sanitizedOptions = {
+                ...options,
+                body: options?.body ? sanitizeIds(options.body) : undefined
+            };
+
+            const notification = new Notification(sanitizedTitle, {
+                icon: '/favicon.ico', 
                 badge: '/favicon.ico',
-                ...options
+                ...sanitizedOptions
             });
 
             notification.onclick = () => {

@@ -33,7 +33,7 @@ const DEFAULT_THRESHOLDS: AlertEngineThresholds = {
     refillDetectionThreshold: 10,
 };
 
-const SCAN_INTERVAL_MS = 60_000; // 60 seconds
+const SCAN_INTERVAL_MS = 10_000; // 10 seconds (High Sensitivity)
 
 function computeRiskIndex(activeAlerts: Alert[]): RiskIndex {
     const fuelAlerts = activeAlerts.filter(a => a.type === 'low-level' || a.type === 'leak' || a.type === 'overfill');
@@ -84,6 +84,13 @@ export function useAlertEngine(
     const [isScanning, setIsScanning] = useState(false);
     const latestReadingsRef = useRef<Record<string, TankReading | null>>({});
     const previousReadingsRef = useRef<Record<string, TankReading | null>>({});
+    const refillSessionsRef = useRef<Record<string, { 
+        isActive: boolean; 
+        startVolume: number; 
+        startTime: number; 
+        stableCount: number;
+        lastInflowVolume: number;
+    }>>({});
     const { status: shiftStatus } = useShiftStatus();
 
     // ── Subscribe to active alerts from Supabase ────────────────────────────
@@ -111,6 +118,7 @@ export function useAlertEngine(
                     timestamp: new Date(row.created_at).getTime(),
                     resolved: row.is_resolved,
                     score: row.alert_data?.score || 0,
+                    metadata: row.metadata || {}
                 } as Alert));
 
                 const sorted = mappedAlerts.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
@@ -145,18 +153,160 @@ export function useAlertEngine(
         setIsScanning(true);
 
         try {
-            const allDrafts = tanks.flatMap(tank =>
-                detectTankAlerts({
+            const allDrafts = tanks.flatMap(tank => {
+                const latestReading = latestReadingsRef.current[tank.id];
+                const previousReading = previousReadingsRef.current[tank.id];
+                
+                // 1. Core Alerts
+                const drafts = detectTankAlerts({
                     tank,
-                    latestReading: latestReadingsRef.current[tank.id] ?? null,
-                    previousReading: previousReadingsRef.current[tank.id] ?? null,
+                    latestReading: latestReading ?? null,
+                    previousReading: previousReading ?? null,
                     isShiftOpen: shiftStatus === 'open',
                     telemetryGapMinutes: thresholds.telemetryGapMinutes,
                     deliveryVarianceThreshold: thresholds.deliveryVarianceThreshold,
                     refillDetectionThreshold: thresholds.refillDetectionThreshold,
                     nightDrawdownSensitivity: thresholds.nightDrawdownSensitivity,
-                })
-            );
+                });
+
+                // 2. STATEFUL REFILL TRACKING
+                if (latestReading && previousReading) {
+                    const currVol = latestReading.volumeCorrected || latestReading.volume || 0;
+                    const prevVol = previousReading.volumeCorrected || previousReading.volume || 0;
+                    const volChange = currVol - prevVol;
+                    
+                    // Threshold normalization (1% of capacity or 20L)
+                    const refillThreshold = tank.capacity ? (tank.capacity * 0.01) : (thresholds.refillDetectionThreshold || 20);
+                    
+                    if (!refillSessionsRef.current[tank.id]) {
+                        refillSessionsRef.current[tank.id] = { isActive: false, startVolume: 0, startTime: 0, stableCount: 0, lastInflowVolume: 0 };
+                    }
+                    
+                    const session = refillSessionsRef.current[tank.id];
+
+                    if (!session.isActive && volChange > refillThreshold) {
+                        // 🟢 START REFILL: Capture current and previous volumes for high-fidelity start point
+                        session.isActive = true;
+                        // V_start is the volume BEFORE the climb started
+                        session.startVolume = prevVol; 
+                        session.startTime = Date.now();
+                        session.stableCount = 0;
+                        session.lastInflowVolume = currVol;
+
+                        const isUnauthorized = shiftStatus !== 'open';
+                        
+                        console.log(`[AlertEngine] REFILL_START on ${tank.name}. Start: ${prevVol}L, Detected Climb: ${volChange}L. Authorized: ${!isUnauthorized}`);
+
+                        window.dispatchEvent(new CustomEvent('system-toast', {
+                            detail: {
+                                title: isUnauthorized ? '🔴 SECURITY: UNAUTHORIZED INFLOW' : 'Refill Protocol: INITIATED',
+                                message: isUnauthorized 
+                                    ? `ALERT: Fuel inflow detected on ${tank.name} while shift is CLOSED. Monitoring unauthorized activity.`
+                                    : `Sensors detected inflow for ${tank.name}. Monitoring volume climb. Pre-refill Volume: ${prevVol.toFixed(0)}L`,
+                                type: isUnauthorized ? 'error' : 'refill',
+                                attribution: 'ATG_SENSE_AUTO'
+                            }
+                        }));
+
+                        // Trigger Modal immediately so user can enter invoice while flowing
+                        pushEvent({
+                            type: isUnauthorized ? 'critical' : 'due',
+                            message: isUnauthorized
+                                ? `SECURITY BREACH: ${tank.name} is receiving product while site is CLOSED!`
+                                : `REFUEL STARTED: ${tank.name} is receiving product.`,
+                            actionLabel: isUnauthorized ? 'INTERCEPT & LOG' : 'Enter Invoice',
+                            metadata: {
+                                tankId: tank.id,
+                                modalType: 'refill_verification',
+                                alertData: {
+                                    tank_id: tank.id,
+                                    metadata: {
+                                        startVolume: prevVol,
+                                        type: isUnauthorized ? 'UNAUTHORIZED_REFILL_IN_PROGRESS' : 'REFILL_IN_PROGRESS'
+                                    }
+                                }
+                            }
+                        });
+                    } else if (session.isActive) {
+                        // Growth detection (1.0L buffer to account for noise)
+                        if (volChange > 1.0) { 
+                            session.stableCount = 0;
+                            session.lastInflowVolume = currVol;
+                            console.log(`[AlertEngine] REFILL_IN_PROGRESS on ${tank.name}. Current: ${currVol}L`);
+                        } else {
+                            // No significant growth detected in this scan
+                            session.stableCount += 1;
+                            console.log(`[AlertEngine] REFILL_STABILIZING on ${tank.name}. Stable for ${session.stableCount} cycle(s).`);
+                        }
+
+                        // 🛑 END REFILL (Stability reached for 1 full reading cycle ~60s)
+                        if (session.stableCount >= 1) {
+                            const endVolume = currVol;
+                            const deliveredVolume = endVolume - session.startVolume;
+                            session.isActive = false;
+
+                            console.log(`[AlertEngine] REFILL_COMPLETE on ${tank.name}. Captured Delta: ${deliveredVolume}L`);
+
+                            const isUnauthorized = shiftStatus !== 'open';
+                            
+                            // Create the permanent alert for reconciliation
+                            const refillAlert = {
+                                station_id: stationId,
+                                tank_id: tank.id,
+                                alert_type: isUnauthorized ? 'unauthorized-refill' : 'refill',
+                                severity: isUnauthorized ? 'critical' : 'info',
+                                title: isUnauthorized 
+                                    ? `🔴 Unauthorized Out-of-Hours Refill: ${tank.name}`
+                                    : `Refill Verification Required: ${tank.name}`,
+                                message: isUnauthorized
+                                    ? `SECURITY VIOLATION: Tank gained ${deliveredVolume.toFixed(1)}L while station was closed. Immeditately reconcile Waybill/Invoice.`
+                                    : `Automatic detection completed. Net Sensory Delivery: ${deliveredVolume.toFixed(1)}L. (Start: ${session.startVolume.toFixed(1)}L -> End: ${endVolume.toFixed(1)}L)`,
+                                alert_data: { score: isUnauthorized ? 98 : 95 },
+                                is_resolved: false,
+                                auth_user_id: 'system',
+                                metadata: {
+                                    type: isUnauthorized ? 'UNAUTHORIZED_REFILL_COMPLETE' : 'REFILL_COMPLETE',
+                                    startVolume: session.startVolume,
+                                    endVolume: endVolume,
+                                    deliveredVolume: deliveredVolume,
+                                    detectedAt: new Date().toISOString()
+                                }
+                            };
+
+                            supabase.from('alerts').insert(refillAlert).then(() => {
+                                // Finalize notification
+                                window.dispatchEvent(new CustomEvent('system-toast', {
+                                    detail: {
+                                        title: isUnauthorized ? '🔴 UNAUTHORIZED REFILL COMPLETED' : 'Refuel Completed',
+                                        message: isUnauthorized
+                                            ? `SECURITY: Volume stabilized on ${tank.name} (+${deliveredVolume.toFixed(0)}L). Shift was CLOSED during inflow.`
+                                            : `Volume stabilized on ${tank.name}. Total sensory delivery: ${deliveredVolume.toFixed(0)}L.`,
+                                        type: isUnauthorized ? 'error' : 'success',
+                                        attribution: 'ATG_SENSE_AUTO'
+                                    }
+                                }));
+
+                                // Trigger Modal again (or refresh it) with end data
+                                pushEvent({
+                                    type: 'critical',
+                                    message: isUnauthorized
+                                        ? `SECURITY ALERT: ${tank.name} gained ${deliveredVolume.toFixed(0)}L while CLOSED.`
+                                        : `REFUEL COMPLETED: ${tank.name} gained ${deliveredVolume.toFixed(0)}L. Immediate reconciliation required.`,
+                                    actionLabel: 'Finalize Forensic Record',
+                                    metadata: {
+                                        tankId: tank.id,
+                                        modalType: 'refill_verification',
+                                        alertData: refillAlert 
+                                    }
+                                });
+                            });
+                        }
+                    }
+                }
+
+                // Filter out 'refill-detected' from drafts as we handle it statefully above
+                return drafts.filter(d => d.type !== 'refill-detected');
+            });
 
             const uniqueDrafts = filterDuplicates(allDrafts, activeAlerts);
 
@@ -171,6 +321,7 @@ export function useAlertEngine(
                     alert_data: { score: draft.score },
                     is_resolved: false,
                     auth_user_id: 'system', // Alert engine acts as system
+                    metadata: draft.metadata || {}
                 }));
 
                 await supabase.from('alerts').insert(dbAlerts);
@@ -181,15 +332,16 @@ export function useAlertEngine(
                     const suspectedType = meta?.type; // 'THEFT_CLOSED', 'LEAK_SUSPICION', 'THEFT_OPEN_PARALLEL'
                     
                     // Push to dynamic TelemetryQueue for ActionQueue visibility
-                    pushEvent({
-                        type: draft.severity === 'critical' ? 'critical' : draft.severity === 'warning' ? 'watch' : 'due',
-                        message: draft.message,
-                        actionLabel: draft.type === 'refill-detected' ? 'Authorize Reconcile' : 'Investigate',
-                        metadata: {
-                            tankId: draft.tankId,
-                            modalType: draft.type === 'refill-detected' ? 'delivery' : null
-                        }
-                    });
+                    if (!suspectedType || (!suspectedType.includes('THEFT') && !suspectedType.includes('LEAK'))) {
+                        pushEvent({
+                            type: draft.severity === 'critical' ? 'critical' : draft.severity === 'warning' ? 'watch' : 'due',
+                            message: draft.message,
+                            actionLabel: 'Investigate',
+                            metadata: {
+                                tankId: draft.tankId
+                            }
+                        });
+                    }
 
                     if (suspectedType && (suspectedType.includes('THEFT') || suspectedType.includes('LEAK'))) {
                         const siteName = draft.rootCauseLink?.label || 'IOTANK SITE';
@@ -201,7 +353,25 @@ export function useAlertEngine(
                             draft.description
                         );
 
-                        // 2. Off-Platform SMTP Tactical Email
+                        // 2. [FORENSIC UPGRADE]: Push specific Intrusion Modal to Telemetry Queue
+                        pushEvent({
+                            type: draft.severity === 'critical' ? 'critical' : 'watch',
+                            message: draft.message,
+                            actionLabel: suspectedType.includes('THEFT') ? 'INTERCEPT NOW' : 'Review Leak',
+                            metadata: {
+                                tankId: draft.tankId,
+                                modalType: 'security_intrusion',
+                                forensicData: {
+                                    type: suspectedType.includes('THEFT') ? 'THEFT' : 'LEAK',
+                                    dropRate: meta.dropRate,
+                                    volumeLost: meta.volumeLost,
+                                    tankName: siteName,
+                                    timestamp: new Date().toISOString()
+                                }
+                            }
+                        });
+
+                        // 3. Off-Platform SMTP Tactical Email
                         EmailDispatchService.sendSecurityAlert({
                             to: 'admin@iotank.com', // In production, this would be the client's admin email
                             type: suspectedType.includes('THEFT') ? 'THEFT' : 'LEAK',

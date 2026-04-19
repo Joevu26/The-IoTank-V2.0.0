@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FiCheckCircle, FiAlertCircle, FiActivity } from 'react-icons/fi';
+import { FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { Tank, FuelTransaction } from '@/types';
 
 interface WetstockReconciliationProps {
@@ -47,75 +47,81 @@ export const WetstockReconciliation: React.FC<WetstockReconciliationProps> = ({ 
     const isHealthy = Math.abs(reconData.variancePct) < 0.5;
 
     return (
-        <div className="acp-card mb-4 !p-4">
-            <div className="acp-card-header border-b border-slate-100 pb-3 mb-3">
-                <div className="acp-card-title !gap-2">
-                    <div className="acp-section-icon !w-7 !h-7 !text-sm wre-icon-container"><FiCheckCircle /></div>
-                    <h3 className="!text-sm">Wetstock Reconciliation (WRe)</h3>
+        <div className="acp-card">
+            <div className="acp-card-header pb-2 mb-3">
+                <div className="acp-card-title">
+                    <div className="acp-section-icon acp-icon-accent-purple"><FiCheckCircle /></div>
+                    <div className="flex flex-col">
+                        <h3>Wetstock Reconciliation (WRe)</h3>
+                        <span className="text-[10px] font-black uppercase tracking-tighter opacity-50">Operational Forensic Ledger</span>
+                    </div>
                 </div>
-                <div className="wre-score-badge !px-2 !py-0.5 !text-[9px]">
-                    Score: {reconData.score.toFixed(1)}%
+                <div className="acp-header-badge !bg-slate-100 !text-slate-600 !border-slate-200" style={{ margin: 0 }}>
+                    SCORE: {reconData.score.toFixed(1)}%
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
-                <div className="bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-0.5">Opening</span>
-                    <span className="text-sm font-black text-slate-800">{reconData.openingStock.toLocaleString()} L</span>
+            {/* ── Mathematical Ledger Section ─────────────────────────── */}
+            <div className="flex flex-col gap-2 p-4 bg-slate-50/50 rounded-xl border border-slate-100 mb-4">
+                <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-500 uppercase tracking-widest">Opening Stock</span>
+                    <span className="font-black text-slate-900">{reconData.openingStock.toLocaleString()} L</span>
                 </div>
-                <div className="bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-0.5">+ Deliveries</span>
-                    <span className="text-sm font-black text-emerald-600">{reconData.deliveries.toLocaleString()} L</span>
+                <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-success uppercase tracking-widest">+ Deliveries</span>
+                    <span className="font-black text-success">{reconData.deliveries.toLocaleString()} L</span>
                 </div>
-                <div className="bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase block mb-0.5">- Dispensed</span>
-                    <span className="text-sm font-black text-rose-600">{reconData.dispensed.toLocaleString()} L</span>
+                <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-danger uppercase tracking-widest">- Dispensed</span>
+                    <span className="font-black text-danger">{reconData.dispensed.toLocaleString()} L</span>
                 </div>
-                <div className="bg-indigo-50/30 p-2 rounded-lg border border-indigo-100/50">
-                    <span className="text-[9px] text-indigo-500 font-bold uppercase block mb-0.5">= Expected</span>
-                    <span className="text-sm font-black text-indigo-700">{reconData.expectedClosing.toLocaleString()} L</span>
+                <div className="h-px bg-slate-200 my-1"></div>
+                <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">= Expected Stock</span>
+                    <span className="font-black text-slate-900">{reconData.expectedClosing.toLocaleString()} L</span>
                 </div>
             </div>
 
-            <div className="wre-summary-panel !p-3 bg-slate-50/30 border border-slate-200/50 rounded-xl relative overflow-hidden">
-                <div className="wre-summary-icon-bg !opacity-5">
-                    <FiActivity size={60} />
-                </div>
-                
-                <div className="flex items-center justify-between mb-3 relative z-10">
-                    <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${isHealthy ? 'border-success/30 bg-success/10 text-success' : 'border-danger/30 bg-danger/10 text-danger'}`}>
-                            {isHealthy ? <FiCheckCircle size={20} /> : <FiAlertCircle size={20} />}
-                        </div>
-                        <div>
-                            <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Variance</div>
-                            <div className="text-lg font-black leading-none">{reconData.variance.toFixed(1)} L <span className="text-[10px] font-bold opacity-60 ml-1">{reconData.variancePct.toFixed(2)}%</span></div>
-                        </div>
+            {/* ── Variance & Impact Section ────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Delta Variance</div>
+                    <div className={`text-xl font-black ${isHealthy ? 'text-success' : 'text-danger'} leading-none`}>
+                        {reconData.variance.toFixed(1)} L 
+                        <span className="text-[10px] opacity-40 ml-2">({reconData.variancePct.toFixed(2)}%)</span>
                     </div>
-                    <div className="text-right">
-                        <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Fin. Impact</div>
-                        <div className="text-lg font-black text-slate-700">
-                            {currency} {reconData.varianceCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </div>
+                    {isHealthy ? (
+                        <FiCheckCircle className="absolute -bottom-2 -right-2 opacity-5 text-success" size={48} />
+                    ) : (
+                        <FiAlertCircle className="absolute -bottom-2 -right-2 opacity-5 text-danger" size={48} />
+                    )}
+                </div>
+                <div className="p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Financial Impact</div>
+                    <div className="text-xl font-black text-slate-900 leading-none">
+                        {currency} {reconData.varianceCost.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                 </div>
+            </div>
 
-                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden flex">
+            {/* ── Drift Legend & Progress ─────────────────────────────── */}
+            <div className="acp-variance-hero !p-0 !bg-transparent !border-none !mb-0 shadow-none">
+                <div className="acp-progress-bar !h-1.5 !mb-2">
                     <div 
-                        className="wre-progress-success h-full" 
-                        style={{ width: '45%' }}
-                    ></div>
-                    <div 
-                        className="wre-progress-danger h-full" 
-                        style={{ width: '1%' }}
+                        className="acp-progress-fill" 
+                        style={{ 
+                            width: `${Math.min(100, Math.max(0, 50 + reconData.variancePct * 10))}%`, 
+                            background: isHealthy ? 'var(--color-success)' : 'var(--color-danger)' 
+                        }}
                     ></div>
                 </div>
-                <div className="flex justify-between mt-1.5 text-[8px] text-slate-500 font-bold uppercase tracking-tighter">
-                    <span>-0.5% Tol</span>
-                    <span>Target: 0.00%</span>
-                    <span>+0.5% Tol</span>
+                <div className="flex justify-between text-[9px] text-slate-400 font-bold uppercase tracking-widest opacity-60">
+                    <span>Negative Drift (-0.5%)</span>
+                    <span className="text-slate-900">Neutral Point (0.00%)</span>
+                    <span>Positive Drift (+0.5%)</span>
                 </div>
             </div>
         </div>
+
     );
 };

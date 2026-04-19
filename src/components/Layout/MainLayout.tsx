@@ -4,8 +4,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
-import { useAlerts } from '@/hooks/useSupabase';
+import { useAlerts, useTanks, useAllLatestReadings } from '@/hooks/useSupabase';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
+import { useAlertEngine } from '@/hooks/useAlertEngine';
 import { AlertBanner } from '../Alerts/AlertBanner';
 import TermsModal from '../Landing/TermsModal';
 import { PhotoNudgeBanner } from './PhotoNudgeBanner';
@@ -18,6 +19,9 @@ import brandMark from '@/assets/iotank-logo-v3.png';
 const TourGuide = lazy(() => import('../Tour/TourGuide').then(module => ({ default: module.TourGuide })));
 
 import './MainLayout.css';
+
+import { RefillVerificationModal } from '../Alerts/RefillVerificationModal';
+import { SecurityIntrusionModal } from '../Alerts/SecurityIntrusionModal';
 
 export const MainLayout: React.FC = () => {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -87,10 +91,60 @@ export const MainLayout: React.FC = () => {
     // Fetch notifications for the floating pop-ups
     const stationId = currentUser?.stationId || '';
     const { alerts } = useAlerts(stationId, false);
+    const { tanks } = useTanks(stationId);
+    
+    const tankIds = React.useMemo(() => tanks.map(t => t.id), [tanks]);
+    const { readings } = useAllLatestReadings(stationId, tankIds);
+
     const unreadAlerts = alerts.filter(a => !a.resolved).slice(0, 1);
+
+    // [FORENSIC GLOBAL TRIGGER]: Automatically pop reconciliation modal for new refill completions
+    const [activeRefillAlert, setActiveRefillAlert] = useState<any>(null);
+    React.useEffect(() => {
+        const latestRefill = alerts.find(a => 
+            (a.type === 'refill' || a.type === 'refill-detected' || a.type === 'unauthorized-refill') && 
+            !a.resolved && 
+            (a.metadata?.type === 'REFILL' || a.metadata?.type === 'UNAUTHORIZED_REFILL' || a.metadata?.type === 'REFILL_COMPLETE' || a.metadata?.type === 'UNAUTHORIZED_REFILL_COMPLETE') &&
+            // Only auto-pop if it happened in the last 5 minutes to avoid stale pops on login
+            (a.metadata?.detectedAt ? (Date.now() - new Date(a.metadata.detectedAt).getTime()) < 300000 : true)
+        );
+        if (latestRefill && (!activeRefillAlert || activeRefillAlert.id !== latestRefill.id)) {
+            setActiveRefillAlert(latestRefill);
+        }
+    }, [alerts, activeRefillAlert]);
+
+    // [SECURITY GLOBAL TRIGGER]: Automatically pop security intrusion modal for THEFT/LEAK
+    const [activeSecurityAlert, setActiveSecurityAlert] = useState<any>(null);
+    React.useEffect(() => {
+        const latestSecurity = alerts.find(a => 
+            (a.type === 'anomaly' || a.type === 'leak' || a.type === 'theft_detected' || a.type === 'leak_detected') && 
+            !a.resolved && 
+            (a.metadata?.type?.includes('THEFT') || a.metadata?.type?.includes('LEAK')) &&
+            // Filter out stale alerts (5 min window)
+            (a.metadata?.detectedAt ? (Date.now() - new Date(a.metadata.detectedAt).getTime()) < 300000 : true)
+        );
+        
+        if (latestSecurity && (!activeSecurityAlert || activeSecurityAlert.id !== latestSecurity.id)) {
+            // We use the first event in the TelemetryQueue if available for forensic data, 
+            // otherwise build from alert metadata
+            setActiveSecurityAlert(latestSecurity);
+        }
+    }, [alerts, activeSecurityAlert]);
 
     // Native Browser Notifications
     useBrowserNotifications(stationId);
+
+    // [SECURITY HEARTBEAT]: Global Alert Detection Engine (Theft/Leak/Refill)
+    const alertEngine = useAlertEngine(stationId);
+
+    // [TELEMETRY PIPELINE]: Feed real-time readings into the engine
+    React.useEffect(() => {
+        if (!readings || Object.keys(readings).length === 0) return;
+        
+        Object.entries(readings).forEach(([tankId, reading]) => {
+            alertEngine.updateReading(tankId, reading as any);
+        });
+    }, [readings, alertEngine]);
 
     const toggleSidebar = () => {
         if (window.innerWidth <= 768) {
@@ -205,6 +259,33 @@ export const MainLayout: React.FC = () => {
                     className="mobile-overlay"
                     onClick={() => setIsMobileMenuOpen(false)}
                     aria-hidden="true"
+                />
+            )}
+
+            {/* Global Refill Reconciliation (Auto-Pop) */}
+            {activeRefillAlert && (
+                <RefillVerificationModal
+                    alert={activeRefillAlert}
+                    stationId={stationId}
+                    onClose={() => setActiveRefillAlert(null)}
+                />
+            )}
+            {/* Global Security Intrusion (Auto-Pop) */}
+            {activeSecurityAlert && (
+                <SecurityIntrusionModal
+                    event={{
+                        message: activeSecurityAlert.message,
+                        metadata: {
+                            forensicData: {
+                                type: activeSecurityAlert.metadata?.type?.includes('THEFT') ? 'THEFT' : 'LEAK',
+                                dropRate: activeSecurityAlert.metadata?.dropRate || 0,
+                                volumeLost: activeSecurityAlert.metadata?.volumeLost,
+                                tankName: activeSecurityAlert.title?.split(': ')[1] || 'Unknown Tank',
+                                timestamp: activeSecurityAlert.metadata?.detectedAt || new Date().toISOString()
+                            }
+                        }
+                    }}
+                    onClose={() => setActiveSecurityAlert(null)}
                 />
             )}
         </div>

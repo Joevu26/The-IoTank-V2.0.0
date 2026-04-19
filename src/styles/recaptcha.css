@@ -2,9 +2,10 @@
 
 /* Google reCAPTCHA v3 Badge Controls - Restored for Official Compliance */
 .grecaptcha-badge {
-    opacity: 1 !important;
-    visibility: visible !important;
-    transform: translateY(0) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(20px) !important;
     /* Use transitions that match the internal expansion speed */
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1), 
                 width 0.3s cubic-bezier(0.16, 1, 0.3, 1), 

@@ -19,13 +19,41 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     const { currentUser } = useAuth();
     const { tanks } = useTanks(currentUser?.stationId || '');
     const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map(t => t.id));
+    const [activeShiftSnapshot, setActiveShiftSnapshot] = useState<any>(null);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [isClosing, setIsClosing] = useState(false);
     const [isHibernating, setIsHibernating] = useState(false);
 
     // Read opening state
+    React.useEffect(() => {
+        if (!isOpen || !currentUser?.stationId) return;
+
+        const fetchActiveShift = async () => {
+            const { data } = await supabase
+                .from('current_station_shifts')
+                .select('*')
+                .eq('station_id', currentUser.stationId)
+                .single();
+            
+            if (data?.metadata?.tank_snapshots) {
+                // Map complex snapshot object back to simple volume map for the calculator
+                const volumeMap: Record<string, number> = {};
+                Object.entries(data.metadata.tank_snapshots).forEach(([id, info]: [string, any]) => {
+                    volumeMap[id] = info.opening_volume;
+                });
+                setActiveShiftSnapshot(volumeMap);
+            }
+        };
+
+        fetchActiveShift();
+    }, [isOpen, currentUser?.stationId]);
+
+    // Legacy fallback (maintained for zero-downtime transition)
     const startVolumesStr = localStorage.getItem('iotank_shift_start_volumes');
-    const startVolumes: Record<string, number> = startVolumesStr ? JSON.parse(startVolumesStr) : {};
+    const legacyVolumes: Record<string, number> = startVolumesStr ? JSON.parse(startVolumesStr) : {};
+    
+    // Primary source is DB snapshot, fallback is legacy LocalStorage
+    const startVolumes = activeShiftSnapshot || legacyVolumes;
     
     const startTimeStr = localStorage.getItem('iotank_shift_start_time');
     const openedByStr = localStorage.getItem('iotank_shift_opened_by');
@@ -146,9 +174,9 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 openedAt: startTimeStr || nowString,
                 closedAt: nowString,
                 durationMin: startTimeStr ? Math.floor((Date.now() - new Date(startTimeStr).getTime()) / 60000) : 0,
-                siteId: tanks[0]?.siteId || '',
+                siteId: tanks[0]?.siteId || null,
                 nodeId: tanks[0]?.sensorId || '',
-                tankId: tanks[0]?.id || '',
+                tankId: tanks[0]?.id || null,
                 pumpReadings,
                 volumeSoldLiters: totalDispensedLiters,
                 expected: { cash: 0, mpesa: 0, pos: 0, total: totalVolumetricSold },
@@ -160,8 +188,10 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 closedBy: { authUserId: currentUser?.authUserId || '', display: currentUser?.displayName || currentUser?.email || '' },
                 closingVolume: (Object.values(readings) as TankReading[]).reduce((sum: number, r: TankReading) => sum + (r.volumeCorrected || r.volume || 0), 0),
                 notes,
-                createdAt: nowString
-            });
+                createdAt: nowString,
+                operation_type: 'CLOSE',
+                action_label: 'Reconciliation Finalized'
+            } as any);
 
             localStorage.removeItem('iotank_shift_start_time');
             localStorage.removeItem('iotank_shift_start_volumes');

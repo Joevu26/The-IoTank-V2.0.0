@@ -69,36 +69,6 @@ export const Dashboard: React.FC = () => {
         }
     }, [tanks.length, tanksLoading, canSee]);
 
-    // --- THEFT DETECTION LOGIC (SIMULATED) ---
-    const prevVolumes = React.useRef<{ [key: string]: number }>({});
-    
-    React.useEffect(() => {
-        if (tanksLoading || tanks.length === 0) return;
-
-        // Use the status from the hook (driven by DB)
-        const currentShiftStatus = shiftStatus?.toLowerCase() || localStorage.getItem('iotank_shift_status') || 'closed';
-        
-        tanks.forEach(tank => {
-            if (!tank || !tank.id) return;
-
-            const currentVol = tank.currentVolume || 0;
-            const lastVol = prevVolumes.current[tank.id];
-
-            // If shift is closed and volume decreases by more than 5L (to avoid noise)
-            if (currentShiftStatus === 'closed' && lastVol !== undefined && currentVol < lastVol - 5.0) {
-                pushEvent({
-                    type: 'system_error',
-                    message: `CRITICAL: Unofficial Fuel Reduction in ${tank.name || 'Unknown Tank'}. Shift is CLOSED. Possible Theft!`,
-                    actionLabel: 'Check Security',
-                    onAction: () => navigate('/history')
-                });
-            }
-            
-            // Update ref for next comparison
-            prevVolumes.current[tank.id] = currentVol;
-        });
-    }, [tanks, tanksLoading, pushEvent, navigate, shiftStatus]);
-
 
     const ghostTank: Tank = {
         id: 'ghost-tank',

@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { FiX, FiShield, FiArrowRight, FiActivity, FiDatabase, FiLock } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
-import { useTanks, useAllLatestReadings } from '@/hooks/useSupabase';
+import { useTanks, useAllLatestReadings, createShift } from '@/hooks/useSupabase';
 import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
@@ -136,14 +136,64 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 alert_data: { type: 'shift_open', user: currentUser.email, time: nowString }
             });
 
-            // 3. Volatile start volumes (kept in localStorage for active session only)
-            const startVolumes: Record<string, number> = {};
+            // 3. Persistent Start Volumes (Cloud Synchronized Snapshot)
+            const startVolumes: Record<string, { opening_volume: number, captured_at: string, is_manual_override: boolean }> = {};
             tanks.forEach(t => {
                 const currentReading = readings[t.id];
                 const liveVolume = currentReading?.volumeCorrected || currentReading?.volume || t.currentVolume || 0;
-                startVolumes[t.id] = liveVolume;
+                startVolumes[t.id] = {
+                    opening_volume: liveVolume,
+                    captured_at: nowString,
+                    is_manual_override: false
+                };
             });
-            localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(startVolumes));
+
+            // Update stateless shift tracker with persistent metadata
+            const { error: snapshotError } = await supabase
+                .from('current_station_shifts')
+                .upsert({
+                    station_id: currentUser.stationId,
+                    status: 'OPEN',
+                    updated_at: nowString,
+                    updated_by: currentUser.authUserId,
+                    metadata: { tank_snapshots: startVolumes }
+                });
+
+            if (snapshotError) throw snapshotError;
+
+            // 3.5 [FORENSIC COMMIT]: Permanent record of shift opening
+            try {
+                await createShift(currentUser.stationId, {
+                    siteId: tanks[0]?.siteId || null,
+                    nodeId: 'CORE-HUB-01', // Local hub identifier
+                    tankId: tanks[0]?.id || null,
+                    openedAt: nowString,
+                    closedAt: nowString, // Temp value for opening record
+                    durationMin: 0,
+                    pumpReadings: {},
+                    volumeSoldLiters: 0,
+                    expected: { cash: 0, mpesa: 0, pos: 0, total: 0 },
+                    received: { cash: 0, mpesa: 0, pos: 0, total: 0, spending: 0 },
+                    variance: { amount: 0, pct: 0 },
+                    status: 'BALANCED',
+                    reviewState: 'OPEN',
+                    openedBy: { authUserId: currentUser.authUserId, display: currentUser.displayName || currentUser.email },
+                    closedBy: { authUserId: currentUser.authUserId, display: currentUser.displayName || currentUser.email },
+                    closingVolume: 0,
+                    notes: `Shift initialized by ${currentUser.displayName || currentUser.email}. Telemetry anchor created.`,
+                    createdAt: nowString,
+                    operation_type: 'OPEN',
+                    action_label: 'Shift Initialized'
+                } as any);
+            } catch (commitErr) {
+                console.error('[ShiftOpen] Forensic commit failed:', commitErr);
+                // Non-blocking but logged
+            }
+
+            // Legacy fallback (maintained for zero-downtime transition)
+            localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(
+                Object.fromEntries(Object.entries(startVolumes).map(([id, data]) => [id, data.opening_volume]))
+            ));
             localStorage.setItem('iotank_shift_status', 'open');
             localStorage.setItem('iotank_shift_start_time', nowString);
             localStorage.setItem('iotank_shift_opened_by', JSON.stringify({ 

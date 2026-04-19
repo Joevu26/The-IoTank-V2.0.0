@@ -12,6 +12,8 @@ import { NotificationService } from '../../services/NotificationService';
 import { Alert, AlertSeverityLabel } from '@/types';
 import { getSeverityClass } from '../../services/AlertScoringEngine';
 import { SkeletonDashboard, SkeletonTable } from '../Common/SkeletonLoader';
+import { resolveAllAlerts } from '@/hooks/useSupabase';
+import { sanitizeIds } from '@/utils/formatUtils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Tab = 'mission' | 'thresholds' | 'preferences';
@@ -112,6 +114,25 @@ const EscalationLadder: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts })
     );
 };
 
+const RiskTrendViz: React.FC = () => {
+    return (
+        <div className="risk-trend-viz">
+            <div className="label-stack">
+                <label>Real-time Pulse</label>
+            </div>
+            <div className="viz-pulse-stack">
+                {[...Array(8)].map((_, i) => (
+                    <div 
+                        key={i} 
+                        className="viz-bar active" 
+                        style={{ animationDelay: `${i * 0.1}s`, height: `${Math.random() * 60 + 40}%` }} 
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const AlertsCenter: React.FC = () => {
     const navigate = useNavigate();
@@ -172,6 +193,29 @@ export const AlertsCenter: React.FC = () => {
             { alertId: id, alertType: alert?.type }
         );
     };
+
+    const [isClearing, setIsClearing] = useState(false);
+
+    const handleResolveAll = async () => {
+        if (!stationId) return;
+        setIsClearing(true);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            await resolveAllAlerts(stationId, currentUser?.authUserId || 'SYSTEM');
+            await AuditService.log(
+                'SYSTEM',
+                'ALERTS_BULK_RESOLVED',
+                stationId,
+                `Operator resolved all active alert vectors.`,
+                'INFO'
+            );
+        } catch (err) {
+            console.error('Error resolving all alerts:', err);
+        } finally {
+            setIsClearing(false);
+        }
+    };
+
     const handleInvestigate = (alert: Alert) => { 
         if (alert.rootCauseLink) {
             const { type, id } = alert.rootCauseLink;
@@ -237,13 +281,25 @@ export const AlertsCenter: React.FC = () => {
                         </button>
                     </nav>
 
-                    <div className="hud-top-actions">
+                        {activeTab === 'mission' && rawActiveAlerts.length > 0 && (
+                            <div className="hud-top-actions">
+                                <RiskTrendViz />
+                                <button 
+                                    className={`tactical-btn-premium danger ${isClearing ? 'loading' : ''}`} 
+                                    onClick={handleResolveAll} 
+                                    disabled={isClearing}
+                                    title="Resolve all active mission vectors"
+                                >
+                                    {isClearing ? <FiActivity className="animate-spin" /> : <FiCheckCircle />}
+                                    {isClearing ? 'Clearing Sensors...' : 'Acknowledge All'}
+                                </button>
+                            </div>
+                        )}
                         {activeTab === 'thresholds' && (
                             <button className="tactical-btn-primary btn-sm" title="Propagate threshold logic to all tanks" aria-label="Propagate Logic">
                                 <FiCheckCircle /> Propagate Logic
                             </button>
                         )}
-                    </div>
                 </header>
 
                 <div className="hud-view-viewport">
@@ -303,13 +359,13 @@ export const AlertsCenter: React.FC = () => {
                                                                 const age = getAlertAge(alert.timestamp);
                                                                 
                                                                 return (
-                                                                    <tr key={alert.id} className={`stream-row ${cssClass} ${label === 'CRITICAL' ? 'premium-glow-critical' : ''}`}>
+                                                                    <tr key={alert.id} className={`stream-row ${cssClass} ${label === 'CRITICAL' ? 'premium-glow-critical' : ''} ${isClearing ? 'stream-row-sweep' : ''}`}>
                                                                         <td>
                                                                             <div className="vector-identity">
                                                                                 <div className="vector-icon-slot">
                                                                                     {label === 'CRITICAL' ? <FiAlertOctagon /> : label === 'HIGH' ? <FiAlertTriangle /> : <FiInfo />}
                                                                                 </div>
-                                                                                <span className="vector-title">{alert.title ?? alert.message}</span>
+                                                                                <span className="vector-title">{sanitizeIds(alert.title ?? alert.message)}</span>
                                                                             </div>
                                                                         </td>
                                                                         <td><span className="signature-pill">{alert.type.replace(/-/g, ' ')}</span></td>

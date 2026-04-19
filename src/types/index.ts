@@ -122,7 +122,7 @@ export interface Alert {
     id: string;
     tankId?: string;
     siteId?: string;
-    type: 'leak' | 'overfill' | 'low-level' | 'high-temperature' | 'sensor-failure' | 'anomaly' | 'refill' | 'refill-detected' | 'connectivity-lost' | 'market-news' | 'regulatory-update' | 'delivery-variance' | 'telemetry-gap' | 'compliance-deadline' | 'composite' | 'info';
+    type: 'leak' | 'theft' | 'theft_detected' | 'leak_detected' | 'overfill' | 'low-level' | 'high-temperature' | 'sensor-failure' | 'anomaly' | 'refill' | 'refill-detected' | 'unauthorized-refill' | 'connectivity-lost' | 'market-news' | 'regulatory-update' | 'delivery-variance' | 'telemetry-gap' | 'compliance-deadline' | 'composite' | 'info';
     severity: 'info' | 'warning' | 'critical';
     severityLabel?: AlertSeverityLabel;  // INFO | WATCH | HIGH | CRITICAL
     score?: number;            // 0-100 calculated severity score
@@ -162,6 +162,10 @@ export interface Alert {
         expectedVolume?: number;
         awaitingVerification?: boolean;
         atgVolume?: number;
+        startVolume?: number;
+        endVolume?: number;
+        detectedAt?: string;
+        type?: string;
         // Escalation ladder
         escalationLevel?: 1 | 2 | 3;  // 1=supervisor, 2=manager, 3=governance
         telemetryGapMinutes?: number;

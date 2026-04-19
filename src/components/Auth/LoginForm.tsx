@@ -383,6 +383,9 @@ export const LoginForm: React.FC = () => {
                     </div>
                     <footer className="login-page-footer">
                         <p className="text-sm text-secondary">© 2026 IoTank. All rights reserved.</p>
+                        <p className="recaptcha-disclosure">
+                            This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy">Privacy Policy</a> and <a href="https://policies.google.com/terms">Terms of Service</a> apply.
+                        </p>
                     </footer>
                 </div>
             </div>

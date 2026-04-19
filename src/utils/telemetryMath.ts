@@ -24,16 +24,17 @@ export const calculateETE = (currentVolume: number, capacity: number, rateLhr: n
     const deadStock = capacity * TELEMETRY_CONSTANTS.DEAD_STOCK_PERCENT;
     const usableVolume = Math.max(0, currentVolume - deadStock);
     
-    if (rateLhr <= 0) return null;
+    // Strictly isolate dispense rates (must be positive)
+    if (rateLhr <= 0.05) return null; 
     return usableVolume / rateLhr;
 };
 
 /**
- * Calculates current dispense rate between two points in time.
+ * Calculates current rate of change (Forensic Raw)
  */
 export const calculateRate = (vStart: number, vEnd: number, hours: number): number => {
     if (hours <= 0) return 0;
-    return Math.max(0, (vStart - vEnd) / hours);
+    return (vStart - vEnd) / hours; // Positive = Dispensing, Negative = Refilling
 };
 
 /**

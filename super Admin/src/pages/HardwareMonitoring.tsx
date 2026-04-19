@@ -7,7 +7,7 @@ import {
     FiUploadCloud, FiDownload, FiAlertTriangle, FiCheckCircle, FiClock,
     FiPlus, FiFilter, FiSearch, FiMoreVertical, FiTerminal,
     FiGitCommit, FiLayers, FiList, FiTrendingUp, FiChevronRight, FiMaximize2,
-    FiShield, FiDatabase, FiCloudLightning, FiCode
+    FiShield, FiDatabase, FiCloudLightning, FiCode, FiCopy
 } from 'react-icons/fi';
 import { BackendTab } from '../components/Hardware/BackendTab';
 import './HardwareMonitoring.css';
@@ -24,30 +24,56 @@ const HardwareMonitoring: React.FC<{ isHubView?: boolean }> = ({ isHubView }) =>
     const [safetyArmed, setSafetyArmed] = useState(false);
     const [commandLoading, setCommandLoading] = useState<string | null>(null);
 
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [statsData, devicesData, firmwareData, campaignsData, tasksData] = await Promise.all([
+                hardwareService.getDeviceStats(),
+                hardwareService.getDevices(),
+                hardwareService.getFirmwareLibrary(),
+                hardwareService.getOTACampaigns(),
+                hardwareService.getDevTasks()
+            ]);
+            setStats(statsData);
+            setDevices(devicesData);
+            setFirmware(firmwareData);
+            setCampaigns(campaignsData);
+            setTasks(tasksData);
+        } catch (error) {
+            console.error('Error fetching hardware data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [statsData, devicesData, firmwareData, campaignsData, tasksData] = await Promise.all([
-                    hardwareService.getDeviceStats(),
-                    hardwareService.getDevices(),
-                    hardwareService.getFirmwareLibrary(),
-                    hardwareService.getOTACampaigns(),
-                    hardwareService.getDevTasks()
-                ]);
-                setStats(statsData);
-                setDevices(devicesData);
-                setFirmware(firmwareData);
-                setCampaigns(campaignsData);
-                setTasks(tasksData);
-            } catch (error) {
-                console.error('Error fetching hardware data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
+
+        // ── REALTIME TELEMETRY SYNC ──────────────────────────────────────────
+        // Subscribe to all changes in the 'devices' table for live dashboard updates
+        const channel = supabase
+            .channel('hardware_live_pulse')
+            .on(
+                'postgres_changes', 
+                { event: '*', schema: 'public', table: 'devices' }, 
+                () => {
+                    console.log('[HardwareRealtime] Synchronizing telemetry...');
+                    // In a high-performance scenario, we'd update specific rows, 
+                    // but for 12-20 nodes, a fresh fetch is ultra-reliable.
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        alert(`ID copied to operational clipboard: ${text}`);
+    };
 
     const handleDeviceClick = (device: Device) => {
         setSelectedDevice(device);
@@ -148,7 +174,15 @@ const HardwareMonitoring: React.FC<{ isHubView?: boolean }> = ({ isHubView }) =>
                                 <tbody>
                                     {devices.slice(0, 5).map(d => (
                                         <tr key={d.id} className="cursor-pointer" onClick={() => handleDeviceClick(d)}>
-                                            <td className="font-mono text-xs font-black text-neon-cyan">#{d.device_id.substring(0, 8)}</td>
+                                            <td className="font-mono text-xs font-black text-neon-cyan">
+                                                <div className="flex items-center gap-2 group/id">
+                                                    <span>#{d.device_id.substring(0, 8)}</span>
+                                                    <FiCopy 
+                                                        className="opacity-0 group-hover/id:opacity-100 cursor-pointer pointer-events-auto" 
+                                                        onClick={(e) => { e.stopPropagation(); copyToClipboard(d.device_id); }}
+                                                    />
+                                                </div>
+                                            </td>
                                             <td className="font-bold text-xs uppercase opacity-80">{d.station_name}</td>
                                             <td className="text-[10px] opacity-40 font-bold italic">{new Date().toLocaleTimeString()}</td>
                                             <td>
@@ -215,7 +249,13 @@ const HardwareMonitoring: React.FC<{ isHubView?: boolean }> = ({ isHubView }) =>
                             <tr key={d.id} className="cursor-pointer" onClick={() => handleDeviceClick(d)}>
                                 <td>
                                     <div className="flex flex-col">
-                                        <span className="font-mono text-xs font-black text-neon-cyan">{d.device_id}</span>
+                                        <div className="flex items-center gap-2 group/regid">
+                                            <span className="font-mono text-xs font-black text-neon-cyan">{d.device_id}</span>
+                                            <FiCopy 
+                                                className="opacity-0 group-hover/regid:opacity-100 cursor-pointer pointer-events-auto" 
+                                                onClick={(e) => { e.stopPropagation(); copyToClipboard(d.device_id); }}
+                                            />
+                                        </div>
                                     </div>
                                 </td>
                                 <td>
@@ -260,8 +300,15 @@ const HardwareMonitoring: React.FC<{ isHubView?: boolean }> = ({ isHubView }) =>
                         <button className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-[var(--glass-border)] bg-[var(--bg-surface)] hover:bg-[var(--color-bg-tertiary)]" onClick={() => setActiveTab('registry')}>Back to Cluster</button>
                         <div>
 
-                             <h2 className="text-3xl font-black lowercase tracking-tighter">node: <span className="text-neon-cyan">{selectedDevice.device_id}</span></h2>
-                             <span className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em]">{selectedDevice.station_name} /// SEGMENT_DELTA_09</span>
+                             <h2 className="text-3xl font-black lowercase tracking-tighter">node: <span className="text-neon-cyan font-mono">{selectedDevice.device_id}</span></h2>
+                             <button 
+                                className="ml-4 p-2 bg-white/5 rounded-lg hover:bg-neon-cyan/20 transition-all text-neon-cyan"
+                                onClick={() => copyToClipboard(selectedDevice.device_id)}
+                                title="Copy Node ID"
+                             >
+                                <FiCopy size={16} />
+                             </button>
+                             <span className="text-[10px] font-bold opacity-30 uppercase tracking-[0.2em] ml-4">{selectedDevice.station_name} /// SEGMENT_DELTA_09</span>
                         </div>
                     </div>
                 </div>

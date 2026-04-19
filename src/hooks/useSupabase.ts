@@ -133,7 +133,8 @@ const mapAlert = (row: any): Alert => ({
     title: row.title || 'Alert',
     timestamp: parseTimestamp(row.timestamp),
     resolved: !!row.is_resolved,
-    detectionMethod: 'deterministic'
+    detectionMethod: 'deterministic',
+    metadata: row.metadata || {}
 });
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -712,14 +713,15 @@ export function useShifts(stationId: string | undefined, tankId?: string) {
 }
 
 /**
- * Create Shift Record
+ * Create Shift Record (Unified Forensic Logging)
  */
-export async function createShift(stationId: string, shiftData: Omit<ShiftDocument, 'id'>) {
+export async function createShift(stationId: string, shiftData: Omit<ShiftDocument, 'id'> & { operation_type?: 'OPEN' | 'CLOSE', action_label?: string }) {
     // Map ShiftDocument to snake_case table columns
     const dbShift = {
         station_id: stationId, 
-        site_id: shiftData.siteId,
-        tank_id: shiftData.tankId,
+        client_id: stationId, // Maintain redundancy for legacy joins
+        site_id: (shiftData.siteId && uuidRegex.test(shiftData.siteId)) ? shiftData.siteId : null,
+        tank_id: (shiftData.tankId && uuidRegex.test(shiftData.tankId)) ? shiftData.tankId : null,
         opened_at: shiftData.openedAt,
         closed_at: shiftData.closedAt,
         duration_min: shiftData.durationMin,
@@ -728,22 +730,21 @@ export async function createShift(stationId: string, shiftData: Omit<ShiftDocume
         expected_collections: shiftData.expected,
         received_collections: {
             ...shiftData.received,
-            // [FORENSIC MAPPING]: Injecting operator identity and terminal volume into collections
-            // until a top-level schema migration is approved.
             opened_by: shiftData.openedBy,
             closing_volume: shiftData.closingVolume
         },
         variance_data: shiftData.variance,
         status: shiftData.status,
         review_state: shiftData.reviewState,
-        closed_by_uid: shiftData.closedBy.authUserId, // Aligned with DB schema column name
-        supervisor_notes: shiftData.notes
+        closed_by_uid: shiftData.closedBy.authUserId || 'SYSTEM_AUTO', 
+        supervisor_notes: shiftData.notes,
+        operation_type: shiftData.operation_type || 'CLOSE',
+        action_label: shiftData.action_label || (shiftData.operation_type === 'OPEN' ? 'Shift Initialized' : 'Reconciliation Finalized')
     };
 
     const { data, error } = await supabase
         .from('shift_closures')
         .insert(dbShift)
-
         .select();
 
     if (error) throw error;
@@ -798,6 +799,24 @@ export async function upsertProfile(profile: Partial<User> & { authUserId: strin
     return data;
 }
 /**
+ * Bulk resolve all alerts for a station
+ */
+export async function resolveAllAlerts(stationId: string, resolvedBy: string = 'SYSTEM') {
+    const { error } = await supabase
+        .from('alerts')
+        .update({
+            is_resolved: true,
+            resolved_at: new Date().toISOString(),
+            resolved_by: resolvedBy
+        })
+        .eq('station_id', stationId)
+        .eq('is_resolved', false);
+
+    if (error) throw error;
+    return true;
+}
+
+/**
  * Resolve Alert
  */
 export async function resolveAlert(alertId: string, resolvedBy: string) {
@@ -814,6 +833,29 @@ export async function resolveAlert(alertId: string, resolvedBy: string) {
     if (error) throw error;
     return data;
 }
+/**
+ * Trigger a new Alert
+ */
+export async function createAlert(alert: Partial<Alert> & { station_id: string }) {
+    const { data, error } = await supabase
+        .from('alerts')
+        .insert({
+            station_id: alert.station_id,
+            tank_id: alert.tankId,
+            alert_type: alert.type || 'anomaly',
+            severity: alert.severity || 'info',
+            message: alert.message || '',
+            title: alert.title || 'System Alert',
+            timestamp: new Date().toISOString(),
+            is_resolved: false,
+            metadata: alert.metadata || {}
+        })
+        .select();
+
+    if (error) throw error;
+    return data;
+}
+
 /**
  * Hook to monitor 'refuelling' state (sudden volume increase)
  * @deprecated Use AlertDetectionEngine refill sensing for centralized forensic logic
@@ -844,4 +886,50 @@ export function useRefuelMonitor(stationId: string, tankId: string) {
     }, [reading]);
 
     return { isRefuelling };
+}
+
+/**
+ * Professional Hook for Active Shift Tracking
+ */
+export function useActiveShift(stationId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    const query = useQuery({
+        queryKey: ['active_shift', stationId],
+        queryFn: async () => {
+            if (!stationId) return null;
+            const { data, error } = await supabase
+                .from('current_station_shifts')
+                .select('*')
+                .eq('station_id', stationId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+            return data || null;
+        },
+        enabled: !!stationId,
+        staleTime: 30 * 1000, 
+    });
+
+    useEffect(() => {
+        if (!stationId) return;
+
+        const channel = supabase
+            .channel(`active-shift:${stationId}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'current_station_shifts',
+                filter: `station_id=eq.${stationId}` 
+            }, () => {
+                queryClient.invalidateQueries({ queryKey: ['active_shift', stationId] });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [stationId, queryClient]);
+
+    return { activeShift: query.data || null, loading: query.isLoading, error: query.error as Error | null };
 }

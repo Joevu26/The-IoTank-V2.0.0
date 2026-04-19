@@ -161,17 +161,32 @@ export function calculateRollingAverage(
 export function getFuelStatus(
     fuelLevel: number
 ): { label: string; className: string; severity: 'ok' | 'warning' | 'critical' } {
+    // 1. CRITICAL OVERFILL (Calibrated with Alert Engine)
     if (fuelLevel >= 98) {
         return { label: 'CRITICAL OVERFILL', className: 'status-overfill', severity: 'critical' };
-    } else if (fuelLevel >= 95) {
+    } 
+    // 2. OPERATOR WARNING (HIGH)
+    else if (fuelLevel >= 95) {
         return { label: 'OPERATOR WARNING', className: 'status-high', severity: 'warning' };
-    } else if (fuelLevel >= 50) {
-        return { label: 'MID-POINT CHECK', className: 'status-nominal', severity: 'ok' };
-    } else if (fuelLevel <= 5) {
-        return { label: 'EMERGENCY STOP', className: 'status-critical', severity: 'critical' };
-    } else if (fuelLevel <= 20) {
-        return { label: 'REORDER', className: 'status-low', severity: 'warning' };
+    } 
+    // 3. OPTIMAL / HIGH (High volume operational state)
+    else if (fuelLevel >= 75) {
+        return { label: 'OPTIMAL / HIGH', className: 'status-nominal', severity: 'ok' };
     }
+    // 4. PRECISE MID-POINT CHECK (Calibrated with Alert Engine +/- 2.5%)
+    else if (fuelLevel >= 47.5 && fuelLevel <= 52.5) {
+        return { label: 'MID-POINT CHECK', className: 'status-nominal', severity: 'ok' };
+    } 
+    // 5. EMERGENCY STOP (Calibrated with Dead Stock protection)
+    else if (fuelLevel <= 5) {
+        return { label: 'EMERGENCY STOP', className: 'status-critical', severity: 'critical' };
+    } 
+    // 6. REORDER POINT (Standard Procurement Trigger)
+    else if (fuelLevel <= 20) {
+        return { label: 'REORDER POINT', className: 'status-low', severity: 'warning' };
+    }
+
+    // Default Fallback
     return { label: 'OK / NOMINAL', className: 'status-nominal', severity: 'ok' };
 }
 

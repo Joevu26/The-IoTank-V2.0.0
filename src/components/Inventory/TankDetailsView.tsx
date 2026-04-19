@@ -11,7 +11,6 @@ import { exportToCSV } from '@/utils/exportUtils';
 import { SensorHealthSection } from './SensorHealthSection';
 import { PredictivePanel } from '../Analytics/PredictivePanel';
 import { WetstockReconciliation } from '../Analytics/WetstockReconciliation';
-import { ShrinkageHeatmap } from '../Analytics/ShrinkageHeatmap';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { useModals } from '@/contexts/ModalContext';
 import { Toast } from '../Common/Toast';
@@ -350,7 +349,6 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                             currency="Ksh" 
                                         />
                                         <div className="h-px bg-slate-100 my-8" />
-                                        <ShrinkageHeatmap />
                                     </div>
                                 )}
                             </div>

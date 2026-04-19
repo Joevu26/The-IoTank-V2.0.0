@@ -46,6 +46,8 @@ export const TeamManagementFactory = () => import('@/components/Users/TeamManage
 const TeamManagement = lazy(TeamManagementFactory);
 export const DeliveriesPageFactory = () => import('@/components/Deliveries/DeliveriesPage').then(module => ({ default: module.DeliveriesPage }));
 const DeliveriesPage = lazy(DeliveriesPageFactory);
+export const ShiftManagementPageFactory = () => import('@/components/Shifts/ShiftManagementPage').then(module => ({ default: module.ShiftManagementPage }));
+const ShiftManagementPage = lazy(ShiftManagementPageFactory);
 const InadequateClearancePage = lazy(() => import('@/components/Auth/InadequateClearancePage').then(module => ({ default: module.InadequateClearancePage })));
 
 
@@ -100,6 +102,7 @@ function App() {
                                         <Route path="analytics" element={<Suspense fallback={<PublicLoader />}><AnalyticsPage /></Suspense>} />
                                         <Route path="reporting" element={<Suspense fallback={<PublicLoader />}><ReportingPage /></Suspense>} />
                                         <Route path="deliveries" element={<Suspense fallback={<PublicLoader />}><DeliveriesPage /></Suspense>} />
+                                        <Route path="shifts" element={<Suspense fallback={<PublicLoader />}><ShiftManagementPage /></Suspense>} />
                                         <Route path="inventory/transactions" element={<Suspense fallback={<PublicLoader />}><DeliveriesPage /></Suspense>} />
                                         <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                         <Route path="event-log" element={<Suspense fallback={<PublicLoader />}><EventLogPage /></Suspense>} />

@@ -20,9 +20,12 @@
     background: rgba(255, 255, 255, 0.95);
     width: 100%;
     max-width: 480px;
+    max-height: 90vh;
     border-radius: 20px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     animation: rv-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
@@ -84,6 +87,25 @@
 /* ── Form Body ──────────────────────────────────────────────── */
 .rv-body {
     padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.rv-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rv-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.rv-body::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.rv-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
 }
 
 /* ── ATG Highlight Card ─────────────────────────────────────── */
@@ -200,63 +222,82 @@
     padding-right: 0.5rem;
 }
 
-/* ── Actions ────────────────────────────────────────────────── */
-.rv-actions {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.rv-btn-cancel {
-    flex: 1;
-    padding: 0.85rem;
-    border-radius: 12px;
-    border: 1.5px solid var(--color-border);
-    background: transparent;
-    font-weight: 700;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.rv-btn-cancel:hover {
-    background: var(--color-bg-hover);
-    color: var(--color-text-primary);
-}
-
-.rv-btn-submit {
-    flex: 2;
-    padding: 0.85rem;
-    border-radius: 12px;
-    border: none;
-    background: var(--color-accent-primary);
-    color: #fff;
-    font-weight: 800;
-    cursor: pointer;
+/* ── Dividers ───────────────────────────────────────────────── */
+.section-divider {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    box-shadow: 0 10px 15px -3px rgba(0, 212, 255, 0.3);
+    gap: 1rem;
+    margin: 1.5rem 0 0.5rem 0;
 }
 
-.rv-btn-submit:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 25px -5px rgba(0, 212, 255, 0.4);
-    background: var(--color-accent-primary-hover, #00c4f8);
+.section-divider span {
+    font-size: 0.6rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-disabled);
+    white-space: nowrap;
 }
 
-.rv-btn-submit:active {
-    transform: translateY(0);
+.section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
 }
 
-.rv-btn-submit:disabled {
+/* ── Variance Indicator ─────────────────────────────────────── */
+.variance-indicator {
+    padding: 1rem;
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: all 0.3s ease;
+}
+
+.variance-indicator.safe {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+}
+
+.variance-indicator.danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+}
+
+.variance-indicator svg {
+    flex-shrink: 0;
+}
+
+/* ── Forensic ATG Points ────────────────────────────────────── */
+.rv-atg-forensics {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: right;
+}
+
+.forensic-point {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.forensic-point span {
+    font-size: 0.6rem;
+    font-weight: 800;
     opacity: 0.6;
-    cursor: not-allowed;
 }
 
-/* ── Spinner ────────────────────────────────────────────────── */
+.forensic-point strong {
+    font-size: 0.75rem;
+    font-weight: 900;
+}
+
 .rv-spinner {
     width: 20px;
     height: 20px;

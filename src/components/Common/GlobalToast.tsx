@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FiBell, FiX, FiCheckCircle, FiAlertCircle, FiInfo } from 'react-icons/fi';
+import { FiBell, FiX, FiCheckCircle, FiAlertCircle, FiInfo, FiTruck, FiActivity } from 'react-icons/fi';
 import './GlobalToast.css';
 
 interface ToastData {
     title: string;
     message: string;
-    type: 'success' | 'error' | 'info' | 'market';
+    type: 'success' | 'error' | 'info' | 'market' | 'refill';
     attribution?: string;
 }
 
@@ -39,7 +39,7 @@ export const GlobalToast: React.FC = () => {
             if (timer) clearTimeout(timer);
             if (progressInterval) clearInterval(progressInterval);
 
-            const duration = 6000;
+            const duration = customEvent.detail?.type === 'refill' ? 8000 : 5000;
             const step = 100;
             
             progressInterval = setInterval(() => {
@@ -70,6 +70,7 @@ export const GlobalToast: React.FC = () => {
             case 'success': return <FiCheckCircle size={18} />;
             case 'error': return <FiAlertCircle size={18} />;
             case 'market': return <FiBell size={18} />;
+            case 'refill': return <FiTruck size={18} />;
             default: return <FiInfo size={18} />;
         }
     };
@@ -79,6 +80,7 @@ export const GlobalToast: React.FC = () => {
             case 'success': return 'OPERATIONAL_SUCCESS';
             case 'error': return 'SYSTEM_EXCEPTION';
             case 'market': return 'MARKET_SIGNAL';
+            case 'refill': return 'HARDWARE_TELEMETRY';
             default: return 'SYSTEM_ADVISORY';
         }
     };

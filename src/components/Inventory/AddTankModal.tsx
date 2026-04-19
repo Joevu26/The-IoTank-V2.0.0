@@ -113,6 +113,36 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
                 { tankId: newTank.id, siteId: formData.siteId }
             );
 
+            // 🟠 REAL-TIME SHIFT SYNC: Forensic Snapshot Injection
+            // If a shift is currently open, we must capture this new tank's starting volume immediately
+            const { data: currentShift } = await supabase
+                .from('current_station_shifts')
+                .select('*')
+                .eq('station_id', stationId)
+                .single();
+
+            if (currentShift && currentShift.status === 'OPEN') {
+                const snapshots = currentShift.metadata?.tank_snapshots || {};
+                const nowString = new Date().toISOString();
+                
+                snapshots[newTank.id] = {
+                    opening_volume: newTank.currentVolume || 0,
+                    captured_at: nowString,
+                    is_manual_override: false,
+                    injection_type: 'hot_provision'
+                };
+
+                await supabase
+                    .from('current_station_shifts')
+                    .update({ metadata: { ...currentShift.metadata, tank_snapshots: snapshots } })
+                    .eq('station_id', stationId);
+
+                // Update legacy fallback
+                const legacySnapshots = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
+                legacySnapshots[newTank.id] = newTank.currentVolume || 0;
+                localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(legacySnapshots));
+            }
+
             onClose();
         } catch (err: any) {
             setError(err.message || 'Failed to create tank');

@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { dashboardService } from '../services/dashboardService';
 import { hardwareService, Device } from '../services/hardwareService';
+import { supabase } from '../config/supabase';
 import type { DashboardStats } from '../services/dashboardService';
 import TacticalMap from './TacticalMap';
 import './Dashboard.css';
@@ -24,22 +25,49 @@ const Dashboard = () => {
     const [devices, setDevices] = useState<Device[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const fetchData = async () => {
+        try {
+            const [statsData, devicesData] = await Promise.all([
+                dashboardService.getPlatformStats(),
+                hardwareService.getDevices()
+            ]);
+            setStats(statsData);
+            setDevices(devicesData);
+        } catch (err) {
+            console.error("Dashboard Sync Error:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [statsData, devicesData] = await Promise.all([
-                    dashboardService.getPlatformStats(),
-                    hardwareService.getDevices()
-                ]);
-                setStats(statsData);
-                setDevices(devicesData);
-            } catch (err) {
-                console.error("Dashboard Sync Error:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
+
+        // ── REALTIME PLATFORM SYNC ──────────────────────────────────────────
+        // Subscribe to critical table changes for immediate dashboard refresh
+        const channel = supabase
+            .channel('dashboard_realtime_sync')
+            .on(
+                'postgres_changes', 
+                { event: '*', schema: 'public', table: 'devices' }, 
+                () => {
+                    console.log('[DashboardRealtime] Hardware update detected. Refreshing stats...');
+                    fetchData();
+                }
+            )
+            .on(
+                'postgres_changes', 
+                { event: '*', schema: 'public', table: 'tanks' }, 
+                () => {
+                    console.log('[DashboardRealtime] Inventory change detected. Refreshing stats...');
+                    fetchData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
 

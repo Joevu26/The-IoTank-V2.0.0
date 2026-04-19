@@ -19,6 +19,7 @@ import {
 import './Navbar.css';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useModals } from '@/contexts/ModalContext';
+import { sanitizeIds } from '@/utils/formatUtils';
 
 import { DeliveryModal } from '../QuickActions/DeliveryModal';
 import { ShiftCloseModal } from '../QuickActions/ShiftCloseModal';
@@ -223,13 +224,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
                     const cat = payload.new.event_category || 'SYSTEM';
                     const isCritical = payload.new.severity === 'CRITICAL';
+                    const description = payload.new.description || '';
+
+                    // [FILTER]: Ignore routine forensic updates on tanks to prevent UI spam during refills
+                    if (cat === 'SYSTEM' && description.includes('Forensic audit: UPDATE detected on tanks')) {
+                        return;
+                    }
+
                     setToast({
-                        message: payload.new.description || 'New audit event recorded.',
+                        message: sanitizeIds(description) || 'New audit event recorded.',
                         type: isCritical ? 'error' : cat === 'SECURITY' ? 'warning' : 'success',
                     });
 
                     if (NotificationService.isEnabled()) {
-                        NotificationService.show(payload.new.description || 'System Audit Event', {
+                        NotificationService.show(sanitizeIds(description) || 'System Audit Event', {
                             body: `Category: ${payload.new.event_category}`,
                             tag: `audit-${payload.new.id}`
                         });
@@ -473,7 +481,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                     <>
                                         {/* Security Alerts Section */}
                                         {unreadAlerts.length > 0 && (
-                                            <div className="section-label px-4 py-2 text-[10px] font-black text-rose-500 uppercase tracking-widest border-b border-slate-100 bg-rose-50/30 sticky top-0 z-10">
+                                            <div className="section-label-tactical">
                                                 Active Risk Vectors
                                             </div>
                                         )}
@@ -497,7 +505,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                         </div>
                                                         <div className="notification-body">
                                                             <span className="font-black text-[13px] leading-tight block mb-1">
-                                                                {alert.message.split('.')[0]}
+                                                                {sanitizeIds(alert.message.split('.')[0])}
                                                             </span>
                                                             <div className="notification-meta flex justify-between items-center opacity-70">
                                                                 <span className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-tighter">
@@ -521,7 +529,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                         })}
 
                                         {/* Forensic Audit Section */}
-                                        <div className="px-4 py-2 text-[11px] font-bold text-[#1e1b4b] uppercase tracking-wider border-b border-t border-slate-100 bg-[#f8fafc] sticky top-0 z-10">
+                                        <div className="section-label-tactical">
                                             Forensic Action Logs
                                         </div>
                                         {unifiedEvents.slice(0, 15).map((event: any) => {
@@ -550,7 +558,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                                 </span>
                                                             </div>
                                                             <p className="text-[12px] text-[#1e1b4b] font-medium leading-tight">
-                                                                {event.description}
+                                                                {sanitizeIds(event.description)}
                                                             </p>
                                                         </div>
                                                         <button
@@ -583,7 +591,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                     }}
                                     className="btn-open-alerts"
                                 >
-                                    Open Alert Center
+                                    <FiActivity /> Open Command Center
                                 </button>
                             </div>
                         </div>

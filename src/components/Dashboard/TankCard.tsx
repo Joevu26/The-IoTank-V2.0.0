@@ -63,7 +63,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                 'SYSTEM', 
                 'DEVICE_COMMAND', 
                 stationId, 
-                `Manual telemetry handshake established: ${tank.name} [ID: ${tank.id}] synchronized with cloud logic.`,
+                `Manual telemetry handshake established: ${tank.name} synchronized with cloud logic.`,
                 'INFO',
                 { tankId: tank.id, tankName: tank.name }
             ).catch(() => {});

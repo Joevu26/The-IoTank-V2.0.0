@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     FiDownload,
     FiTarget,
@@ -29,8 +29,10 @@ import {
     MdSyncProblem,
     MdSecurity,
     MdSettingsSuggest,
+    MdDoneAll,
 } from 'react-icons/md';
 import { format } from 'date-fns';
+import { sanitizeIds } from '@/utils/formatUtils';
 
 import {
     useEventLog,
@@ -115,7 +117,18 @@ export const EventLogPage: React.FC = () => {
         categoryCounts,
         tanks,
         exportCSV,
+        acknowledgeAll,
     } = useEventLog(stationId);
+
+    const [isClearing, setIsClearing] = useState(false);
+
+    const handleAcknowledgeAll = async () => {
+        setIsClearing(true);
+        // Wait for animation sweep
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await acknowledgeAll();
+        setIsClearing(false);
+    };
 
     const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
     const endIdx = Math.min(currentPage * PAGE_SIZE, total);
@@ -169,6 +182,15 @@ export const EventLogPage: React.FC = () => {
                             <MdOutlineEventNote size={13} />
                             {total.toLocaleString()} events
                         </span>
+                        <button 
+                            className={`btn-tactical ${isClearing ? 'loading' : ''}`} 
+                            onClick={handleAcknowledgeAll} 
+                            disabled={isClearing || total === 0}
+                            title="Clear all unread forensic entries"
+                        >
+                            {isClearing ? <FiActivity className="animate-spin" /> : <MdDoneAll size={16} />}
+                            {isClearing ? 'Acknowledging...' : 'Mark All Read'}
+                        </button>
                         <button className="el-btn-export" onClick={exportCSV}>
                             <FiDownload size={14} />
                             Export CSV
@@ -302,7 +324,7 @@ export const EventLogPage: React.FC = () => {
                                 </tr>
                             ) : (
                                 events.map((ev) => (
-                                    <tr key={ev.id}>
+                                    <tr key={ev.id} className={isClearing ? 'neural-sweep-exit' : ''}>
                                         <td className="el-td-ts">
                                             <div className="ts-date">{format(ev.timestamp, 'dd MMM')}</div>
                                             <div className="ts-time">{format(ev.timestamp, 'HH:mm:ss')}</div>
@@ -312,7 +334,7 @@ export const EventLogPage: React.FC = () => {
                                                 <div className="type-icon">
                                                     <EventTypeIcon type={ev.type} />
                                                 </div>
-                                                <span className="type-label">{ev.title}</span>
+                                                <span className="type-label">{sanitizeIds(ev.title)}</span>
                                             </div>
                                         </td>
                                         <td className="el-td-actor">
@@ -325,7 +347,7 @@ export const EventLogPage: React.FC = () => {
                                             <SeverityBadge severity={ev.severity} />
                                         </td>
                                         <td className="el-td-details">
-                                            {ev.description}
+                                            {sanitizeIds(ev.description)}
                                         </td>
                                     </tr>
                                 ))

@@ -1,8 +1,8 @@
 /**
  * ============================================================
- *  Tank   : Petrol Storage 1 | 2000L capacity
- *  Org ID : 70508c07-0bfc-4f9c-b47b-4d2572c7aca2
- *  Tank ID: 998bbb8d-6a0b-44e6-b2b7-f5bde17a3f63
+ *  Tank   : Petrol Storage 1 | 4000L capacity
+ *  Org ID : Managed via DB (Station ID updated by user)
+ *  Tank ID: Managed via DB (Tank ID updated by user)
  * ============================================================
  */
 
@@ -22,45 +22,42 @@ const char* SUPABASE_URL              = "https://suifvborodwergtrbjez.supabase.c
 const char* SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWZ2Ym9yb2R3ZXJndHJiamV6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Mzc2MDc0MCwiZXhwIjoyMDg5MzM2NzQwfQ.96AE-5FQpBvOKKjfNmbqWX05x3ND6ifyO4ITP0c-Gvc";
 
 // ─── ID Configuration ───────────────────────────────────────
+// These will be updated by the user from the Super Admin Portal
 const char* STATION_ID = "9a594b8e-15b2-48a8-b17d-7ef7fa5e9b8a"; 
 const char* TANK_ID    = "18f70714-35d6-45cd-8019-00c9cff35d65";
 
-/**
- * [SECURITY NOTE]
- * For production, never embed the SUPABASE_SERVICE_ROLE_KEY.
- * Instead, use the IoTank Secure Token workflow:
- * 1. Call Edge Function /issue-device-token (requires Admin auth)
- * 2. Store the returned 'token' (JWT) in ESP32 Flash/EEPROM
- * 3. Use that token in the 'Authorization: Bearer <TOKEN>' header
- */
+// Hardware JWT placeholder
 const char* SECURE_DEVICE_TOKEN = "PASTE_YOUR_HARDWARE_JWT_HERE"; 
 
 // ─── Tank Configuration ──────────────────────────────────────
-#define TANK_CAPACITY       2000.0f
-#define TANK_START_MIN      50.0f
-#define TANK_START_MAX      500.0f
-#define LOW_FUEL_THRESHOLD  100.0f
+#define TANK_CAPACITY       4000.0f
+#define TANK_START_MIN      400.0f    // 10% (Triggers low fuel warning)
+#define TANK_START_MAX      1200.0f   // 30%
+#define LOW_FUEL_THRESHOLD  800.0f    // 20% (Standard reorder point)
+#define CRITICAL_THRESHOLD  200.0f    // 5% (Dead stock breach)
 
 // ─── Pump / Dispense Configuration ──────────────────────────
-#define DISPENSE_RATE_LPS    0.8333f   // 50 L/min
-#define DB_WRITE_INTERVAL_MS 6000      // Log every 5L (6s)
+#define DISPENSE_RATE_LPS    1.0f      // 60 L/min
+#define DB_WRITE_INTERVAL_MS 5000      // Log every 5L (5s) for "Live" feel
 #define DB_WRITE_CHUNK       5.0f
 
 // ─── Refill Configuration ────────────────────────────────────
-#define REFILL_RATE_LPS     2.5f       // 150 L/min
-#define REFILL_INTERVAL_MS  4000       // Log every 10L (4s)
+#define REFILL_RATE_LPS     5.0f       // 300 L/min
+#define REFILL_INTERVAL_MS  2000       // Log every 10L (2s)
 #define REFILL_CHUNK        10.0f
 
 // ─── Temperature Simulation ──────────────────────────────────
 #define TEMP_BASE_MIN       22.0f
 #define TEMP_BASE_MAX       34.0f
 #define TEMP_NOISE          0.4f
+#define TEMP_CRITICAL       60.0f      // Alert Threshold
 
 // ─── State ───────────────────────────────────────────────────
 float tankLevel      = 0.0f;
 float totalDispensed = 0.0f;
 int   dispenseCount  = 0;
 float currentTemp    = 28.0f;
+int   currentRSSI    = -65;
 unsigned long elapsedSec = 0;
 
 // ─── Vehicle Types ──────────────────────────────────────────
@@ -74,59 +71,48 @@ struct VehicleType {
 const VehicleType VEHICLES[] = {
   { "Motorbike",       5,  15, 0.30f },
   { "Car",            20,  45, 0.55f },
-  { "Transit/Matatu", 45,  60, 0.15f }
+  { "Transit/Matatu", 45,  100, 0.15f } // Increased for 4000L tank context
 };
 const int VEHICLE_COUNT = 3;
 
 // ─── Supabase Push Function ─────────────────────────────────
-void pushToSupabase(float vol, float temp) {
+void pushToSupabase(float vol, float temp, int rssi) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println(F("  ⚠ WiFi disconnected. Skipping push."));
     return;
   }
 
   WiFiClientSecure client;
-  client.setInsecure(); // No certificate validation for simulation purposes
+  client.setInsecure(); 
 
   HTTPClient http;
   http.begin(client, SUPABASE_URL);
   
-  // Headers
   http.addHeader("Content-Type", "application/json");
 
-  // Determine which key to use (Use Device Token if available, otherwise fallback to Service Role for testing)
   String activeToken = String(SECURE_DEVICE_TOKEN);
   if (activeToken == "PASTE_YOUR_HARDWARE_JWT_HERE" || activeToken.length() < 10) {
     activeToken = String(SUPABASE_SERVICE_ROLE_KEY);
   }
 
-  // Supabase's API Gateway (Kong) requires the 'apikey' header for ALL requests.
   http.addHeader("apikey", activeToken);
   String authHeader = "Bearer " + activeToken;
   http.addHeader("Authorization", authHeader);
   http.addHeader("Prefer", "return=minimal");
 
-  // Payload (JSON)
-  // Matching sensor_readings table exactly
-  float fillPct = (vol / TANK_CAPACITY) * 100.0f;
-  String jsonPayload = "{\"station_id\": \"" + String(STATION_ID) + "\", \"tank_id\": \"" + String(TANK_ID) + "\", \"volume\": " + String(vol, 2) + ", \"temperature\": " + String(temp, 2) + ", \"rssi\": " + String(WiFi.RSSI()) + "}";
+  // Payload matches the simplified sensor_readings schema (volume, temperature, rssi)
+  String jsonPayload = "{\"station_id\": \"" + String(STATION_ID) + 
+                       "\", \"tank_id\": \"" + String(TANK_ID) + 
+                       "\", \"volume\": " + String(vol, 2) + 
+                       ", \"temperature\": " + String(temp, 2) + 
+                       ", \"rssi\": " + String(rssi) + "}";
 
   int httpResponseCode = http.POST(jsonPayload);
 
   if (httpResponseCode >= 200 && httpResponseCode <= 299) {
-    Serial.printf("  [Supabase] Success (HTTP %d)\n", httpResponseCode);
-  } else if (httpResponseCode == 409) {
-    Serial.printf("  [Supabase] Warning: Conflict/Duplicate (HTTP 409)\n");
-    String responseBody = http.getString();
-    Serial.print("  [Supabase] Debug: ");
-    Serial.println(responseBody);
-  } else if (httpResponseCode > 0) {
-    Serial.printf("  [Supabase] Error: (HTTP %d)\n", httpResponseCode);
-    String responseBody = http.getString();
-    Serial.print("  [Supabase] Detail: ");
-    Serial.println(responseBody);
+    Serial.printf("  [Supabase] Push Success: %.1fL | %.1fC | %ddBm\n", vol, temp, rssi);
   } else {
-    Serial.printf("  [Supabase] ERROR: %s\n", http.errorToString(httpResponseCode).c_str());
+    Serial.printf("  [Supabase] Error: (HTTP %d) %s\n", httpResponseCode, http.getString().c_str());
   }
   
   http.end();
@@ -154,14 +140,44 @@ const VehicleType& pickVehicle() {
   return VEHICLES[VEHICLE_COUNT - 1];
 }
 
+// ─── Anomaly Engine ─────────────────────────────────────────
+
+void simulateTheft() {
+  Serial.println(F("\n🚨 ANOMALY: Rapid Drawdown (Theft Simulation)"));
+  float theftVol = randFloat(30, 80);
+  int steps = 5;
+  float chunk = theftVol / steps;
+  
+  for(int i=0; i<steps; i++) {
+    tankLevel -= chunk;
+    if (tankLevel < 0) tankLevel = 0;
+    pushToSupabase(tankLevel, currentTemp, currentRSSI);
+    delay(2000); // Very fast drop to trigger theft logic
+  }
+}
+
+void simulateHeatwave() {
+  Serial.println(F("\n🔥 ANOMALY: Temperature Spike (Safety Alert)"));
+  float spikeTemp = randFloat(62.0, 75.0);
+  pushToSupabase(tankLevel, spikeTemp, currentRSSI);
+  delay(5000);
+}
+
+void simulateConnectivityDrop() {
+  Serial.println(F("\n📡 ANOMALY: Signal Degradation (Weak RSSI)"));
+  int weakRSSI = random(-95, -88);
+  pushToSupabase(tankLevel, currentTemp, weakRSSI);
+  delay(5000);
+}
+
 // ─── Main Simulation Logic ──────────────────────────────────
 void simulateDispense() {
   const VehicleType& v = pickVehicle();
   int volume = (random(v.minLitres / 5, (v.maxLitres / 5) + 1)) * 5;
 
-  if ((float)volume > tankLevel - 20.0f) {
-    volume = (int)((tankLevel - 20.0f) / 5.0f) * 5;
-    if (volume <= 0) return;
+  if (tankLevel - volume < 50.0f) {
+    Serial.println(F("  ⚠ Buffer reached. Skipping dispense."));
+    return;
   }
 
   Serial.printf("\n🚗 DISPENSE START | %s | %dL\n", v.name, volume);
@@ -169,34 +185,31 @@ void simulateDispense() {
   int chunks = volume / (int)DB_WRITE_CHUNK;
   for (int c = 1; c <= chunks; c++) {
     delay(DB_WRITE_INTERVAL_MS);
-    elapsedSec += 6;
+    elapsedSec += 5;
     tankLevel -= DB_WRITE_CHUNK;
     currentTemp = simulateTemp(elapsedSec);
     
-    Serial.printf("   Progress: %d/%dL | Tank: %.1fL | RSSI: %d\n", 
-                  c * 5, volume, tankLevel, WiFi.RSSI());
-    
-    pushToSupabase(tankLevel, currentTemp);
+    Serial.printf("   Progress: %d/%dL | Tank: %.1fL\n", c * 5, volume, tankLevel);
+    pushToSupabase(tankLevel, currentTemp, currentRSSI);
   }
   dispenseCount++;
 }
 
 void simulateRefill() {
   float needed = TANK_CAPACITY - tankLevel;
-  int chunks = (int)(needed / REFILL_CHUNK);
-  
+  if (needed < 100) return;
+
   Serial.printf("\n⛽ REFILL START | Adding %.0fL\n", needed);
 
+  int chunks = (int)(needed / REFILL_CHUNK);
   for (int c = 1; c <= chunks; c++) {
     delay(REFILL_INTERVAL_MS);
-    elapsedSec += 4;
+    elapsedSec += 2;
     tankLevel += REFILL_CHUNK;
     currentTemp = simulateTemp(elapsedSec);
     
-    Serial.printf("   Refilling: +%.0fL | Tank: %.1fL\n", 
-                  (float)c * REFILL_CHUNK, tankLevel);
-    
-    pushToSupabase(tankLevel, currentTemp);
+    Serial.printf("   Refilling: +%.0fL | Tank: %.1fL\n", (float)c * REFILL_CHUNK, tankLevel);
+    pushToSupabase(tankLevel, currentTemp, currentRSSI);
   }
 }
 
@@ -204,7 +217,6 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // WiFi Connection
   Serial.printf("\nConnecting to %s ", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
@@ -214,29 +226,41 @@ void setup() {
   Serial.println("\nCONNECTED!");
 
   randomSeed(esp_random());
-  tankLevel = round(randFloat(TANK_START_MIN, TANK_START_MAX) / 5.0f) * 5.0f;
+  // Start with a level that triggers "Low Fuel Warning" (between 5% and 20%)
+  tankLevel = round(randFloat(CRITICAL_THRESHOLD + 50, LOW_FUEL_THRESHOLD - 50) / 10.0f) * 10.0f;
   
-  Serial.println("IoTank Simulator Online.");
-  pushToSupabase(tankLevel, simulateTemp(0));
+  Serial.println(F("IoTank 4000L Simulator Online."));
+  pushToSupabase(tankLevel, simulateTemp(0), currentRSSI);
 }
 
 void loop() {
-  if (tankLevel <= LOW_FUEL_THRESHOLD) {
+  // 1. Refill Logic
+  if (tankLevel <= CRITICAL_THRESHOLD) {
     simulateRefill();
   }
 
-  // Idle (1-2 mins for simulation speed)
-  unsigned long idleSec = random(60, 120);
+  // 2. High Frequency Anomaly Check (30% chance each cycle for testing)
+  int dice = random(0, 100);
+  if (dice < 10) {
+    simulateTheft();
+  } else if (dice < 20) {
+    simulateHeatwave();
+  } else if (dice < 30) {
+    simulateConnectivityDrop();
+  }
+
+  // 3. Idle Heartbeat (Faster for testing: 30-60s)
+  unsigned long idleSec = random(30, 60);
   Serial.printf("\n💤 Idle for %lu seconds...\n", idleSec);
   
   for (int i = 0; i < idleSec / 10; i++) {
     delay(10000); // 10s heartbeat
     elapsedSec += 10;
     currentTemp = simulateTemp(elapsedSec);
-    Serial.printf("   [Heartbeat] Tank: %.1fL | Temp: %.1fC | RSSI: %d\n", 
-                  tankLevel, currentTemp, WiFi.RSSI());
-    pushToSupabase(tankLevel, currentTemp);
+    currentRSSI = random(-70, -60); // Jitter RSSI
+    pushToSupabase(tankLevel, currentTemp, currentRSSI);
   }
 
+  // 4. Dispense Operation
   simulateDispense();
 }

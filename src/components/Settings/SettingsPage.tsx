@@ -10,7 +10,7 @@ import {
 import { MdWifi, MdRefresh } from 'react-icons/md';
 import { DeviceCommandService, DeviceCommand } from '@/services/DeviceCommandService';
 import { convertToWebP } from '@/utils/performance';
-import { useTanks, updateTank as syncTankToDb } from '@/hooks/useSupabase';
+import { useTanks, updateTank as syncTankToDb, createAlert } from '@/hooks/useSupabase';
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
@@ -206,6 +206,17 @@ export const SettingsPage: React.FC = () => {
                 'INFO',
                 { tankId, fuelType: tankToUpdate.fuelType, retailPrice: normalizedPrice, currency: 'Ksh', oldPrice }
             );
+
+            // 🔴 TRIGGER SYSTEM ALERT for Financial Governance
+            await createAlert({
+                station_id: currentUser?.stationId || '',
+                tankId: tankId,
+                type: 'compliance-deadline', // Using a suitable existing type, or we could add 'price-update'
+                severity: 'info',
+                title: 'Fuel Price Calibration',
+                message: `${fuelName} unit price adjusted from ${oldPrice} to ${normalizedPrice} Ksh. Shift valuation updated.`,
+                metadata: { oldPrice, newPrice: normalizedPrice, tankName: fuelName }
+            }).catch(e => console.error('Failed to trigger price alert:', e));
         } catch (err) {
             console.error('Price update error:', err);
             setToast({ message: 'Update failed. Please check connection.', type: 'error' });

@@ -59,56 +59,63 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
 
             <div className="stats-grid">
                 {/* Card 1: Cumulative Total Volume */}
-                <div className="ds-card ds-card-panel stat-card">
-                    <div className="stat-header">
-                        <span className="stat-label">Total Network Volume</span>
-                        <FiLayers className="stat-icon text-primary" />
-                    </div>
-                    <div className="stat-value-large text-success">
-                        {tanks.length === 0 && stationId ? (
-                            <span className="animate-pulse">...</span>
-                        ) : (
-                            Math.round(totalVolume).toLocaleString()
-                        )}
-                        <span className="text-sm text-secondary font-normal ml-1">L</span>
-                    </div>
-                    <div className="stat-meta">
-                        <span className="text-xs text-secondary">
-                            {tanks.length === 0 && stationId ? 'Synchronizing fleet...' : `Across ${tanks.length} Active Tanks`}
-                        </span>
+                <div className="ds-card ds-card-panel ds-card-full-gradient bg-cyan-industrial stat-card">
+                    <div className="stat-content h-full flex flex-col justify-between">
+                        <div className="stat-header">
+                            <span className="stat-label-refined">Total Network Volume</span>
+                            <FiLayers className="stat-icon" />
+                        </div>
+                        <div className="stat-value-large">
+                            {tanks.length === 0 && stationId ? (
+                                <span className="animate-pulse">...</span>
+                            ) : (
+                                Math.round(totalVolume).toLocaleString()
+                            )}
+                            <span className="stat-value-unit">L</span>
+                        </div>
+                        <div className="stat-meta">
+                            <span className="text-[10px] font-black tracking-widest uppercase">
+                                {tanks.length === 0 && stationId ? 'Synchronizing fleet...' : `Across ${tanks.length} Active Tanks`}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
                 {/* Card 2: Cumulative Asset Value (Level 6+) */}
                 {canSee(6) && (
                     <div 
-                        className="ds-card ds-card-panel stat-card clickable group" 
+                        className={`ds-card ds-card-panel ds-card-full-gradient ${hasMissingPrices ? 'bg-amber-600 shadow-amber-200' : 'bg-emerald-industrial'} stat-card clickable group`} 
                         onClick={() => navigate('/settings')}
                         title={hasMissingPrices ? "Configure Fuel Prices to enable valuation" : "View Inventory Pricing"}
                     >
-                        <div className="stat-header">
-                            <span className="stat-label">Total Asset Value</span>
-                            <FiCheckCircle className={`stat-icon ${hasMissingPrices ? 'text-amber-500' : 'text-success'}`} />
-                        </div>
-                        <div className="stat-value-large text-success">
-                            {tanks.length === 0 && stationId ? (
-                                <span className="animate-pulse">...</span>
-                            ) : hasMissingPrices ? (
-                                <span className="text-amber-500 underline text-sm animate-pulse flex items-center gap-2">
-                                    N/A (SET PRICES)
-                                </span>
-                            ) : (
-                                <>Ksh {totalAssetValue.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                })}</>
-                            )}
-                        </div>
-                        <div className="stat-meta">
-                            <span className="text-xs text-secondary">Global Revaluation</span>
-                            <span className="text-xs font-bold text-success flex items-center gap-1">
-                                <FiTrendingUp /> {totalTrend}
-                            </span>
+                        <div className="stat-content h-full flex flex-col justify-between">
+                            <div className="stat-header">
+                                <span className="stat-label-refined">Total Asset Value</span>
+                                <FiCheckCircle className="stat-icon" />
+                            </div>
+                            <div className="stat-value-large">
+                                {tanks.length === 0 && stationId ? (
+                                    <span className="animate-pulse">...</span>
+                                ) : hasMissingPrices ? (
+                                    <span className="text-white underline text-sm animate-pulse flex items-center gap-2">
+                                        N/A (SET PRICES)
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span className="text-sm opacity-60 mr-1">Ksh</span> 
+                                        {totalAssetValue.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0
+                                        })}
+                                    </>
+                                )}
+                            </div>
+                            <div className="stat-meta">
+                                <span className="text-[10px] font-black tracking-widest uppercase">Global Revaluation</span>
+                                <div className="stat-trend-chip bg-white/20 text-white">
+                                    <FiTrendingUp /> {totalTrend}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

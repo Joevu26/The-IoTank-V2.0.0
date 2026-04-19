@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import './PendingRegistrations.css'; // Shared premium aesthetics
 import './ClientsList.css'; 
+import KenyaMap from '../components/KenyaMap';
 
 interface Station {
     station_id: string;
@@ -198,152 +199,172 @@ const ClientsList: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
         }, []);
 
         return createPortal(
-            <div 
-                className="iotank-portal-overlay" 
-                onClick={onClose}
-                style={{
-                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-                    background: 'rgba(7, 10, 20, 0.85)', backdropFilter: 'blur(16px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    zIndex: 999999, padding: '24px'
-                }}
-            >
-                <div 
-                    className="iotank-portal-content" 
-                    onClick={e => e.stopPropagation()}
-                    style={{
-                        background: '#fff', borderRadius: '28px', border: '1px solid rgba(255,255,255,0.8)',
-                        boxShadow: '0 40px 100px -20px rgba(0,0,0,0.6), 0 20px 50px -10px rgba(0,114,255,0.4)',
-                        display: 'flex', flexDirection: 'column', width: '95%', maxWidth: '760px',
-                        maxHeight: '85vh', overflow: 'hidden', position: 'relative'
-                    }}
-                >
-                    <header className="modal-header" style={{ flex: '0 0 auto', padding: '24px 32px' }}>
+            <div className="iotank-portal-overlay" onClick={onClose}>
+                <div className="iotank-portal-content" onClick={e => e.stopPropagation()}>
+                    <header className="modal-header">
                         <div className="header-text-container">
-                            <div className="flex items-center gap-3">
-                                <h2 style={{ margin: 0, color: '#fff', fontWeight: 800 }}>Station Registry Audit: {station.station_name}</h2>
-                            </div>
-                            <p style={{ margin: '4px 0 0 0', color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>Forensic metadata analysis and hardware inventory overview.</p>
-                            <div className="modal-header-badges" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                                <span className="modal-badge emerald">Registry Verified</span>
-                                <span className={`modal-badge ${station.account_status === 'active' ? 'blue' : 'rose'}`}>
-                                    Status: {station.account_status}
-                                </span>
-                            </div>
+                            <h2 className="text-white font-black tracking-tight flex items-center gap-3">
+                                <FiShield className="text-emerald-400" />
+                                Station Registry Audit: {station.station_name}
+                            </h2>
+                            <p className="text-slate-400 text-xs mt-1">Forensic metadata analysis and hardware inventory overview.</p>
                         </div>
                         <button className="close-btn" onClick={onClose} title="Close Audit">
                             <FiX size={18} />
                         </button>
                     </header>
 
-                    <div 
-                        className="modal-body-scroll custom-scrollbar"
-                        style={{
-                            flex: '1 1 auto', overflowY: 'auto', padding: '32px',
-                            display: 'flex', flexDirection: 'column', gap: '32px', minHeight: 0
-                        }}
-                    >
-                        {/* Identity Section */}
-                        <div className="atm-section emerald" style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.07)' }}>
-                            <div className="atm-section-header" style={{ padding: '12px 16px', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="atm-section-icon"><FiUser size={14} /></div>
-                                <span className="atm-section-title" style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#475569' }}>Identity & Signature</span>
+                    <div className="modal-body-scroll custom-scrollbar">
+                        
+                        {/* ── Live Geographic Intelligence ── */}
+                        <div className="telemetry-radar-card" style={{ padding: '16px', background: '#f8fafc' }}>
+                            <div className="radar-visualization" style={{ width: '180px', height: '180px' }}>
+                                <KenyaMap 
+                                    lat={-1.2921} // Defaulting to Nairobi if specific cords missing, or use station data if available
+                                    lng={36.8219} 
+                                    className="border-none shadow-none"
+                                />
                             </div>
-                            <div className="atm-section-body" style={{ padding: '24px', background: '#fff', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Full Legal Entity</label>
-                                    <div className="audit-field-value" style={{ fontWeight: 700, color: '#1e293b' }}>{station.station_name}</div>
+                            <div className="telemetry-stats">
+                                <div className="tel-active-badge">
+                                    <div className="tel-pulse-icon"><FiActivity size={20} /></div>
+                                    <div className="tel-active-text">Satellite Link Active</div>
                                 </div>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>System Identifier</label>
-                                    <div className="flex items-center gap-2">
-                                        <div className="audit-field-value mono" style={{ fontSize: '0.75rem', color: '#6366f1', fontFamily: 'monospace' }}>{station.station_id}</div>
-                                        <button onClick={() => copyToClipboard(station.station_id, 'audit-id')} className="text-slate-400 hover:text-indigo-600 transition-colors">
-                                            {copiedId === 'audit-id' ? <FiCheck size={12} className="text-emerald-500" /> : <FiCopy size={12} />}
-                                        </button>
+                                <div className="flex gap-12 mt-4">
+                                    <div className="form-group">
+                                        <label>Latitude</label>
+                                        <div className="audit-field-value mono" style={{ fontSize: '0.9rem' }}>1.2921° N</div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Longitude</label>
+                                        <div className="audit-field-value mono" style={{ fontSize: '0.9rem' }}>36.8219° E</div>
+                                    </div>
+                                </div>
+                                <div className="mt-4 p-3 bg-white border border-slate-200 rounded-lg">
+                                    <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Grid Reference</p>
+                                    <p className="text-[11px] font-bold text-slate-700">KENYA_SOUTH_CENTRAL_09X</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Identity Section ── */}
+                        <div className="atm-section">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon" style={{ background: '#6366f1' }}><FiUser /></div>
+                                <span className="atm-section-title">Identity & Signature</span>
+                            </div>
+                            <div className="atm-section-body">
+                                <div className="atm-grid-2">
+                                    <div className="form-group">
+                                        <label>Full Legal Entity</label>
+                                        <div className="audit-field-value">{station.station_name}</div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>System Identifier</label>
+                                        <div className="flex items-center gap-2">
+                                            <div className="audit-field-value mono truncate">{station.station_id}</div>
+                                            <button onClick={() => copyToClipboard(station.station_id, 'audit-id')} className="text-indigo-500 hover:text-indigo-700">
+                                                {copiedId === 'audit-id' ? <FiCheck size={12} className="text-emerald-500" /> : <FiCopy size={12} />}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Regional Section */}
-                        <div className="atm-section blue" style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.07)' }}>
-                            <div className="atm-section-header" style={{ padding: '12px 16px', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="atm-section-icon"><FiMapPin size={14} /></div>
-                                <span className="atm-section-title" style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#475569' }}>Operational Region</span>
+                        {/* ── Regional Section ── */}
+                        <div className="atm-section">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon" style={{ background: '#0ea5e9' }}><FiMapPin /></div>
+                                <span className="atm-section-title">Operational Region</span>
                             </div>
-                            <div className="atm-section-body" style={{ padding: '24px', background: '#fff', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Primary County</label>
-                                    <div className="audit-field-value" style={{ fontWeight: 700, color: '#1e293b' }}>{station.county || 'Unassigned'}</div>
-                                </div>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Registry Status</label>
-                                    <div className={`dp-status-badge dp-status-badge--${station.account_status === 'active' ? 'approved' : 'rejected'}`}>
-                                        {station.account_status}
-                                    </div>
+                            <div className="atm-section-body">
+                                <div className="atm-grid-2">
+                                    <div className="form-group"><label>Primary County</label><div className="audit-field-value">{station.county || 'Unassigned'}</div></div>
+                                    <div className="form-group"><label>Status</label><div><span className={`dp-status-badge dp-status-badge--${station.account_status === 'active' ? 'approved' : 'rejected'}`}>{station.account_status}</span></div></div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Hardware Section */}
-                        <div className="atm-section cyan" style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.07)' }}>
-                            <div className="atm-section-header" style={{ padding: '12px 16px', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="atm-section-icon"><FiCodesandbox size={14} /></div>
-                                <span className="atm-section-title" style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#475569' }}>Hardware Inventory (ATG Telemetry)</span>
+                        {/* ── Hardware Section ── */}
+                        <div className="atm-section">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon" style={{ background: '#10b981' }}><FiCodesandbox /></div>
+                                <span className="atm-section-title">Hardware Inventory (ATG Telemetry)</span>
                             </div>
-                            <div className="atm-section-body" style={{ padding: '24px', background: '#fff' }}>
-                                {station.tanks && station.tanks.length > 0 ? (
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-                                        {station.tanks.map((tank: any) => (
-                                            <div key={tank.id} style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-                                                <div style={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', color: '#10b981' }}>{tank.tank_name}</div>
-                                                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', margin: '6px 0' }}>{Number(tank.tank_capacity).toLocaleString()} L</div>
-                                                <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b' }}>{tank.fuel_type} • ID: {tank.id.slice(0, 8)}</div>
+                            <div className="atm-section-body">
+                                <div className="hw-inventory-grid">
+                                    {station.tanks?.map((tank: any) => (
+                                        <div key={tank.id} className="hw-tank-card forensic-card">
+                                            <div className="card-main-info">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div>
+                                                        <div className="hw-tank-name">{tank.tank_name}</div>
+                                                        <div className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.15em]">{tank.fuel_type}</div>
+                                                    </div>
+                                                    <div className="capacity-glance">
+                                                        <span className="val">{Number(tank.tank_capacity).toLocaleString()}</span>
+                                                        <span className="unit">Liters</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="forensic-meta-grid">
+                                                    <div className="meta-item full-width">
+                                                        <label>Firmware Tank Identifier (.ino config)</label>
+                                                        <div className="copy-code-wrapper">
+                                                            <code className="tank-id-code">{tank.id}</code>
+                                                            <button 
+                                                                onClick={() => copyToClipboard(tank.id, `tank-${tank.id}`)}
+                                                                className="copy-btn-inner"
+                                                                title="Copy for .ino configuration"
+                                                            >
+                                                                {copiedId === `tank-${tank.id}` ? <FiCheck size={14} className="text-emerald-500" /> : <FiCopy size={14} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="meta-item">
+                                                        <label>Telemetry Endpoint</label>
+                                                        <div className="meta-val truncate">atg.v3.io/{tank.id.slice(0, 8)}</div>
+                                                    </div>
+                                                    <div className="meta-item">
+                                                        <label>Sync Authority</label>
+                                                        <div className="meta-val">CLOUD_MANAGED</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center py-6 text-slate-400">
-                                        <FiCodesandbox size={32} className="mb-2 opacity-20" />
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">No active hardware packets detected.</p>
-                                    </div>
-                                )}
+                                        </div>
+                                    )) || <p className="text-slate-400 text-xs italic">No hardware provisioned.</p>}
+                                </div>
                             </div>
                         </div>
 
-                        {/* History Section */}
-                        <div className="atm-section slate" style={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.07)' }}>
-                            <div className="atm-section-header" style={{ padding: '12px 16px', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className="atm-section-icon"><FiClock size={14} /></div>
-                                <span className="atm-section-title" style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: '#475569' }}>Chronicle & Handshake</span>
+                        {/* ── History Section ── */}
+                        <div className="atm-section">
+                            <div className="atm-section-header">
+                                <div className="atm-section-icon" style={{ background: '#f59e0b' }}><FiClock /></div>
+                                <span className="atm-section-title">Chronicle & Handshake</span>
                             </div>
-                            <div className="atm-section-body" style={{ padding: '24px', background: '#fff', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Registry Handshake</label>
-                                    <div className="audit-field-value mono truncate" style={{ fontSize: '0.75rem', color: '#1e293b', fontFamily: 'monospace' }}>{new Date(station.created_at).toLocaleString()}</div>
-                                </div>
-                                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    <label style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Last Telemetry Signal</label>
-                                    <div className={`audit-field-value mono ${(station as any).last_active ? 'text-emerald-600 font-bold' : 'text-rose-500'}`} style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                                        {(station as any).last_active ? new Date((station as any).last_active).toLocaleString() : 'NO SIGNAL'}
-                                    </div>
+                            <div className="atm-section-body">
+                                <div className="atm-grid-2">
+                                    <div className="form-group"><label>Handshake</label><div className="audit-field-value mono">{new Date(station.created_at).toLocaleString()}</div></div>
+                                    <div className="form-group"><label>Last Telemetry</label><div className={`audit-field-value mono ${(station as any).last_active ? 'text-emerald-600' : 'text-rose-500'}`}>{(station as any).last_active ? new Date((station as any).last_active).toLocaleString() : 'OFFLINE'}</div></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="modal-footer premium-footer" style={{ flex: '0 0 auto', padding: '20px 32px' }}>
-                        <button className="btn-cancel" onClick={onClose}>Close Registry</button>
-                        <button className="btn-resync-hardware" onClick={() => handleResyncHardware(station.station_id)} disabled={loading}>
+                    <footer className="modal-footer premium-footer">
+                        <button className="btn-cancel" onClick={onClose} style={{ fontWeight: 800 }}>Close Registry</button>
+                        <button className="btn-resync-hardware" onClick={() => handleResyncHardware(station.station_id)} disabled={loading} style={{ fontWeight: 800 }}>
                             {loading ? <FiLoader className="animate-spin" /> : <FiRefreshCw />}
                             <span>Re-sync Hardware</span>
                         </button>
                         <button className="btn-audit-approve" onClick={() => navigate(`/clients/${station.station_id}`)}>
-                            <span>Advanced Engineering Hub</span>
+                            <span>ADVANCED ENGINEERING HUB</span>
                             <FiExternalLink />
                         </button>
-                    </div>
+                    </footer>
                 </div>
             </div>,
             document.body

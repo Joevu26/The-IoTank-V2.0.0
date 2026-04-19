@@ -26,17 +26,17 @@ export const ShiftAnalyticsTable: React.FC = () => {
     );
 
     return (
-        <div className="logistics-card mt-12 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="logistics-card mt-12 max-w-full overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="logistics-header border-b border-slate-50 bg-gradient-to-r from-white to-slate-50/50">
                 <div className="logistics-title-group">
                     <div className="acp-section-icon acp-icon-accent-purple shadow-sm">
                         <FiClipboard size={18} />
                     </div>
                     <div>
-                        <h3 className="text-slate-800 font-black text-lg tracking-tight">Shift Operational Logs</h3>
+                        <h3 className="text-slate-800 font-black text-lg tracking-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Shift Operational Logs</h3>
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">Historical Reconciliation Archive</p>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black" style={{ fontFamily: 'var(--font-family-primary)' }}>Historical Reconciliation Archive</p>
                         </div>
                     </div>
                 </div>
@@ -52,25 +52,27 @@ export const ShiftAnalyticsTable: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto scrollbar-elegant">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
+                <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead className="logistics-table-head">
                         <tr>
                             <th className="w-[100px]">Forensic ID</th>
+                            <th className="w-[120px]">Action</th>
                             <th>Creator / Operator</th>
                             <th>Date Snapshot</th>
-                            <th>Time Window</th>
-                            <th className="text-right">Closing Vol (L)</th>
-                            <th className="text-right">Closing Cash</th>
+                            <th>Time Point</th>
+                            <th className="text-right">Volumetric (L)</th>
+                            <th className="text-right">Collections</th>
                             <th className="text-right">Spending</th>
                             <th className="text-right">Variance</th>
                             <th>Analytical Notes</th>
-                            <th className="text-right">Sync Status</th>
+                            <th className="text-center">Sync Status</th>
+                            <th className="text-right">Forensics</th>
                         </tr>
                     </thead>
                     <tbody>
                         {shifts.length === 0 ? (
                             <tr>
-                                <td colSpan={10} className="px-6 py-20 text-center">
+                                <td colSpan={12} className="px-6 py-20 text-center">
                                     <div className="flex flex-col items-center opacity-30">
                                         <FiShield size={48} className="text-slate-400 mb-4" />
                                         <p className="text-slate-500 font-black uppercase tracking-[0.2em] text-[11px]">No shift logs found in the intelligence archive.</p>
@@ -84,52 +86,69 @@ export const ShiftAnalyticsTable: React.FC = () => {
                             const spending = received.spending || 0;
                             const closingVol = received.closing_volume || 0;
                             const closingCash = received.cash || 0;
+                            const opType = shift.operation_type || 'CLOSE';
                             
                             // Forensic alert check
-                            const isCritical = Math.abs(variance.amount) > 100;
+                            const isCritical = opType === 'CLOSE' && Math.abs(variance.amount) > 100;
+                            const isOpening = opType === 'OPEN';
 
                             return (
-                                <tr key={shift.id} className={`logistics-row ${isCritical ? 'has-alert' : ''} group`}>
+                                <tr key={shift.id} className={`logistics-row ${isCritical ? 'has-alert' : ''} group ${isOpening ? 'bg-cyan-50/10' : ''}`}>
                                     <td className="logistics-cell">
                                         <div className="flex items-center gap-2">
                                             <span className="text-[11px] font-black text-slate-400 font-mono tracking-tighter">#{shift.id.slice(0, 8).toUpperCase()}</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell">
+                                        <div className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest inline-block border ${
+                                            isOpening 
+                                                ? 'bg-cyan-100 text-cyan-700 border-cyan-200' 
+                                                : 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        }`}>
+                                            {isOpening ? 'Opened' : 'Closed'}
+                                        </div>
+                                    </td>
+                                    <td className="logistics-cell">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 shadow-sm border border-white group-hover:from-purple-500 group-hover:to-indigo-600 group-hover:text-white transition-all duration-300">
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 shadow-sm border border-white transition-all duration-300 ${isOpening ? 'bg-cyan-500 text-white' : 'bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-purple-500 group-hover:to-indigo-600 group-hover:text-white'}`}>
                                                 <FiUser size={14} />
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="logistics-operator-bold">{openedBy}</span>
-                                                <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">System Operator</span>
+                                                <span className="text-[9px] text-slate-400 font-black uppercase tracking-tighter">
+                                                    {isOpening ? 'Shift Initialization' : 'Session Lead'}
+                                                </span>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="logistics-cell">
                                         <div className="flex items-center gap-2 text-slate-600">
                                             <FiCalendar size={12} className="text-slate-300" />
-                                            <span className="text-xs font-black">{format(new Date(shift.opened_at), 'MMM dd, yyyy')}</span>
+                                            <span className="text-xs font-black">{format(new Date(isOpening ? shift.opened_at : shift.closed_at), 'MMM dd, yyyy')}</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell">
                                         <div className="flex items-center gap-2 text-slate-400">
                                             <FiClock size={12} className="text-purple-300" />
-                                            <span className="text-[10px] font-bold uppercase">{format(new Date(shift.opened_at), 'HH:mm')} — {format(new Date(shift.closed_at), 'HH:mm')}</span>
+                                            <span className="text-[10px] font-bold uppercase">
+                                                {format(new Date(isOpening ? shift.opened_at : shift.closed_at), 'HH:mm')}
+                                            </span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell text-right">
                                         <div className="flex flex-col items-end">
                                             <span className="logistics-value-bold flex items-center gap-1">
                                                 <FiDroplet size={11} className="text-indigo-400" />
-                                                {Math.round(closingVol).toLocaleString()}
+                                                {isOpening ? '---' : Math.round(closingVol).toLocaleString()}
                                             </span>
-                                            <span className="text-[9px] text-slate-400 font-black uppercase">Liters</span>
+                                            <span className="text-[9px] text-slate-400 font-black uppercase">Archive</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell text-right">
                                         <div className="flex flex-col items-end">
-                                            <span className="text-sm font-black text-slate-800">${closingCash.toLocaleString()}</span>
+                                            <span className={`text-sm font-black ${isOpening ? 'text-slate-300' : 'text-slate-800'}`}>
+                                                {isOpening ? '---' : `Ksh ${closingCash.toLocaleString()}`}
+                                            </span>
                                             <span className="text-[9px] text-emerald-500 font-black uppercase items-center flex gap-1">
                                                 <FiDollarSign size={8} /> Revenue
                                             </span>
@@ -137,39 +156,51 @@ export const ShiftAnalyticsTable: React.FC = () => {
                                     </td>
                                     <td className="logistics-cell text-right">
                                         <div className="flex flex-col items-end">
-                                            <span className="text-sm font-black text-red-500">${spending.toLocaleString()}</span>
+                                            <span className={`text-sm font-black ${isOpening ? 'text-slate-300' : 'text-red-500'}`}>
+                                                {isOpening ? '---' : `Ksh ${spending.toLocaleString()}`}
+                                            </span>
                                             <span className="text-[9px] text-red-400/60 font-black uppercase">Spent</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell text-right">
                                          <div className="flex flex-col items-end">
-                                            <div className={`text-sm font-black px-3 py-1 rounded-lg border flex items-center gap-2 group-hover:scale-105 transition-transform ${
-                                                variance.amount > 0 
-                                                    ? 'text-red-600 bg-red-50 border-red-100' 
-                                                    : variance.amount < 0 
-                                                    ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
-                                                    : 'text-slate-400 bg-slate-50 border-slate-100'
-                                            }`}>
-                                                {variance.amount === 0 ? 'BALANCED' : (
-                                                    <>
-                                                        {variance.amount > 0 ? '-' : '+'}${Math.abs(variance.amount).toFixed(2)}
-                                                        {isCritical && <FiAlertTriangle className="animate-bounce" size={14} />}
-                                                    </>
-                                                )}
-                                            </div>
+                                            {isOpening ? (
+                                                <span className="text-[10px] font-black text-slate-400 opacity-50 italic">SESSION_START</span>
+                                            ) : (
+                                                <div className={`text-sm font-black px-3 py-1 rounded-lg border flex items-center gap-2 group-hover:scale-105 transition-transform ${
+                                                    variance.amount > 0 
+                                                        ? 'text-red-600 bg-red-50 border-red-100' 
+                                                        : variance.amount < 0 
+                                                        ? 'text-emerald-600 bg-emerald-50 border-emerald-100' 
+                                                        : 'text-slate-400 bg-slate-50 border-slate-100'
+                                                }`}>
+                                                    {variance.amount === 0 ? 'BALANCED' : (
+                                                        <>
+                                                            {variance.amount > 0 ? '-' : '+'}Ksh {Math.abs(variance.amount).toFixed(0)}
+                                                            {isCritical && <FiAlertTriangle className="animate-bounce" size={14} />}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">Variance Delta</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell">
                                         <div className="max-w-[180px]">
                                             <p className="acp-note-truncate text-[11px] font-bold text-slate-500 italic leading-tight" title={shift.notes}>
-                                                {shift.notes || 'No forensic remarks documented for this session.'}
+                                                {shift.notes || (isOpening ? 'Shift commenced. Telemetry tracking active.' : 'No forensic remarks documented.')}
                                             </p>
+                                        </div>
+                                    </td>
+                                    <td className="logistics-cell text-center">
+                                        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 group/sync">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="text-[9px] font-black text-emerald-700 uppercase tracking-tighter">Cloud Persistent</span>
                                         </div>
                                     </td>
                                     <td className="logistics-cell text-right">
                                         <button className="px-4 py-2 rounded-xl bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest hover:bg-purple-600 hover:shadow-lg hover:shadow-purple-200 transition-all duration-300">
-                                            Details
+                                            Audit
                                         </button>
                                     </td>
                                 </tr>

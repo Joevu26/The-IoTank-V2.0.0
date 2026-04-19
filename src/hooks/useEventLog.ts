@@ -133,6 +133,22 @@ export function useEventLog(stationId: string) {
         }
     };
 
+    async function acknowledgeAll() {
+        if (!stationId) return;
+        try {
+            const { error } = await supabase
+                .from('unified_events')
+                .update({ is_resolved: true })
+                .eq('station_id', stationId)
+                .eq('is_resolved', false);
+            
+            if (error) throw error;
+            fetchEvents();
+        } catch (err) {
+            console.error('Error acknowledging all events:', err);
+        }
+    }
+
     function updateFilter<K extends keyof EventLogFilters>(key: K, value: EventLogFilters[K]) {
         setFilters(prev => ({ ...prev, [key]: value }));
         setCurrentPage(1);
@@ -178,7 +194,13 @@ export function useEventLog(stationId: string) {
         filters,
         updateFilter,
         resetFilters,
-        categoryCounts: { telemetry: 0, operational: total, system: 0, ai: 0 }, // Simplified
+        acknowledgeAll,
+        categoryCounts: { 
+            telemetry: events.filter(e => e.category === 'telemetry').length, 
+            operational: events.filter(e => e.category === 'operational').length, 
+            system: events.filter(e => e.category === 'system').length, 
+            ai: events.filter(e => e.category === 'ai').length 
+        }, 
         tanks,
         exportCSV,
     };

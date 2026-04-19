@@ -241,7 +241,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const dropRate = volumeDrop / timeDiffHrs; // L/hr
 
         // Heuristics
-        const rapidDropThreshold = tank.rapidDefillThreshold || 100; // L/hr (Forensic Theft)
+        const rapidDropThreshold = tank.rapidDefillThreshold || 50; // L/hr (Forensic Theft) - REDUCED FROM 100
         const leakThreshold = tank.leakageThreshold || 2;           // L/hr (Maintenance Leak)
         
         // Physical Capacity Limit: 
@@ -251,13 +251,13 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
 
         if (!isShiftOpen) {
             // CASE A: Shift is CLOSED. Any drop is suspicious.
-            const MIN_THEFT_VOLUME = 5.0; // Liters - Increased threshold to mitigate ultrasonic jitter
+            const MIN_THEFT_VOLUME = 2.0; // Liters - REDUCED FROM 5.0 to increase sensitivity
             if (volumeDrop > MIN_THEFT_VOLUME && dropRate > rapidDropThreshold) {
                 const { score, label } = scoreByType('composite-supply-risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
                     siteId: tank.siteId,
-                    type: 'anomaly',
+                    type: 'theft_detected',
                     title: `THEFT DETECTED: ${tank.name}`,
                     description: `Unauthorized rapid drop of ${volumeDrop.toFixed(1)}L while shift is CLOSED. Intensity: ${dropRate.toFixed(0)} L/hr.`,
                     message: `CRITICAL: Rapid drawdown on ${tank.name} (Closed Shift)`,
@@ -270,14 +270,14 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     detectionMethod: 'deterministic',
                     aiConfidence: 0.98,
                     rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                    metadata: { type: 'THEFT_CLOSED', dropRate, volumeLost: volumeDrop } as any
+                    metadata: { type: 'theft_closed', dropRate, volumeLost: volumeDrop } as any
                 });
             } else if (dropRate > leakThreshold) {
                 const { score, label } = scoreByType('infrastructure-degradation', 0.85);
                 drafts.push({
                     tankId: tank.id,
                     siteId: tank.siteId,
-                    type: 'leak',
+                    type: 'leak_detected',
                     title: `LEAK SUSPICION: ${tank.name}`,
                     description: `Persistent volume decline of ${dropRate.toFixed(2)} L/hr during 'Quiet Hours' (Closed Shift). Possible infrastructure failure.`,
                     message: `WARNING: Forensic leak detection on ${tank.name}`,
@@ -290,12 +290,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     detectionMethod: 'deterministic',
                     aiConfidence: 0.85,
                     rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                    metadata: { type: 'LEAK_SUSPICION', dropRate } as any
+                    metadata: { type: 'leak_suspicion', dropRate } as any
                 });
             }
         } else {
             // CASE B: Shift is OPEN. Drop is expected, but siphoning (Parallel Pull) is theft.
-            const MIN_THEFT_VOLUME = 5.0; // Liters - Standardized noise rejection threshold
+            const MIN_THEFT_VOLUME = 2.0; // Liters - REDUCED FROM 5.0
             if (volumeDrop > MIN_THEFT_VOLUME && dropRate > maxPumpFlow) {
                 const { score, label } = scoreByType('composite-supply-risk', 0.95);
                 drafts.push({
@@ -325,24 +325,47 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const volumeIncrease = currVol - prevVol;
 
         if (volumeIncrease > refillThreshold) {
-            const { score, label } = scoreByType('refill-detected', 0.90);
+            // [HARDENING]: Ensure refill doesn't exceed physical tank capacity (Refill Integrity)
+            const isOverCapacity = tank.capacity && (currVol > tank.capacity * 1.02); // 2% buffer for thermal expansion
+            const isUnauthorized = !isShiftOpen;
+
+            const { score, label } = scoreByType(
+                isOverCapacity ? 'composite-supply-risk' : (isUnauthorized ? 'composite-supply-risk' : 'refill-detected'), 
+                0.90
+            );
+
             drafts.push({
                 tankId: tank.id,
                 siteId: tank.siteId,
-                type: 'refill-detected',
-                title: `Refill Identified (Add Delivery)`,
-                description: `Significant volume increase of ${volumeIncrease.toFixed(1)}L detected at ${new Date().toLocaleTimeString()}. Automated delivery record required for forensic reconciliation.`,
-                message: `INFO: ${tank.name} refill sensing (+${volumeIncrease.toFixed(1)}L). Please add delivery record.`,
-                severity: 'info',
+                type: isOverCapacity ? 'anomaly' : (isUnauthorized ? 'unauthorized-refill' : 'refill-detected'),
+                title: isOverCapacity 
+                    ? `INTEGRITY BREACH: Over-Capacity detected on ${tank.name}` 
+                    : (isUnauthorized ? `🔴 UNAUTHORIZED REFILL: ${tank.name}` : `Refill Identified (Add Delivery)`),
+                description: isOverCapacity 
+                    ? `Critical integrity error: Tank level (${currVol.toFixed(1)}L) exceeds physical capacity (${tank.capacity}L). This indicates severe calibration drift or sensor malfunction.`
+                    : (isUnauthorized
+                        ? `SECURITY BREACH: Fuel inflow of ${volumeIncrease.toFixed(1)}L detected while shift is CLOSED. Out-of-hours delivery requires immediate verification.`
+                        : `Significant volume increase of ${volumeIncrease.toFixed(1)}L detected at ${new Date().toLocaleTimeString()}. Automated delivery record required for forensic reconciliation.`),
+                message: isOverCapacity 
+                    ? `CRITICAL: ${tank.name} measured volume exceeds physical capacity. Integrity breach.`
+                    : (isUnauthorized
+                        ? `SECURITY: Unauthorized ${tank.name} refill (+${volumeIncrease.toFixed(1)}L) while closed.`
+                        : `INFO: ${tank.name} refill sensing (+${volumeIncrease.toFixed(1)}L). Please add delivery record.`),
+                severity: (isOverCapacity || isUnauthorized) ? 'critical' : 'info',
                 severityLabel: label,
-                score,
+                score: (isOverCapacity || isUnauthorized) ? 98 : score,
                 source: 'system',
                 state: 'ACTIVE',
                 resolved: false,
                 detectionMethod: 'deterministic',
-                aiConfidence: 0.90,
+                aiConfidence: 0.95,
                 rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                metadata: { type: 'REFILL', volumeIncrease } as any
+                metadata: { 
+                    type: isOverCapacity ? 'INTEGRITY_BREACH' : (isUnauthorized ? 'UNAUTHORIZED_REFILL' : 'REFILL'), 
+                    volumeIncrease, 
+                    currVol, 
+                    tankCapacity: tank.capacity 
+                } as any
             });
         }
     }

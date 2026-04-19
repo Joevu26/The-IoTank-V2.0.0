@@ -84,7 +84,9 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
             }
 
             // 2. ETE Calculation using Unified Logic
-            const effectiveRate = avgDailyRate || currentShiftRate || 0.1; 
+            // If Refilling (negative rate), fallback to stable historical average for forecast
+            const depletionRate = currentShiftRate > 0 ? currentShiftRate : 0;
+            const effectiveRate = depletionRate || avgDailyRate || 0.1; 
             const hoursLeft = calculateETE(latestVolume, tank.capacity, effectiveRate);
 
             let ete = 'Stable';
@@ -97,8 +99,11 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
                 } else {
                     ete = `${hoursLeft.toFixed(1)} Hours`;
                 }
+            } else if (currentShiftRate < -2) {
+                ete = 'Refilling';
             }
 
+            // Real trend detection using raw rate
             const trend = currentShiftRate > 0.5 ? 'decreasing' : currentShiftRate < -0.5 ? 'increasing' : 'stable';
 
             return {

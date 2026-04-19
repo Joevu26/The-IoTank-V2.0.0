@@ -90,7 +90,6 @@ export const PredictivePanel: React.FC<PredictivePanelProps> = ({ stationId, tan
                     <FiZap style={{ color: '#a855f7' }} />
                     <h3 className="text-md font-bold text-slate-800">Predictive Intelligence</h3>
                 </div>
-                <span className="ai-badge" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 800 }}>Powered by Gemini</span>
             </div>
 
             {/* AI Refill Forecast Card */}

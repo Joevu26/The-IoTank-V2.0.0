@@ -56,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             case '/market': return Factories.MarketPageFactory;
             case '/alerts': return Factories.AlertsCenterFactory;
             case '/reporting': return Factories.ReportingPageFactory;
+            case '/shifts': return Factories.ShiftManagementPageFactory;
             case '/users': return Factories.TeamManagementFactory;
             case '/settings': return Factories.SettingsPageFactory;
             case '/help': return Factories.HelpPageFactory;
@@ -67,6 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'Core Operations', isSection: true, path: 'sec-core', level: 7 },
         { name: t('dashboard'), path: '/dashboard', icon: <MdDashboard />, level: 7 },
         { name: t('inventory'), path: '/inventory', icon: <MdStorage />, level: 7 },
+        { name: 'Shift Audit', path: '/shifts', icon: <MdOutlineEventNote />, level: 6 },
         { name: 'Deliveries', path: '/deliveries', icon: <FiTruck />, level: 6 },
         { name: t('analytics'), path: '/analytics', icon: <MdBarChart />, level: 6 },
 

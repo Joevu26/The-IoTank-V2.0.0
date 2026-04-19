@@ -61,3 +61,27 @@ export function formatTemperature(
 
     return includeSymbol ? `${formatted}${symbol}` : formatted;
 }
+
+/**
+ * Sanitize internal IDs from user-facing strings for security.
+ * Strips UUID patterns and "[ID: ...]" blocks.
+ * @param str - Original string
+ * @returns Sanitized string
+ */
+export function sanitizeIds(str: string | undefined | null): string {
+    if (!str) return '';
+    
+    // 1. Match typical UUIDs (8-4-4-4-12)
+    const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+    
+    // 2. Match explicit ID tags like [ID: xxx] or [Node ID: xxx]
+    const idTagRegex = /\[(?:Node\s+)?ID:\s*[^\]]+\]/gi;
+    
+    return str
+        .replace(uuidRegex, '')
+        .replace(idTagRegex, '')
+        .replace(/\(\s*\)/g, '') // Remove empty parentheses leftover
+        .replace(/\[\s*\]/g, '') // Remove empty brackets leftover
+        .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
+        .trim();
+}

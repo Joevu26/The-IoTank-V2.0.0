@@ -459,15 +459,16 @@
 /* New User Profile Dropdown Design - Premium Overhaul */
 .modern-dropdown {
     width: 280px !important;
-    border-radius: 20px !important; /* Slightly tighter radius for industrial look */
+    border-radius: 20px !important;
     padding: 0 0 16px 0 !important;
     box-shadow: 
-        var(--shadow-xl),
-        0 0 0 1px rgba(255, 255, 255, 0.4) inset !important;
-    border: 1px solid var(--color-border) !important;
-    background: var(--color-bg-secondary-glass) !important; /* Frosted glass from palette */
-    -webkit-backdrop-filter: blur(16px) saturate(1.2) !important;
-    backdrop-filter: blur(16px) saturate(1.2) !important;
+        0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+        0 10px 10px -5px rgba(0, 0, 0, 0.04),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    background: rgba(255, 255, 255, 0.72) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    backdrop-filter: blur(24px) saturate(200%) !important;
 }
 
 .modern-dropdown.notifications-dropdown {
@@ -482,22 +483,28 @@
 }
 
 .modern-dropdown .dropdown-header {
-    padding: 24px !important;
-    background: linear-gradient(180deg, rgba(248, 250, 252, 1) 0%, rgba(241, 245, 249, 0.5) 100%) !important;
+    padding: 20px 24px !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(241, 245, 249, 0.4) 100%) !important;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important; /* Centered Header */
+    align-items: center !important;
     text-align: center !important;
-    gap: 8px !important;
+    gap: 10px !important;
 }
 
 .notif-header h3 {
-    font-size: 1.2rem !important;
-    font-weight: 900 !important;
-    color: #1e1b4b !important;
+    font-size: clamp(1rem, 1.2vw, 1.15rem) !important;
+    font-weight: 850 !important;
+    color: #0f172a !important;
     margin: 0 !important;
-    letter-spacing: -0.03em !important;
+    letter-spacing: -0.01em !important;
+    animation: lively-pulse 4s infinite ease-in-out;
+}
+
+@keyframes lively-pulse {
+    0%, 100% { text-shadow: 0 0 0 transparent; transform: scale(1); }
+    50% { text-shadow: 0 0 15px rgba(6, 182, 212, 0.3); transform: scale(1.02); }
 }
 
 .notif-badge-inline {
@@ -678,26 +685,31 @@
 
 /* Notifications Specifics */
 .notifications-dropdown .notification-item {
-    padding: 8px 12px !important;
-    border-radius: 10px !important;
-    margin-bottom: 4px !important;
-    border: 1px solid rgba(0, 212, 255, 0.08) !important;
-    background: linear-gradient(145deg, rgba(255,255,255,0.85) 0%, rgba(248,252,255,0.95) 100%) !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    padding: 12px 14px !important;
+    border-radius: 16px !important;
+    margin: 8px 12px !important;
+    border: 1px solid rgba(0, 0, 0, 0.03) !important;
+    background: rgba(255, 255, 255, 0.3) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     cursor: pointer !important;
+    position: relative;
+    overflow: hidden;
 }
 
 .notifications-dropdown .notification-item:hover {
-    background: linear-gradient(145deg, #ffffff 0%, #f7fcff 100%) !important;
-    border-color: rgba(0, 212, 255, 0.2) !important;
-    box-shadow: 0 4px 10px rgba(0, 212, 255, 0.06) !important;
-    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.6) !important;
+    border-color: rgba(6, 182, 212, 0.2) !important;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.08) !important;
+    transform: translateY(-2px);
+    border-radius: 2px !important; /* Sharp Edges on hover */
 }
 
 .notifications-dropdown .notification-item.unread {
-    background: linear-gradient(145deg, rgba(240, 253, 255, 0.95) 0%, rgba(235, 250, 255, 0.95) 100%) !important; 
-    border-color: rgba(0, 212, 255, 0.25) !important;
-    box-shadow: inset 2px 0 0 #00d4ff !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    border-color: rgba(6, 182, 212, 0.3) !important;
+    box-shadow: 
+        0 4px 6px -1px rgba(0, 0, 0, 0.05),
+        inset 3px 0 0 #06b6d4 !important;
 }
 
 .notifications-dropdown .notification-title {
@@ -794,10 +806,54 @@
 }
 
 /* Category Colors */
-.cat-security .notif-placeholder { background: #fee2e2 !important; color: #ef4444 !important; }
-.cat-shift .notif-placeholder { background: #ecfeff !important; color: #0891b2 !important; }
-.cat-delivery .notif-placeholder { background: #f0fdf4 !important; color: #16a34a !important; }
-.cat-team .notif-placeholder { background: #fffbeb !important; color: #d97706 !important; }
+.cat-security .notif-placeholder { background: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; }
+.cat-shift .notif-placeholder { background: rgba(6, 182, 212, 0.1) !important; color: #06b6d4 !important; }
+.cat-delivery .notif-placeholder { background: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; }
+.cat-team .notif-placeholder { background: rgba(245, 158, 11, 0.1) !important; color: #f59e0b !important; }
+
+/* ─────────────────────────────────────────────────────────────
+   NEW: NOTIFICATION ANIMATIONS & ACTION BUTTONS
+   ───────────────────────────────────────────────────────────── */
+
+.btn-open-alerts {
+    background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%) !important;
+    color: white !important;
+    width: fit-content !important;
+    min-width: 200px !important;
+    margin: 12px auto 24px auto !important;
+    padding: 10px 24px !important;
+    border-radius: 12px !important;
+    font-size: 0.7rem !important;
+    font-weight: 950 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border: none !important;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+}
+
+.btn-open-alerts:hover {
+    background: linear-gradient(135deg, #08d9ff 0%, #3b82f6 100%) !important;
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 20px -5px rgba(6, 182, 212, 0.4);
+}
+
+.section-label-tactical {
+    padding: 12px 18px !important;
+    font-size: 0.6rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b !important;
+    border-bottom: 1px solid rgba(0,0,0,0.03) !important;
+    background: rgba(255,255,255,0.4) !important;
+    backdrop-filter: blur(4px) !important;
+}
 .cat-system .notif-placeholder { background: #f8fafc !important; color: #475569 !important; }
 
 .notification-body {
