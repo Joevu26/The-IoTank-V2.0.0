@@ -34,6 +34,7 @@ END $$;
 
 -- Hardened SELECT: Only allow viewing if the user belongs to the station 
 -- or is viewing their own path.
+DROP POLICY IF EXISTS "Strict photo viewing" ON storage.objects;
 CREATE POLICY "Strict photo viewing"
 ON storage.objects FOR SELECT
 TO authenticated

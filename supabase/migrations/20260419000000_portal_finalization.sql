@@ -83,8 +83,13 @@ ALTER TABLE public.system_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.newsletter_templates ENABLE ROW LEVEL SECURITY;
 
 -- Admins can manage all
+DROP POLICY IF EXISTS "Admins full access to firmware_campaigns" ON public.firmware_campaigns;
 CREATE POLICY "Admins full access to firmware_campaigns" ON public.firmware_campaigns FOR ALL USING (public.is_system_admin('admin_helper'));
+
+DROP POLICY IF EXISTS "Admins full access to system_tasks" ON public.system_tasks;
 CREATE POLICY "Admins full access to system_tasks" ON public.system_tasks FOR ALL USING (public.is_system_admin('admin_helper'));
+
+DROP POLICY IF EXISTS "Admins full access to newsletter_templates" ON public.newsletter_templates;
 CREATE POLICY "Admins full access to newsletter_templates" ON public.newsletter_templates FOR ALL USING (public.is_system_admin('admin_helper'));
 
 -- 6. Seed some default data if empty

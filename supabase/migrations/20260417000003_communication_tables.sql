@@ -37,25 +37,31 @@ ALTER TABLE public.global_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dashboard_banners ENABLE ROW LEVEL SECURITY;
 
 -- Admins can do everything
+DROP POLICY IF EXISTS "Admins full access to announcements" ON public.global_announcements;
 CREATE POLICY "Admins full access to announcements" ON public.global_announcements
     FOR ALL USING (EXISTS (SELECT 1 FROM public.system_users WHERE auth_user_id = auth.uid() AND is_active = TRUE));
 
+DROP POLICY IF EXISTS "Admins full access to banners" ON public.dashboard_banners;
 CREATE POLICY "Admins full access to banners" ON public.dashboard_banners
     FOR ALL USING (EXISTS (SELECT 1 FROM public.system_users WHERE auth_user_id = auth.uid() AND is_active = TRUE));
 
 -- Clients/Users can read active banners
+DROP POLICY IF EXISTS "Everyone can read active banners" ON public.dashboard_banners;
 CREATE POLICY "Everyone can read active banners" ON public.dashboard_banners
     FOR SELECT USING (is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW()));
 
 -- Clients can read announcements targeted to them (Simplified 'All' check for now)
+DROP POLICY IF EXISTS "Everyone can read announcements" ON public.global_announcements;
 CREATE POLICY "Everyone can read announcements" ON public.global_announcements
     FOR SELECT USING (status = 'sent' AND target_audience = 'All');
 
 -- 4. Audit Logging Trigger
+DROP TRIGGER IF EXISTS on_announcement_created ON public.global_announcements;
 CREATE TRIGGER on_announcement_created
     AFTER INSERT ON public.global_announcements
     FOR EACH ROW EXECUTE FUNCTION public.log_admin_action();
 
+DROP TRIGGER IF EXISTS on_banner_modified ON public.dashboard_banners;
 CREATE TRIGGER on_banner_modified
     AFTER INSERT OR UPDATE ON public.dashboard_banners
     FOR EACH ROW EXECUTE FUNCTION public.log_admin_action();
