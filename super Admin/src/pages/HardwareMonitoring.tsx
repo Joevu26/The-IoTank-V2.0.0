@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { supabase } from '../config/supabase';
 import { hardwareService, Device, FirmwareVersion, OTACampaign, DevTask } from '../services/hardwareService';
 import { 
     FiCpu, FiHardDrive, FiActivity, FiMapPin, 
