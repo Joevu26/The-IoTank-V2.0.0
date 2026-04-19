@@ -6,6 +6,8 @@ import { TankReading, Tank, Alert, User, ShiftDocument, Site } from '@/types';
 import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
 import { AuditService } from '@/services/AuditService';
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Helper to safely cast to number with a default
  */

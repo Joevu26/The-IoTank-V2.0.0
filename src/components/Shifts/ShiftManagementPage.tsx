@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { 
-    FiActivity, FiShield, FiTrendingUp, 
-    FiCheckCircle, FiCalendar 
+    FiActivity, FiShield, FiTrendingUp 
 } from 'react-icons/fi';
 import { MdOutlineEventNote } from 'react-icons/md';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,7 +14,7 @@ export const ShiftManagementPage: React.FC = () => {
     const stationId = currentUser?.stationId || '';
     
     // Data Loading
-    const { tanks, loading: tanksLoading } = useTanks(stationId);
+    const { loading: tanksLoading } = useTanks(stationId);
     const { shifts, loading: shiftsLoading } = useShifts(stationId);
     const { activeShift, loading: activeLoading } = useActiveShift(stationId);
 

@@ -173,6 +173,14 @@ export interface Alert {
         lossVolume?: number;
         dropRate?: number;
         suspectedType?: 'theft' | 'leak';
+        // Market/Price
+        oldPrice?: number;
+        newPrice?: number;
+        priceDiff?: number;
+        // Shift/Forensic
+        nodeId?: string;
+        openedBy?: any;
+        closing_volume?: number;
     };
 }
 
