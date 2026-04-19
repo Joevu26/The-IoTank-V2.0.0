@@ -27,11 +27,11 @@ import { useShiftStatus } from '@/hooks/useShiftStatus';
 export const Dashboard: React.FC = () => {
     const { currentUser } = useAuth();
     const { pushEvent } = useTelemetryQueue();
-    const navigate = useNavigate();
+    // const navigate = useNavigate(); // Unused in this build
     const stationId = currentUser?.stationId || '';
 
     const { tanks, loading: tanksLoading, error: tanksError } = useTanks(stationId);
-    const { status: shiftStatus } = useShiftStatus();
+    useShiftStatus();
     
     // Fetch latest readings for all tanks to get RSSI
     const { readings } = useAllLatestReadings(stationId, (tanks || []).map(t => t.id));

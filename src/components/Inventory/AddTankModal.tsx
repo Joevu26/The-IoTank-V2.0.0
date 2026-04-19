@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { supabase } from '@/config/supabase';
 import { FiX, FiPlus, FiAlertCircle, FiLock, FiChevronRight, FiInfo } from 'react-icons/fi';
 import { useSites, createTank } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';

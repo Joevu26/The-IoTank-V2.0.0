@@ -181,6 +181,7 @@ export interface Alert {
         nodeId?: string;
         openedBy?: any;
         closing_volume?: number;
+        tankName?: string;
     };
 }
 

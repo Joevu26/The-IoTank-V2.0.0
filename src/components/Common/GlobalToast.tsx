@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiBell, FiX, FiCheckCircle, FiAlertCircle, FiInfo, FiTruck, FiActivity } from 'react-icons/fi';
+import { FiBell, FiX, FiCheckCircle, FiAlertCircle, FiInfo, FiTruck } from 'react-icons/fi';
 import './GlobalToast.css';
 
 interface ToastData {
