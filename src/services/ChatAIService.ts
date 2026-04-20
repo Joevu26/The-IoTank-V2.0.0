@@ -112,7 +112,7 @@ export class ChatAIService {
                 body: JSON.stringify({
                     action: 'chat',
                     body: { contents },
-                    endpoint: 'models/gemini-1.5-flash-latest:generateContent'
+                    endpoint: 'models/gemini-1.5-flash:generateContent'
                 })
             });
 

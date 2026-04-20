@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     if (!allowedEndpoints.has(targetEndpoint)) {
       throw new Error('Endpoint is not allowed');
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/${targetEndpoint}?key=${geminiApiKey}`
+    const url = `https://generativelanguage.googleapis.com/v1/${targetEndpoint}?key=${geminiApiKey}`
     
     const response = await fetch(url, {
       method: 'POST',

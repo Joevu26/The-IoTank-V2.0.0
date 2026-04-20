@@ -68,6 +68,8 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [approving, setApproving] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [showManualModal, setShowManualModal] = useState(false);
@@ -138,11 +140,33 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
 
   const handleApproveAdmin = async (reg: PendingReg) => {
     setApproving(true);
+    setProcessingId(reg.id);
     setToast(null);
+    
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('approve-registration', {
-        body: { registrationId: reg.id }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+          setToast({ show: true, type: 'error', title: 'Session Expired', message: 'Your session has ended. Please sign in again.' });
+          setTimeout(() => window.location.href = '/', 1500);
+          return;
+      }
+
+      console.log(`[DEBUG_LOG] ADMIN_PROVISION: Authorizing for ${reg.email}...`);
+      
+      const { data, error } = await supabase.functions.invoke('approve-registration', {
+        body: { registrationId: reg.id, approvedBy: session.user.id }
       });
+
+      if (error) {
+          if (error.status === 401 || (error.message && error.message.includes('401'))) {
+              console.error("[DEBUG_LOG] AUTH_FAILURE: Stale session detected. Purging.");
+              setToast({ show: true, type: 'error', title: 'Identity Desync', message: 'Security token mismatch. Forced re-authentication required.' });
+              localStorage.clear();
+              setTimeout(() => window.location.href = '/', 2000);
+              return;
+          }
+          throw error;
+      }
       
       if (data && data.success === false) {
           setToast({
@@ -178,6 +202,7 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
       setToast({ show: true, type: 'error', title: "Critical Exception", message: err.message });
     } finally {
       setApproving(false);
+      setProcessingId(null);
     }
   };
 
@@ -473,8 +498,8 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                             ) : (
                                 <>
                                     <button className="btn-audit-reject" onClick={() => setRejectingId(reg.id)}>Reject Identity</button>
-                                    <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving}>
-                                        {approving ? <FiLoader className="animate-spin" /> : <FiZap />}
+                                    <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving && processingId === reg.id}>
+                                        {approving && processingId === reg.id ? <FiLoader className="animate-spin" /> : <FiZap />}
                                         <span>Provision Executive Account</span>
                                     </button>
                                 </>
@@ -673,10 +698,20 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <button className="action-circle approve" onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} disabled={approving} title="Approve Request">
-                                                            {approving ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
+                                                        <button 
+                                                            className="action-circle approve" 
+                                                            onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} 
+                                                            disabled={approving && processingId === reg.id} 
+                                                            title="Approve Request"
+                                                        >
+                                                            {approving && processingId === reg.id ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
                                                         </button>
-                                                        <button className="action-circle reject" onClick={(e) => { e.stopPropagation(); setRejectingId(reg.id); }} title="Reject Request">
+                                                        <button 
+                                                            className="action-circle reject" 
+                                                            onClick={(e) => { e.stopPropagation(); setRejectingId(reg.id); }} 
+                                                            disabled={approving && processingId === reg.id}
+                                                            title="Reject Request"
+                                                        >
                                                             <FiXCircle size={18} />
                                                         </button>
                                                     </>

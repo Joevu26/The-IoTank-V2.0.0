@@ -38,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, children }) => 
 
     useEffect(() => {
         const checkConnection = async () => {
+            if (!systemUser) return;
             try {
                 const { error } = await supabase.from('market_prices').select('id').limit(1);
                 if (error) console.error('Supabase Connection Error:', error);
@@ -56,6 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, children }) => 
         if (!canSee(1)) return;
 
         const loadCriticalEvents = async () => {
+            if (!systemUser || !canSee(1)) return;
             try {
                 const since = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
                 const { count, error } = await supabase
