@@ -278,9 +278,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                                           (sessionError as any).status === 400;
                     
                     if (isInvalidToken) {
-                        console.error("[DEBUG_LOG] BOOT: Session data corrupted or expired. Purging.");
+                        console.warn("[DEBUG_LOG] BOOT: Session data corrupted or expired. Performing silent purge.");
                         localStorage.removeItem(CACHE_KEY);
-                        await supabase.auth.signOut();
+                        // Sign out but without throwing more errors
+                        await supabase.auth.signOut().catch(() => {});
                         setCurrentUser(null);
                         updateLoadingState(false);
                         return;
