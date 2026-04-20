@@ -161,7 +161,8 @@ export class IntelligenceAIService {
                 };
             }
 
-            const response = await fetch(`https://suifvborodwergtrbjez.supabase.co/functions/v1/${provider}-proxy`, {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/${provider}-proxy`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -234,7 +235,8 @@ export class IntelligenceAIService {
     private async callGemini(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/gemini-proxy', {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/gemini-proxy`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -263,7 +265,8 @@ export class IntelligenceAIService {
     private async callGroq(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/groq-proxy', {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/groq-proxy`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -292,7 +295,8 @@ export class IntelligenceAIService {
     private async callDeepSeek(context: any, actionType: string = 'intelligence'): Promise<string> {
         try {
             const headers = await this.getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/deepseek-proxy', {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/deepseek-proxy`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({

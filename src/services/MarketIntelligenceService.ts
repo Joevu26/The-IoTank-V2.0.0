@@ -63,7 +63,8 @@ export class MarketIntelligenceService {
 
             for (const q of queries) {
                 const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&domains=${domains}&language=en&sortBy=publishedAt&pageSize=15&from=${fromDate}`;
-                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const response = await fetch(`${supabaseUrl}/functions/v1/news-api-proxy`, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ url })
@@ -79,7 +80,8 @@ export class MarketIntelligenceService {
             
             if (allArticles.length === 0) {
                 const headlinesUrl = `https://newsapi.org/v2/top-headlines?category=business&q=fuel&language=en&pageSize=10`;
-                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/news-api-proxy', {
+                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                const response = await fetch(`${supabaseUrl}/functions/v1/news-api-proxy`, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ url: headlinesUrl })
@@ -134,7 +136,8 @@ export class MarketIntelligenceService {
     async fetchEIAPrices(): Promise<any> {
         try {
             const headers = await this.getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/eia-proxy', {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/eia-proxy`, {
                 method: 'POST',
                 headers
             });
@@ -154,9 +157,10 @@ export class MarketIntelligenceService {
 
         try {
             const headers = await this.getSafeAuthHeaders();
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
             for (const symbol of benchmarks) {
-                const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/alpha-vantage-proxy', {
+                const response = await fetch(`${supabaseUrl}/functions/v1/alpha-vantage-proxy`, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({ symbol })
