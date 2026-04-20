@@ -172,8 +172,8 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
           title: 'Provisioning Success',
           message: `${reg.full_name} has been synchronized as Executive Administrator.`
       });
+      setSelectedReg(null); // Close modal IMMEDIATELY on success
       await fetchRegistrations();
-      setSelectedReg(null); // Close modal if open
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: "Critical Exception", message: err.message });
     } finally {
@@ -181,8 +181,9 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
     }
   };
 
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
   const handleReject = async (reg: PendingReg) => {
-    if (!window.confirm(`Are you sure you want to reject ${reg.full_name}'s request?`)) return;
     try {
       const { error } = await supabase.from('pending_registrations').update({ status: 'rejected' }).eq('id', reg.id);
       if (error) throw error;
@@ -192,8 +193,9 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
           title: 'Request Rejected', 
           message: `Administrative access for ${reg.full_name} has been formally declined and archived.` 
       });
-      await fetchRegistrations();
+      setRejectingId(null);
       setSelectedReg(null); // Close modal if open
+      await fetchRegistrations();
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: "Rejection Logic Failed", message: err.message });
     }
@@ -462,11 +464,21 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
 
                     {reg.status === 'pending' && (
                         <div className="form-actions mt-8">
-                            <button className="btn-audit-reject" onClick={() => handleReject(reg)}>Reject Identity</button>
-                            <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving}>
-                                {approving ? <FiLoader className="animate-spin" /> : <FiZap />}
-                                <span>Provision Executive Account</span>
-                            </button>
+                            {rejectingId === reg.id ? (
+                                <div className="flex items-center gap-3 animate-in slide-in-from-right-4 duration-300">
+                                    <span className="text-[10px] font-black uppercase text-rose-600">Archiving Identity?</span>
+                                    <button className="btn-confirm-reject" onClick={() => handleReject(reg)}>Confirm</button>
+                                    <button className="btn-cancel-reject" onClick={() => setRejectingId(null)}>Cancel</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <button className="btn-audit-reject" onClick={() => setRejectingId(reg.id)}>Reject Identity</button>
+                                    <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving}>
+                                        {approving ? <FiLoader className="animate-spin" /> : <FiZap />}
+                                        <span>Provision Executive Account</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -650,12 +662,25 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                                     <td className="text-right">
                                         {reg.status === 'pending' ? (
                                             <div className="flex justify-end gap-2 pr-2">
-                                                <button className="action-circle approve" onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} disabled={approving} title="Approve Request">
-                                                    {approving ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
-                                                </button>
-                                                <button className="action-circle reject" onClick={(e) => { e.stopPropagation(); handleReject(reg); }} title="Reject Request">
-                                                    <FiXCircle size={18} />
-                                                </button>
+                                                {rejectingId === reg.id ? (
+                                                    <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                                                        <button className="action-circle-small confirm" onClick={(e) => { e.stopPropagation(); handleReject(reg); }} title="Confirm Reject">
+                                                            <FiCheckCircle size={14} />
+                                                        </button>
+                                                        <button className="action-circle-small cancel" onClick={(e) => { e.stopPropagation(); setRejectingId(null); }} title="Cancel">
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <button className="action-circle approve" onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} disabled={approving} title="Approve Request">
+                                                            {approving ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
+                                                        </button>
+                                                        <button className="action-circle reject" onClick={(e) => { e.stopPropagation(); setRejectingId(reg.id); }} title="Reject Request">
+                                                            <FiXCircle size={18} />
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="flex justify-end pr-4">

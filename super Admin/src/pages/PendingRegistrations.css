@@ -314,6 +314,48 @@
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
 }
 
+.action-circle-small {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.action-circle-small.confirm { background: #10b981; color: #fff; }
+.action-circle-small.confirm:hover { background: #059669; }
+.action-circle-small.cancel { background: #f1f5f9; color: #64748b; }
+.action-circle-small.cancel:hover { background: #e2e8f0; color: #1e293b; }
+
+.btn-confirm-reject {
+    padding: 0.5rem 1rem;
+    background: #f43f5e;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(244, 63, 94, 0.2);
+}
+
+.btn-cancel-reject {
+    padding: 0.5rem 1rem;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
 /* ── Pagination ── */
 .table-pagination-footer {
     padding: 1rem 1.5rem;

@@ -254,7 +254,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const isRecoveryFlow = window.location.pathname === '/reset-password';
 
     // 1. Check active session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error: sessionError }) => {
+      // CATCH: Invalid Refresh Token or other session recovery failures
+      if (sessionError) {
+        const isInvalidToken = sessionError.message?.toLowerCase().includes('refresh token') || 
+                              sessionError.message?.toLowerCase().includes('invalid token') ||
+                              (sessionError as any).status === 400;
+        
+        if (isInvalidToken) {
+            console.warn("[DEBUG_LOG] BOOT: Session data corrupted or expired. Performing silent purge.");
+            // Sign out but without throwing more errors
+            await supabase.auth.signOut().catch(() => {});
+            setUser(null);
+            setSystemUser(null);
+            setLoading(false);
+            return;
+        }
+      }
+
       if (session?.user) {
         currentUserRef.current = session.user.id;
         if (!isRecoveryFlow) {

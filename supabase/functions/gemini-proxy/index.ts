@@ -7,6 +7,7 @@ declare const Deno: any;
 
 const allowedEndpoints = new Set([
   'models/gemini-1.5-flash:generateContent',
+  'models/gemini-1.5-flash-latest:generateContent',
   'models/gemini-1.5-pro:generateContent',
 ]);
 const MAX_PER_WINDOW = 20;
