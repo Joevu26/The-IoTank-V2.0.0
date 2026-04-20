@@ -62,6 +62,10 @@ Deno.serve(async (req: Request) => {
   const SMTP_PASSWORD = Deno.env.get('SMTP_PASSWORD'); 
   const SEND_FROM_EMAIL = Deno.env.get('SEND_FROM_EMAIL') || SMTP_USERNAME;
 
+  if (!SMTP_PASSWORD) {
+    console.warn('[dispatch] SMTP_PASSWORD not configured. Emails will likely fail if authentication is required.');
+  }
+
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: 'Missing Supabase URL/Key' }), {
       status: 500,

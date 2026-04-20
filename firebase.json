@@ -1,10 +1,4 @@
 {
-    "functions": {
-        "predeploy": [
-            "npm --prefix functions run build"
-        ],
-        "source": "functions"
-    },
     "hosting": [
         {
             "site": "the-iotank-project",
