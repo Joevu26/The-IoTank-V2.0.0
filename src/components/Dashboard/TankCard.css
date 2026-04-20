@@ -310,18 +310,6 @@
     }
 }
 
-@media (max-width: 640px) {
-    .command-center-grid {
-        grid-template-columns: 1fr;
-        gap: 1.25rem;
-    }
-
-    .gauge-section {
-        max-width: 140px;
-        margin: 0 auto;
-    }
-}
-
 @media (max-width: 480px) {
     .tank-card.live-command-center {
         padding: 1rem;

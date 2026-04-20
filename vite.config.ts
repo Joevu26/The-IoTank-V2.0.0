@@ -5,6 +5,7 @@ import compression from 'vite-plugin-compression';
 import path from 'path';
 
 export default defineConfig({
+  cacheDir: 'node_modules/.vite_clean',
   plugins: [
     react(),
     VitePWA({
@@ -123,7 +124,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
   },
   server: {
-    port: 3000,
+    port: 3001,
     open: true,
   },
 });

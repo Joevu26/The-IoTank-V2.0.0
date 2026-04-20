@@ -380,6 +380,9 @@ verify_jwt = false
 [functions.news-api-proxy]
 verify_jwt = false
 
+[functions.approve-registration]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

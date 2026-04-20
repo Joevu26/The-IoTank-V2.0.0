@@ -155,8 +155,8 @@ export const DeliveriesPage: React.FC = () => {
                         <FiTruck size={24} />
                     </div>
                     <div>
-                        <h1>Delivery Intelligence</h1>
-                        <p className="dp-subtitle">Forensic audit, supplier verification and historical reconciliation.</p>
+                        <h1>Deliveries</h1>
+                        <p className="dp-subtitle">Track orders, reconcile arrivals and review delivery history.</p>
                     </div>
                 </div>
                 <div className="dp-header-actions">
@@ -262,14 +262,14 @@ export const DeliveriesPage: React.FC = () => {
                         <table className="tdv-transaction-table">
                             <thead>
                                 <tr>
-                                    <th>ORDER REF</th>
-                                    <th>SUPPLIER</th>
-                                    <th>FUEL GRADE</th>
-                                    <th>QUANTITY</th>
-                                    <th>EXPECTED</th>
-                                    <th>ACTOR</th>
-                                    <th>PRIORITY</th>
-                                    <th>STATUS</th>
+                                    <th>Order Ref</th>
+                                    <th>Supplier</th>
+                                    <th>Fuel Grade</th>
+                                    <th>Quantity</th>
+                                    <th>Expected</th>
+                                    <th>Actor</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -347,14 +347,14 @@ export const DeliveriesPage: React.FC = () => {
                         <table className="tdv-transaction-table">
                             <thead>
                                 <tr>
-                                    <th>INVOICE #</th>
-                                    <th>SUPPLIER / OMC</th>
-                                    <th>TRUCK</th>
-                                    <th>PRODUCT</th>
-                                    <th>INVOICED</th>
-                                    <th>ATG DELTA</th>
-                                    <th>VARIANCE</th>
-                                    <th>STATUS</th>
+                                    <th>Invoice #</th>
+                                    <th>Supplier / OMC</th>
+                                    <th>Truck</th>
+                                    <th>Product</th>
+                                    <th>Invoiced</th>
+                                    <th>ATG Delta</th>
+                                    <th>Variance</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>

@@ -11,7 +11,7 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({ statio
         <div className="ds-card ds-card-panel protocol-guard-card p-6 h-full flex flex-col justify-between group">
             <div className="flex-1">
                 {/* Header Section with Pulse Effect */}
-                <div className="flex justify-between items-start mb-8">
+                <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center">
                         <div className="guard-pulse-core">
                             <div className="pulse-ring"></div>
@@ -35,7 +35,7 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({ statio
                 </div>
 
                 {/* Trust Metrics Section */}
-                <div className="mb-10">
+                <div className="mb-5">
                     <div className="flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">System Trust Index</span>
@@ -43,18 +43,18 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({ statio
                         </div>
                         <span className="text-2xl font-black text-emerald-600 tabular-nums tracking-tighter">99.98%</span>
                     </div>
-                    <div className="h-4 bg-slate-100/80 rounded-2xl overflow-hidden p-1 border border-slate-200/50 shadow-inner">
+                    <div className="h-2.5 bg-slate-100/80 rounded-2xl overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
                         <div className="h-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500 rounded-xl shadow-lg relative">
                             <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.4)_50%,transparent_100%)] animate-[shimmer_2s_infinite]"></div>
                         </div>
                     </div>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-2.5 tracking-widest text-right italic">Optimized for Ultra-Low Latency</p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase mt-1.5 tracking-widest text-right italic">Optimized for Ultra-Low Latency</p>
                 </div>
 
                 {/* HUD Grid Section */}
-                <div className="grid gap-4">
+                <div className="grid gap-2.5">
                     <div className="security-hud-metric">
-                        <div className="flex justify-between items-center mb-4">
+                        <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2.5">
                                 <div className="p-1.5 bg-emerald-100/50 rounded-lg">
                                     <FiActivity size={14} className="text-emerald-600" />
@@ -80,7 +80,7 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({ statio
                     </div>
                     
                     <div className="security-hud-metric border-emerald-100/30">
-                        <div className="flex justify-between items-center mb-3">
+                        <div className="flex justify-between items-center mb-1.5">
                             <div className="flex items-center gap-2">
                                 <FiCpu size={12} className="text-slate-400" />
                                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Network Identity Blueprint</span>

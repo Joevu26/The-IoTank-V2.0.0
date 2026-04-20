@@ -4,6 +4,7 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  cacheDir: 'node_modules/.vite_clean',
   plugins: [react()],
   resolve: {
     alias: {
@@ -13,6 +14,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom']
   },
   server: {
+    port: 5174,
     fs: {
       allow: ['..']
     }

@@ -77,7 +77,7 @@ export const TankVisual2D: React.FC<TankVisual2DProps> = ({
       
       {/* Percentage Indicator */}
       <div className="tank-2d-percentage">
-        {fuelLevel}%
+        {parseFloat(fuelLevel.toFixed(2))}%
       </div>
     </div>
   );

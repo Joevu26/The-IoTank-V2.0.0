@@ -1099,3 +1099,40 @@
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── C2 Network Provisioning (Words vs Input) ─── */
+.wifi-provisioning-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.wifi-grid-row {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 16px;
+    align-items: center;
+}
+
+.wifi-words-column h4 {
+    color: #334155;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+.wifi-words-column p {
+    color: #64748b;
+    line-height: 1.5;
+    margin-top: 4px;
+}
+
+.wifi-input-column .settings-input {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+@media (max-width: 640px) {
+    .wifi-grid-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+}

@@ -59,8 +59,8 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
 
             <div className="stats-grid">
                 {/* Card 1: Cumulative Total Volume */}
-                <div className="ds-card ds-card-panel ds-card-full-gradient bg-cyan-industrial stat-card">
-                    <div className="stat-content h-full flex flex-col justify-between">
+                <div className="ds-card ds-card-premium glow-cyan stat-card">
+                    <div className="stat-content flex flex-col gap-1">
                         <div className="stat-header">
                             <span className="stat-label-refined">Total Network Volume</span>
                             <FiLayers className="stat-icon" />
@@ -74,8 +74,8 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
                             <span className="stat-value-unit">L</span>
                         </div>
                         <div className="stat-meta">
-                            <span className="text-[10px] font-black tracking-widest uppercase">
-                                {tanks.length === 0 && stationId ? 'Synchronizing fleet...' : `Across ${tanks.length} Active Tanks`}
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af', fontWeight: 400 }}>
+                                {tanks.length === 0 && stationId ? 'Syncing...' : `Across ${tanks.length} tank${tanks.length === 1 ? '' : 's'}`}
                             </span>
                         </div>
                     </div>
@@ -84,11 +84,11 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
                 {/* Card 2: Cumulative Asset Value (Level 6+) */}
                 {canSee(6) && (
                     <div 
-                        className={`ds-card ds-card-panel ds-card-full-gradient ${hasMissingPrices ? 'bg-amber-600 shadow-amber-200' : 'bg-emerald-industrial'} stat-card clickable group`} 
+                        className={`ds-card ds-card-premium ${hasMissingPrices ? 'glow-amber' : 'glow-success'} stat-card clickable group`} 
                         onClick={() => navigate('/settings')}
                         title={hasMissingPrices ? "Configure Fuel Prices to enable valuation" : "View Inventory Pricing"}
                     >
-                        <div className="stat-content h-full flex flex-col justify-between">
+                        <div className="stat-content flex flex-col gap-1">
                             <div className="stat-header">
                                 <span className="stat-label-refined">Total Asset Value</span>
                                 <FiCheckCircle className="stat-icon" />
@@ -110,9 +110,9 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
                                     </>
                                 )}
                             </div>
-                            <div className="stat-meta">
-                                <span className="text-[10px] font-black tracking-widest uppercase">Global Revaluation</span>
-                                <div className="stat-trend-chip bg-white/20 text-white">
+                            <div className="stat-meta mt-1">
+                                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', fontWeight: 400 }}>Portfolio value</span>
+                                <div className="stat-trend-chip">
                                     <FiTrendingUp /> {totalTrend}
                                 </div>
                             </div>

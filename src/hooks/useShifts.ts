@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { ShiftDocument } from '@/types';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface UseShiftsOptions {
     startDate?: Date;
@@ -15,6 +16,9 @@ interface UseShiftsReturn {
     error: string | null;
 }
 
+/**
+ * Hook for Shift Operational Logs (Historical)
+ */
 export function useShifts(stationId: string, options: UseShiftsOptions = {}): UseShiftsReturn {
     const [shifts, setShifts] = useState<ShiftDocument[]>([]);
     const [loading, setLoading] = useState(true);
@@ -57,6 +61,7 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
                 if (fetchError) throw fetchError;
 
                 const mappedShifts: ShiftDocument[] = (data || []).map(row => ({
+                    ...row,
                     id: row.id,
                     tankId: row.tank_id,
                     siteId: row.site_id,
@@ -76,6 +81,9 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
                     notes: row.notes,
                     recordedAt: row.recorded_at,
                     metadata: row.metadata,
+                    // Forensic Fields
+                    received_collections: row.received_collections,
+                    variance_data: row.variance_data
                 } as unknown as ShiftDocument));
 
                 setShifts(mappedShifts);
@@ -90,7 +98,6 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
 
         fetchShifts();
 
-        // Subscribe to changes
         const channel = supabase
             .channel(`shifts:${stationId}`)
             .on(
@@ -106,4 +113,50 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
     }, [stationId, options.startDate, options.endDate, options.tankId, options.siteId]);
 
     return { shifts, loading, error };
+}
+
+/**
+ * Hook for Active Shift Tracking (Continuous State)
+ */
+export function useActiveShift(stationId: string | undefined) {
+    const queryClient = useQueryClient();
+
+    const query = useQuery({
+        queryKey: ['active_shift', stationId],
+        queryFn: async () => {
+            if (!stationId) return null;
+            const { data, error } = await supabase
+                .from('current_station_shifts')
+                .select('*')
+                .eq('station_id', stationId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+            return data || null;
+        },
+        enabled: !!stationId,
+        staleTime: 30 * 1000, 
+    });
+
+    useEffect(() => {
+        if (!stationId) return;
+
+        const channel = supabase
+            .channel(`active-shift:${stationId}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'current_station_shifts',
+                filter: `station_id=eq.${stationId}` 
+            }, () => {
+                queryClient.invalidateQueries({ queryKey: ['active_shift', stationId] });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [stationId, queryClient]);
+
+    return { activeShift: query.data || null, loading: query.isLoading, error: query.error as Error | null };
 }

@@ -77,11 +77,11 @@ export const GlobalToast: React.FC = () => {
 
     const getSeverityLabel = () => {
         switch (toast.type) {
-            case 'success': return 'OPERATIONAL_SUCCESS';
-            case 'error': return 'SYSTEM_EXCEPTION';
+            case 'error': return 'CRITICAL';
             case 'market': return 'MARKET_SIGNAL';
-            case 'refill': return 'HARDWARE_TELEMETRY';
-            default: return 'SYSTEM_ADVISORY';
+            case 'refill': return 'HARDWARE';
+            case 'success': return 'OPERATIONAL';
+            default: return 'WATCH';
         }
     };
 
@@ -90,30 +90,33 @@ export const GlobalToast: React.FC = () => {
             className={`precision-toast-container ${visible ? 'active' : ''}`}
             role="alert"
         >
-            <div className={`precision-toast-card status-${toast.type}`}>
-                <div className="toast-accent-line" />
-                <div className="toast-header-compact">
-                    <div className="toast-title-stack">
-                        <span className="toast-attribution">{toast.attribution || 'SYSTEM INTERFACE'}</span>
-                        <h4 className="toast-title-text">{toast.title}</h4>
+            <div className={`precision-toast-card-industrial status-${toast.type}`}>
+                <div className="toast-body-industrial">
+                    <div className="toast-pill-wrapper">
+                        <span className={`industrial-pill pill-${toast.type}`}>
+                            {getSeverityLabel()}
+                        </span>
                     </div>
-                    <button onClick={() => setVisible(false)} className="toast-close-trigger">
-                        <FiX size={14} />
-                    </button>
+                    
+                    <div className="toast-content-industrial text-slate-800">
+                        <div className="flex justify-between items-start">
+                            <h4 className="toast-title-industrial">{toast.title}</h4>
+                            <button onClick={() => setVisible(false)} className="toast-close-mini">
+                                <FiX size={12} />
+                            </button>
+                        </div>
+                        <p className="toast-message-industrial">{toast.message}</p>
+                        
+                        <div className="toast-footer-industrial">
+                            <span className="toast-action-link">
+                                Investigate <span className="arrow">→</span>
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="toast-body-tactical">
-                    <div className="toast-icon-wrapper">
-                        {getIcon()}
-                    </div>
-                    <div className="toast-content-wrapper">
-                        <span className="toast-severity-pill">{getSeverityLabel()}</span>
-                        <p className="toast-message-text">{toast.message}</p>
-                    </div>
-                </div>
-
-                <div className="toast-progress-container">
-                    <div className="toast-progress-bar" style={{ width: `${progress}%` }} />
+                <div className="toast-progress-industrial">
+                    <div className="toast-progress-bar-industrial" style={{ width: `${progress}%` }} />
                 </div>
             </div>
         </div>

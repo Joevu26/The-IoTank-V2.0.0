@@ -36,16 +36,16 @@ serve(async (req) => {
             if (tank.status !== 'idle') continue;
 
             const twoHoursAgo = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
-            const { data: readingsData, error: readingsError } = await supabase
-                .from('tank_readings')
-                .select('ambient_volume')
+        const { data: readingsData, error: readingsError } = await supabase
+                .from('sensor_readings')
+                .select('volume')
                 .eq('tank_id', tank.id)
                 .gt('timestamp', twoHoursAgo)
                 .order('timestamp', { ascending: true });
 
             if (readingsError || !readingsData || readingsData.length < 10) continue;
 
-            const readings = readingsData.map(d => d.ambient_volume as number);
+            const readings = readingsData.map(d => d.volume as number);
             const slope = calculateSlope(readings);
             const LEAK_THRESHOLD = -0.5; // >0.5L drop per internal interval
 

@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import './InventoryPage.css';
 import { useAuth } from '@/hooks/useAuth';
 import { useTransactions } from '@/hooks/useTransactions';
-import { useTanks, useRefuelMonitor } from '@/hooks/useSupabase';
+import { useTanks, useRefuelMonitor, useSites } from '@/hooks/useSupabase';
 import { FiAlertTriangle, FiGrid, FiList, FiPlus } from 'react-icons/fi';
 import { TankDetailsView } from './TankDetailsView';
 import { PageHeader } from '../Common/PageHeader';
@@ -26,6 +26,7 @@ export const InventoryPage: React.FC = () => {
     const stationId = currentUser?.stationId || '';
     const { tanks, loading: tanksLoading } = useTanks(stationId);
     const { transactions, loading: txLoading } = useTransactions(stationId);
+    const { sites } = useSites(stationId);
     const { isRefuelling } = useRefuelMonitor(stationId, tanks[0]?.id || '');
 
     // View Management
@@ -115,8 +116,8 @@ export const InventoryPage: React.FC = () => {
         <div className="inventory-page-container">
             {/* Page Header */}
             <PageHeader
-                title="Inventory Command"
-                description="Global stock oversight and terminal health monitoring"
+                title="Inventory"
+                description="Monitor tank levels, sensor health, and stock details across all nodes."
             />
 
             {/* Fleet Intelligence Strip */}
@@ -253,7 +254,8 @@ export const InventoryPage: React.FC = () => {
             {/* Add Tank Modal */}
             {showAddModal && (
                 <AddTankModal
-                    stationId={stationId}
+                    isOpen={showAddModal}
+                    sites={sites}
                     onClose={() => setShowAddModal(false)}
                     onSuccess={(newTank) => {
                         setActiveTankId(newTank.id);

@@ -658,61 +658,8 @@ export function useProfile(authUserId: string | undefined) {
     return { profile, loading, error };
 }
 
-/**
- * Hook for Shift Closures
- */
-export function useShifts(stationId: string | undefined, tankId?: string) {
-    const [shifts, setShifts] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<Error | null>(null);
-
-    useEffect(() => {
-        if (!stationId) {
-            setLoading(false);
-            return;
-        }
-
-        const fetchShifts = async () => {
-            try {
-                let query = supabase
-                    .from('shift_closures')
-                    .select('*')
-                    .eq('station_id', stationId)
-                    .order('closed_at', { ascending: false });
-
-                if (tankId) {
-                    query = query.eq('tank_id', tankId);
-                }
-
-                const { data, error } = await query;
-                if (error) throw error;
-                setShifts(data || []);
-            } catch (err) {
-                console.error('Error fetching shifts:', err);
-                setError(err as Error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchShifts();
-
-        const channel = supabase
-            .channel(`shifts:${stationId}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'shift_closures', filter: `station_id=eq.${stationId}` },
-                () => fetchShifts()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, tankId]);
-
-    return { shifts, loading, error };
-}
+// useShifts moved to useShifts.ts - exported here for forensic compatibility during HMR transition
+export { useShifts } from './useShifts';
 
 /**
  * Create Shift Record (Unified Forensic Logging)
@@ -890,48 +837,5 @@ export function useRefuelMonitor(stationId: string, tankId: string) {
     return { isRefuelling };
 }
 
-/**
- * Professional Hook for Active Shift Tracking
- */
-export function useActiveShift(stationId: string | undefined) {
-    const queryClient = useQueryClient();
-
-    const query = useQuery({
-        queryKey: ['active_shift', stationId],
-        queryFn: async () => {
-            if (!stationId) return null;
-            const { data, error } = await supabase
-                .from('current_station_shifts')
-                .select('*')
-                .eq('station_id', stationId)
-                .single();
-
-            if (error && error.code !== 'PGRST116') throw error;
-            return data || null;
-        },
-        enabled: !!stationId,
-        staleTime: 30 * 1000, 
-    });
-
-    useEffect(() => {
-        if (!stationId) return;
-
-        const channel = supabase
-            .channel(`active-shift:${stationId}`)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'current_station_shifts',
-                filter: `station_id=eq.${stationId}` 
-            }, () => {
-                queryClient.invalidateQueries({ queryKey: ['active_shift', stationId] });
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, queryClient]);
-
-    return { activeShift: query.data || null, loading: query.isLoading, error: query.error as Error | null };
-}
+// useActiveShift moved to useShifts.ts - exported here for forensic compatibility during HMR transition
+export { useActiveShift } from './useShifts';

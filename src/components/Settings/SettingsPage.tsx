@@ -10,7 +10,7 @@ import {
 import { MdWifi, MdRefresh } from 'react-icons/md';
 import { DeviceCommandService, DeviceCommand } from '@/services/DeviceCommandService';
 import { convertToWebP } from '@/utils/performance';
-import { useTanks, updateTank as syncTankToDb, createAlert } from '@/hooks/useSupabase';
+import { useTanks, updateTank as syncTankToDb, createAlert, useSites } from '@/hooks/useSupabase';
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
@@ -22,6 +22,8 @@ export const SettingsPage: React.FC = () => {
         currentUser, verifySettingsPassword, updateUser, enrollMFA, verifyMFARegistration, unenrollMFA
     } = useAuth();
     const { t } = useTranslation();
+    const stationId = currentUser?.stationId || '';
+    const { sites } = useSites(stationId);
 
     // Section Refs
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -224,7 +226,6 @@ export const SettingsPage: React.FC = () => {
     };
 
     // Tank Info for Config
-    const stationId = currentUser?.stationId || 'default-station-id';
     const { tanks } = useTanks(stationId);
 
     const [profileForm, setProfileForm] = useState({
@@ -283,7 +284,13 @@ export const SettingsPage: React.FC = () => {
     const [isSendingCommand, setIsSendingCommand] = useState(false);
 
     // Get unique devices from tanks safely
-    const uniqueDevices = Array.from(new Set(tanks.map((t: any) => t.sensorId || t.sensor_id).filter(id => id)));
+    // [SCOPING FIX]: Ensure we only show hardware ids for the current station's tanks
+    const uniqueDevices = Array.from(new Set(
+        tanks
+            .filter((t: any) => (t.stationId || t.station_id) === stationId)
+            .map((t: any) => t.sensorId || t.sensor_id)
+            .filter(id => id)
+    ));
 
     useEffect(() => {
         if (activeTab === 'devices' && currentUser?.stationId) {
@@ -1565,19 +1572,11 @@ selectedDevice
 <option value="">
 Select a registered device...
 </option>
-                                        {
-uniqueDevices.map(id =>(                                            
-<option key={
-id
-} value={
-id
-}>
-ESP-NODE: {
-(id as string).toUpperCase()
-}
-</option>
-                                        ))
-}                                    
+                                        {uniqueDevices.map(id => (                                            
+                                            <option key={id} value={id}>
+                                                ESP-NODE: {(id as string).toUpperCase()}
+                                            </option>
+                                        ))}                                    
 </select>
                                 
 </div>
@@ -1601,41 +1600,54 @@ Network Provisioning
 </span>
                                         
 </div>
-                                        
-<div className="space-y-3">
-                                            
-<input                                                 id="wifi-ssid"                                                className="settings-input !bg-white !text-xs !h-10 border-slate-200"                                                 placeholder="WiFi SSID (Network Name)"                                                 value={
-wifiConfig.ssid
-}                                                onChange={
-e =>
- setWifiConfig(prev =>({
- ...prev, ssid: e.target.value 
-}))
-}                                                aria-label="WiFi SSID"                                                title="WiFi SSID"                                            />
-                                            
-<input                                                 id="wifi-password"                                                className="settings-input !bg-white !text-xs !h-10 border-slate-200"                                                 type="password"                                                 placeholder="WiFi Password"                                                 value={
-wifiConfig.password
-}                                                onChange={
-e =>
- setWifiConfig(prev =>({
- ...prev, password: e.target.value 
-}))
-}                                                aria-label="WiFi Password"                                                title="WiFi Password"                                            />
-                                            
-<button                                                 className="btn-submit w-full !py-2.5 !text-[11px] !rounded-lg !bg-blue-600 hover:!bg-blue-700 shadow-sm"                                                disabled={
-isSendingCommand || !wifiConfig.ssid || !selectedDevice
-}                                                onClick={
-() =>
- handleSendCommand('SET_WIFI', wifiConfig)
-}                                                title="Deploy Network Config to Device"                                            >
-                                                Deploy WiFi Configuration                                            
-</button>
-                                        
-</div>
+                                            <div className="wifi-provisioning-layout mt-4">
+                                                <div className="wifi-grid-row border-b border-slate-100 pb-3 mb-3">
+                                                    <div className="wifi-words-column">
+                                                        <h4 className="text-[11px] font-bold text-slate-700">WiFi Name</h4>
+                                                    </div>
+                                                    <div className="wifi-input-column mt-0">
+                                                        <input 
+                                                            id="wifi-ssid" 
+                                                            className="settings-input !bg-white !text-xs !h-9 border-slate-200" 
+                                                            placeholder="WiFi Name" 
+                                                            value={wifiConfig.ssid} 
+                                                            onChange={e => setWifiConfig(prev => ({ ...prev, ssid: e.target.value }))}
+                                                            aria-label="WiFi Name" 
+                                                            title="WiFi Name" 
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="wifi-grid-row pb-3">
+                                                    <div className="wifi-words-column">
+                                                        <h4 className="text-[11px] font-bold text-slate-700">WiFi Password</h4>
+                                                    </div>
+                                                    <div className="wifi-input-column mt-0">
+                                                        <input 
+                                                            id="wifi-password" 
+                                                            className="settings-input !bg-white !text-xs !h-9 border-slate-200" 
+                                                            type="password" 
+                                                            placeholder="WiFi Password" 
+                                                            value={wifiConfig.password} 
+                                                            onChange={e => setWifiConfig(prev => ({ ...prev, password: e.target.value }))}
+                                                            aria-label="WiFi Password" 
+                                                            title="WiFi Password" 
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <button 
+                                                    className="btn-submit w-full !py-2.5 !text-[11px] !rounded-lg !bg-blue-600 hover:!bg-blue-700 shadow-lg shadow-blue-200 transition-all font-bold mt-2" 
+                                                    disabled={isSendingCommand || !wifiConfig.ssid || !selectedDevice} 
+                                                    onClick={() => handleSendCommand('SET_WIFI', wifiConfig)} 
+                                                    title="Deploy WiFi Configuration"
+                                                >
+                                                    Execute Over-the-Air Provisioning                                            
+                                                </button>
+                                            </div>                                    
+                                    </div>
                                     
-</div>
-                                    
-<div className="grid grid-cols-2 gap-3 mt-4">
+                                    <div className="grid grid-cols-2 gap-3 mt-4">
                                         
 <button                                             className="c2-diagnostic-card ping"                                            disabled={
 isSendingCommand || !selectedDevice
@@ -1720,11 +1732,8 @@ Audit trail of remote execution and hardware pings.
 recentCommands.length >
  0 ? (                                        
 <div className="space-y-3">
-                                            {
-recentCommands.map(cmd =>(                                                
-<div key={
-cmd.id
-} className="c2-log-entry p-4 border rounded-xl bg-white hover:shadow-md transition-all flex items-center justify-between group">
+                                            {recentCommands.map(cmd => (                                                
+                                                <div key={cmd.id} className="c2-log-entry p-4 border rounded-xl bg-white hover:shadow-md transition-all flex items-center justify-between group">
                                                     
 <div className="flex items-center gap-4">
                                                         
@@ -2186,16 +2195,15 @@ mfaLoading ? 'Verifying...' : 'Complete Activation'
 </div>
 ,                document.body            )
 }            {
-showAddTankModal && (                
-<AddTankModal                     stationId={
-stationId
-}                    onClose={
-() =>
- setShowAddTankModal(false)
-}                    onSuccess={
-() =>
- setShowAddTankModal(false)
-}                 />
+                showAddTankModal && (
+                <AddTankModal
+                    isOpen={showAddTankModal}
+                    sites={sites}
+                    onClose={() => setShowAddTankModal(false)}
+                    onSuccess={() => {
+                        setShowAddTankModal(false);
+                    }}
+                />
             )
 }            {
 toast && 

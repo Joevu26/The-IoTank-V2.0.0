@@ -37,6 +37,7 @@ export type EventType =
     | 'ORDER_CANCELLED'
     | 'THEFT_DETECTED'
     | 'LEAK_DETECTED'
+    | 'HARDWARE_PROVISIONED'
     | 'ALERTS_BULK_RESOLVED'
     | 'ALERTS_BULK_DISMISSED';
 

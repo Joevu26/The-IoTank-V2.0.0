@@ -467,6 +467,12 @@ export interface ShiftDocument {
     closingVolume: number; // Tank volume at closure
     notes: string;
     createdAt: string; // ISO String
+
+    // Forensic Fields (Optional for backward compatibility)
+    received_collections?: any;
+    variance_data?: any;
+    operatorName?: string;
+    operation_type?: string;
 }
 
 

@@ -10,20 +10,19 @@
 .card-header-premium {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 12px;
+    margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--color-divider);
 }
 .header-icon-glow {
-    font-size: 1.8rem;
-    color: var(--color-accent-primary);
-    filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.4));
+    font-size: 1.25rem;
+    color: #6366f1;
 }
 .header-text h3 {
     margin: 0;
-    font-size: 1.1rem;
-    font-weight: 900;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--color-text-primary);
     letter-spacing: -0.01em;
 }
@@ -31,7 +30,7 @@
     margin: 0;
     font-size: 0.75rem;
     color: var(--color-text-secondary);
-    font-weight: 500;
+    font-weight: 400;
 }
 .metrics-grid-premium {
     display: grid;
@@ -41,22 +40,21 @@
 .mini-stat-module {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 12px;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    transition: all 0.2s ease;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #f3f4f6;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 .mini-stat-module:hover {
-    background: rgba(255, 255, 255, 0.6);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+    border-color: #e5e7eb;
 }
 .mini-icon {
-    font-size: 1.25rem;
+    font-size: 1rem;
     flex-shrink: 0;
-    opacity: 0.9;
+    color: #9ca3af;
 }
 .mini-content {
     display: flex;
@@ -64,22 +62,22 @@
     min-width: 0;
 }
 .mini-label {
-    font-size: 0.65rem;
-    font-weight: 800;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #9ca3af;
+    text-transform: none;
+    letter-spacing: 0;
     margin-bottom: 2px;
 }
 .mini-value-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 .mini-value {
-    font-size: 0.9rem;
-    font-weight: 900;
-    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #111827;
     white-space: nowrap;
 }
 .mini-stat-module.state-optimal .mini-icon,
@@ -113,12 +111,12 @@
 .mini-stat-module.state-loading .mini-status { background: rgba(148, 163, 184, 0.15); }
 
 .mini-status {
-    font-size: 0.6rem;
-    font-weight: 900;
-    padding: 2px 6px;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    text-transform: none;
+    letter-spacing: 0;
 }
 .rssi-monitor-section {
     margin-top: 32px;
@@ -128,19 +126,20 @@
 .section-title {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 16px;
 }
 .section-icon {
-    color: var(--color-accent-primary);
+    color: #9ca3af;
+    font-size: 0.9rem;
 }
 .section-title h4 {
     margin: 0;
-    font-size: 0.85rem;
-    font-weight: 800;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+    text-transform: none;
+    letter-spacing: 0;
 }
 .rssi-nodes-grid {
     display: grid;
@@ -162,16 +161,17 @@
     min-width: 0;
 }
 .node-name {
-    font-size: 0.75rem;
-    font-weight: 800;
-    color: var(--color-text-primary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #111827;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .node-id {
-    font-size: 0.6rem;
-    color: var(--color-text-secondary);
+    font-size: 0.6875rem;
+    color: #9ca3af;
+    font-family: var(--font-family-mono);
 }
 .node-signal {
     display: flex;
@@ -193,9 +193,10 @@
 .bar-3 { height: 12px; }
 .bar-4 { height: 16px; }
 .rssi-value {
-    font-size: 0.6rem;
-    font-weight: 900;
-    text-transform: uppercase;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: none;
+    color: #6b7280;
 }
 .no-nodes-message {
     grid-column: 1 / -1;

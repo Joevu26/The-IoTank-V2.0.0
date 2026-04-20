@@ -8,15 +8,43 @@ interface PageHeaderProps {
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, description, action }) => {
     return (
-        <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <header style={{
+            marginBottom: '2rem',
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            paddingBottom: '1.5rem',
+            borderBottom: '1px solid #E8E9F5',
+        }}>
             <div>
-                <h1 className="text-2xl font-black text-primary tracking-tight">{title}</h1>
+                <h1 style={{
+                    fontSize: '1.875rem',
+                    fontWeight: 700,
+                    color: '#323264',
+                    letterSpacing: '-0.03em',
+                    margin: 0,
+                    lineHeight: 1.2,
+                }}>
+                    {title}
+                </h1>
                 {description && (
-                    <p className="text-secondary text-base mt-2 max-w-2xl">{description}</p>
+                    <p style={{
+                        fontSize: '0.9375rem',
+                        color: '#7A7A95',
+                        marginTop: '0.375rem',
+                        marginBottom: 0,
+                        fontWeight: 400,
+                        lineHeight: 1.5,
+                    }}>
+                        {description}
+                    </p>
                 )}
             </div>
             {action && (
-                <div className="flex items-center gap-3">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', paddingTop: '0.25rem' }}>
                     {action}
                 </div>
             )}

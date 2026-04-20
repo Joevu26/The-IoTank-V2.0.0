@@ -29,34 +29,34 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 22px 28px 16px;
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
+    padding: 18px 28px 14px;
+    border-bottom: 1px solid #E8E9F5;
+    background: #ffffff;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
 .tdv-header h2 {
-    font-size: 1.5rem;
-    font-weight: 900;
+    font-size: 1.25rem;
+    font-weight: 600;
     margin: 0;
-    color: var(--color-text-primary);
-    letter-spacing: -0.025em;
+    color: #323264;
+    letter-spacing: -0.02em;
     line-height: 1.2;
 }
 
 /* Fuel type badge */
 .badge-fuel-type {
-    font-size: 0.62rem;
-    font-weight: 800;
-    color: var(--color-text-disabled);
-    background: var(--color-bg-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #7A7A95;
+    background: #F4F5FF;
     padding: 3px 10px;
     border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid var(--color-border);
+    text-transform: capitalize;
+    letter-spacing: 0;
+    border: 1px solid #E8E9F5;
 }
 
 /* Telemetry meta row */
@@ -325,16 +325,16 @@
     min-width: 0;
 }
 
-/* Tank viewer cell — High-visibility industrial theme */
+/* Tank viewer cell */
 .visual-main {
-    background: #f8fafc;
-    border: 1px solid var(--color-border);
-    border-radius: 18px;
+    background: #F4F5FF;
+    border: 1px solid #E8E9F5;
+    border-radius: 14px;
     padding: 20px;
     min-height: 320px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 2px 8px rgba(100, 90, 200, 0.06);
 }
 
 .visual-main::before {
@@ -344,8 +344,8 @@
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, #7c3aed, #a855f7, #c084fc);
-    border-radius: 18px 18px 0 0;
+    background: linear-gradient(90deg, #6366f1, #a78bfa, #c084fc);
+    border-radius: 14px 14px 0 0;
 }
 
 /* Stats row — 3 KPI cards */
@@ -358,64 +358,62 @@
 /* Stat KPI Card */
 .stat-card {
     background: #ffffff;
-    border: 1px solid rgba(168, 85, 247, 0.1);
-    border-radius: 16px;
-    padding: 18px 20px;
+    border: 1px solid #ebebf5;
+    border-radius: 12px;
+    padding: 1.125rem 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     position: relative;
     overflow: hidden;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 1px 4px rgba(100, 90, 200, 0.05);
+}
+
+/* Color-differentiated left border accent per card position */
+.stat-card:nth-child(1) {
+    border-left: 3px solid #6366f1;
+}
+.stat-card:nth-child(2) {
+    border-left: 3px solid #f59e0b;
+}
+.stat-card:nth-child(3) {
+    border-left: 3px solid #10b981;
 }
 
 .stat-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #a855f7, #7c3aed);
-    border-radius: 16px 16px 0 0;
-    opacity: 0;
-    transition: opacity 0.2s;
+    content: none;
 }
 
 .stat-card:hover {
-    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.1);
-    border-color: rgba(168, 85, 247, 0.25);
-    transform: translateY(-1px);
-}
-
-.stat-card:hover::after {
-    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.1);
+    border-color: #c7d2fe;
 }
 
 .stat-label {
-    font-size: 0.65rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #7A7A95;
 }
 
 .stat-value {
-    font-size: 1.75rem;
-    font-weight: 900;
-    color: #0f172a;
-    line-height: 1;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #323264;
+    line-height: 1.1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
 }
 
 .stat-trend {
-    font-size: 0.65rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #7A7A95;
 }
 
 .mini-metric {
@@ -425,17 +423,17 @@
 }
 
 .mini-label {
-    font-size: 0.58rem;
-    font-weight: 800;
-    color: #cbd5e1;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #B6B6CC;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .mini-value {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: #334155;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #323264;
 }
 
 /* ── ── ── ── ── ── ── ── ── ── ── ── ── ──
@@ -443,104 +441,90 @@
 ── ── ── ── ── ── ── ── ── ── ── ── ── ── */
 .sh-card {
     background: #ffffff;
-    border: 1px solid rgba(168, 85, 247, 0.12);
-    border-radius: 18px;
+    border: 1px solid #ebebf5;
+    border-top: 2px solid #6366f1;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(100, 90, 200, 0.06);
     position: relative;
 }
 
 .sh-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2.5px;
-    background: linear-gradient(90deg, #7c3aed, #a855f7, #06b6d4);
-    border-radius: 18px 18px 0 0;
+    content: none;
 }
 
 .sh-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 14px;
-    border-bottom: 1px solid #f1f5f9;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid #f0f0f8;
+    background: #fafaff;
 }
 
 .sh-card-title-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625rem;
 }
 
 .sh-card-icon-wrap {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
-    background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(168, 85, 247, 0.08));
-    border: 1px solid rgba(168, 85, 247, 0.15);
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px solid rgba(99, 102, 241, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #7c3aed;
+    color: #6366f1;
     flex-shrink: 0;
 }
 
 .sh-card-title {
-    font-size: 0.72rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #0f172a;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #323264;
 }
 
 .sh-card-subtitle {
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: #94a3b8;
+    font-size: 0.6875rem;
+    font-weight: 400;
+    color: #7A7A95;
     margin-top: 1px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .sh-live-pill {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background: rgba(16, 185, 129, 0.07);
-    border: 1px solid rgba(16, 185, 129, 0.18);
-    color: #059669;
-    font-size: 0.6rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    padding: 5px 10px;
-    border-radius: 99px;
+    gap: 5px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #16a34a;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 0.3125rem 0.625rem;
+    border-radius: 9999px;
 }
 
 .sh-live-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #10b981;
+    background: #22c55e;
     animation: shPulse 2s ease-in-out infinite;
     flex-shrink: 0;
 }
 
 @keyframes shPulse {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.5;
-        transform: scale(0.8);
-    }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
 }
 
 /* 4-column forced grid */
@@ -553,20 +537,27 @@
 
 /* Individual metric cell */
 .sh-metric-card {
-    padding: 18px 20px;
+    padding: 1rem 1.125rem;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    border-right: 1px solid #f1f5f9;
-    transition: background 0.2s;
+    gap: 6px;
+    border-right: 1px solid #f0f0f8;
+    transition: background 0.15s;
+    position: relative;
 }
+
+/* Subtle color accent per metric column */
+.sh-metric-card:nth-child(1) { border-bottom: 2px solid #10b981; }
+.sh-metric-card:nth-child(2) { border-bottom: 2px solid #a78bfa; }
+.sh-metric-card:nth-child(3) { border-bottom: 2px solid #f59e0b; }
+.sh-metric-card:nth-child(4) { border-bottom: 2px solid #6366f1; }
 
 .sh-metric-card:last-child {
     border-right: none;
 }
 
 .sh-metric-card:hover {
-    background: rgba(168, 85, 247, 0.02);
+    background: #fafaff;
 }
 
 .sh-metric-header {
@@ -577,28 +568,28 @@
 }
 
 .sh-metric-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 6px;
-    background: rgba(168, 85, 247, 0.08);
-    border: 1px solid rgba(168, 85, 247, 0.12);
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #a855f7;
+    color: #6366f1;
     flex-shrink: 0;
 }
 
 .sh-metric-badge {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.55rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 3px 7px;
-    border-radius: 99px;
+    gap: 3px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 9999px;
     border: 1px solid;
     white-space: nowrap;
 }
@@ -618,40 +609,40 @@
 }
 
 .sh-metric-value {
-    font-size: 2rem;
-    font-weight: 900;
-    color: #0f172a;
-    letter-spacing: -0.03em;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #323264;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
 }
 
 .sh-metric-unit {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #7A7A95;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0;
 }
 
 .sh-metric-label {
-    font-size: 0.6rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #94a3b8;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #7A7A95;
 }
 
 .sh-metric-bar-track {
-    height: 3px;
-    background: #f1f5f9;
-    border-radius: 99px;
+    height: 5px;
+    background: #f0f0f8;
+    border-radius: 9999px;
     overflow: hidden;
     margin-top: 4px;
 }
 
 .sh-metric-bar-fill {
     height: 100%;
-    border-radius: 99px;
+    border-radius: 9999px;
     transition: width 1s ease-out;
 }
 
@@ -659,13 +650,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 0 20px 16px;
-    padding: 10px 14px;
+    margin: 0 1.25rem 1rem;
+    padding: 0.625rem 0.875rem;
     background: #fffbeb;
     border: 1px solid #fde68a;
-    border-radius: 10px;
+    border-radius: 8px;
     color: #92400e;
-    font-size: 0.72rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
     line-height: 1.4;
 }
 
@@ -737,30 +729,24 @@
    LIVE TRENDS CHART BLOCK
 ── ── ── ── ── ── ── ── ── ── ── ── ── ── */
 .live-trends {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid #E8E9F5;
+    border-top: 2px solid #6366f1;
+    border-radius: 12px;
     padding: 20px 24px;
     position: relative;
     overflow: hidden;
 }
 
 .live-trends::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #7c3aed, #a855f7, #00d4ff);
-    border-radius: 16px 16px 0 0;
+    content: none;
 }
 
 .live-trends h3 {
     margin: 0 0 16px;
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: var(--color-text-primary);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #323264;
     letter-spacing: -0.01em;
 }
 

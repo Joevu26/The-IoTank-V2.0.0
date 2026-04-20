@@ -105,8 +105,8 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
             <div className="card-header-premium">
                 <FiActivity className="header-icon-glow" />
                 <div className="header-text">
-                    <h3>Executive Overview & Fleet Risk</h3>
-                    <p>Sub-critical telemetry & operational risk indicators</p>
+                    <h3>System Health</h3>
+                    <p>Telemetry integrity and operational status across all nodes</p>
                 </div>
             </div>
 
@@ -130,7 +130,7 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
             <div className="rssi-monitor-section mt-8">
                 <div className="section-title">
                     <FiWifi className="section-icon" />
-                    <h4>Terminal Signal Integrity (RSSI)</h4>
+                    <h4>Signal Strength</h4>
                 </div>
                 <div className="rssi-nodes-grid">
                     {tanks.length === 0 ? (

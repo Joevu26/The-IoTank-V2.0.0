@@ -1,5 +1,7 @@
 // @ts-ignore Deno edge import
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.40.0'
+// @ts-ignore Deno edge import
+import * as jose from 'https://esm.sh/jose@5.2.3'
 
 declare const Deno: any;
 
@@ -43,31 +45,81 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization')!;
     if (!authHeader) return errorResponse('Auth header missing', 401);
 
-    const supabaseUrl = 'https://suifvborodwergtrbjez.supabase.co';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     if (!supabaseUrl || !supabaseKey) {
-        return errorResponse('Internal Config Error: Supabase credentials missing.', 500);
+        return errorResponse('Internal Config Error: Supabase credentials missing (URL or Key).', 500);
     }
 
-    // Initialize with explicit URL to ensure JWT matching
     const supabaseAdmin = createClient(supabaseUrl, supabaseKey, { 
         auth: { persistSession: false } 
     });
 
     const token = authHeader.replace('Bearer ', '').trim();
-    const { data: { user: adminUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    let adminUser: any = null;
+
+    // STEP 0: PRIMARY AUTH (Standard Supabase getUser)
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
-    if (authError || !adminUser) {
-        console.error(`[PROVISIONING_AUTH_FAIL]`, {
-            error: authError?.message,
-            tokenPrefix: token.substring(0, 15) + '...',
-            envUrl: supabaseUrl
-        });
-        return errorResponse(`Unauthorized: ${authError?.message || 'Invalid Session'}`, 401, {
-            hint: "Check if your frontend VITE_SUPABASE_URL matches the project secret SUPABASE_URL."
+    if (user) {
+        adminUser = user;
+        console.log(`[PROVISIONING_AUTH_OK] Verified via standard RPC: ${adminUser.email}`);
+    } else {
+        // STEP 0.1: FALLBACK AUTH (JWKS for ES256 algorithm support)
+        console.warn(`[PROVISIONING_AUTH_FALLBACK] RPC failed (Code: ${authError?.code || 'None'}). Attempting JWKS verification...`);
+        
+        try {
+            const JWKS = jose.createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/jwks`));
+            const { payload } = await jose.jwtVerify(token, JWKS, {
+                issuer: `${supabaseUrl}/auth/v1`,
+                audience: 'authenticated'
+            });
+
+            if (payload && payload.sub) {
+                // Fetch the actual user data from Supabase using Service Role to confirm they exist
+                const { data: suUser, error: suError } = await supabaseAdmin.auth.admin.getUserById(payload.sub as string);
+                
+                if (suUser && suUser.user) {
+                    adminUser = suUser.user;
+                    console.log(`[PROVISIONING_JWKS_OK] Verified via JWKS Fallback: ${adminUser.email}`);
+                } else {
+                    console.error(`[PROVISIONING_JWKS_VERIFIED_BUT_NOT_FOUND] User ID ${payload.sub} not in database.`, suError);
+                }
+            }
+        } catch (jwksErr: any) {
+            console.error(`[PROVISIONING_JWKS_FAIL] Verification failed: ${jwksErr.message}`);
+            
+            // If it's a known algorithm issue, provide the hint
+            const isAlgError = authError?.message?.includes('algorithm') || jwksErr.message?.includes('algorithm');
+            
+            return errorResponse(`Unauthorized: Identity Verification Failed`, 401, {
+                hint: isAlgError ? "Security token algorithm mismatch (ES256 detected). Please sign out and sign back in to refresh your session." : "Security token mismatch. Check if your project URL is correct.",
+                system_error: authError?.message || jwksErr.message,
+                code: authError?.code || 'JWT_VERIFICATION_FAILED'
+            });
+        }
+    }
+
+    if (!adminUser) {
+        return errorResponse('Unauthorized: Valid administrator session required.', 401);
+    }
+
+    // ROLE ENFORCEMENT: Strictly require Super Admin (Level 1)
+    const { data: sysUser, error: sysError } = await supabaseAdmin
+        .from('system_users')
+        .select('role, is_active')
+        .eq('auth_user_id', adminUser.id)
+        .maybeSingle();
+
+    if (sysError || !sysUser || sysUser.role !== 'super_admin' || !sysUser.is_active) {
+        console.warn(`[PROVISIONING_BLOCK] Unauthorized attempt by ${adminUser.email} (Role: ${sysUser?.role || 'none'})`);
+        return errorResponse('Permission Denied: Only active Super Admins can finalize station provisioning.', 403, {
+            hint: "Administrative provisioning is a Level 1 clearance operation."
         });
     }
+
+    console.log(`[PROVISIONING_AUTH_OK] Authorized by Super Admin: ${adminUser.email}`);
 
     const body = await req.json().catch(() => ({}));
     const { registrationId } = body;
@@ -90,7 +142,7 @@ Deno.serve(async (req) => {
     const { data: existingUserId, error: lookupError } = await supabaseAdmin.rpc('get_auth_user_id_by_email', { p_email: reg.email });
     
     if (lookupError) {
-        console.warn(`[PROVISIONING_LOOKUP_WARN] Auth lookup failed, proceeding with invitation.`, lookupError);
+        console.warn(`[PROVISIONING_LOOKUP_WARN] Auth lookup failed for ${reg.email}, proceeding with invitation. Error:`, lookupError);
     }
 
     let targetUserId = existingUserId;
@@ -120,8 +172,13 @@ Deno.serve(async (req) => {
     });
 
     if (rpcError) {
-        console.error(`[PROVISIONING_RPC_ERROR]`, rpcError);
-        return errorResponse(`Database RPC Error: ${rpcError.message} (${rpcError.code})`, 500, rpcError);
+        console.error(`[PROVISIONING_RPC_ERROR] Execution failed for UID: ${targetUserId}`, rpcError);
+        return errorResponse(`Database RPC Error: ${rpcError.message} (${rpcError.code})`, 500, {
+            ...rpcError,
+            step: 'RPC_EXECUTION',
+            userId: targetUserId,
+            registrationId
+        });
     }
 
     if (!rpcResult || rpcResult.success === false) {

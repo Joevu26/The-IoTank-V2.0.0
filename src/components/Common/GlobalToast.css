@@ -1,173 +1,137 @@
-/* GlobalToast.css - Precision Industrial Notification Stack */
+/* GlobalToast.css - Industrial Action Queue Notification System */
 
 .precision-toast-container {
     position: fixed;
-    top: 60px;
+    top: 24px;
     right: 24px;
-    z-index: 10000;
-    width: 380px;
+    z-index: 99999; /* Ensure high visibility over modals */
+    width: 360px;
     pointer-events: none;
     transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-    transform: translateX(400px) scale(0.9);
+    transform: translateY(-20px) scale(0.95);
     opacity: 0;
 }
 
 .precision-toast-container.active {
     pointer-events: auto;
-    transform: translateX(0) scale(1);
+    transform: translateY(0) scale(1);
     opacity: 1;
 }
 
-.precision-toast-card {
+.precision-toast-card-industrial {
     position: relative;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 
-        0 25px 50px -12px rgba(0, 0, 0, 0.15),
+        0 20px 40px -10px rgba(0, 0, 0, 0.12),
         0 0 0 1px rgba(0, 0, 0, 0.02) inset;
     overflow: hidden;
     padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
 }
 
-.dark .precision-toast-card {
-    background: rgba(15, 23, 42, 0.8);
-    border-color: rgba(51, 65, 85, 0.5);
-    box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.5);
-}
-
-.toast-accent-line {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: #64748b;
-}
-
-/* Status Variants */
-.status-success .toast-accent-line { background: #10b981; }
-.status-error .toast-accent-line { background: #ef4444; }
-.status-market .toast-accent-line { background: #6366f1; }
-.status-info .toast-accent-line { background: #3b82f6; }
-
-.toast-header-compact {
+.toast-body-industrial {
     display: flex;
-    justify-content: space-between;
+    gap: 1.25rem;
     align-items: flex-start;
 }
 
-.toast-title-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-}
-
-.toast-attribution {
-    font-size: 0.6rem;
-    font-weight: 850;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-}
-
-.toast-title-text {
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: #1e293b;
-    letter-spacing: -0.01em;
-}
-
-.dark .toast-title-text { color: white; }
-
-.toast-close-trigger {
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    cursor: pointer;
-    padding: 2px;
-    transition: all 0.2s ease;
-}
-
-.toast-close-trigger:hover {
-    color: #1e293b;
-    transform: rotate(90deg);
-}
-
-.toast-body-tactical {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.toast-icon-wrapper {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f1f5f9;
-    color: #64748b;
+.toast-pill-wrapper {
     flex-shrink: 0;
 }
 
-.status-success .toast-icon-wrapper { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.status-error .toast-icon-wrapper { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-.status-market .toast-icon-wrapper { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
-.status-info .toast-icon-wrapper { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.industrial-pill {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+}
 
-.toast-content-wrapper {
+/* Severity Colors to match Action Queue */
+.pill-error { background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; }
+.pill-success { background: #ecfdf5; color: #059669; border: 1px solid #d1fae5; }
+.pill-info { background: #eff6ff; color: #2563eb; border: 1px solid #dbeafe; }
+.pill-market { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+.pill-refill { background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8; }
+.status-default .industrial-pill { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; } /* WATCH */
+
+.toast-content-industrial {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
 }
 
-.toast-severity-pill {
-    font-family: var(--font-family-mono, monospace);
-    font-size: 0.55rem;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #f1f5f9;
-    color: #64748b;
-    width: fit-content;
+.toast-title-industrial {
+    font-size: 14px;
+    font-weight: 850;
+    color: #1e293b;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
 }
 
-.status-success .toast-severity-pill { background: rgba(16, 185, 129, 0.12); color: #059669; }
-.status-error .toast-severity-pill { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
-.status-market .toast-severity-pill { background: rgba(99, 102, 241, 0.12); color: #4f46e5; }
-
-.toast-message-text {
-    font-size: 0.8rem;
+.toast-message-industrial {
+    font-size: 12px;
     color: #64748b;
     line-height: 1.5;
-    font-weight: 550;
+    font-weight: 500;
 }
 
-.dark .toast-message-text { color: #94a3b8; }
+.toast-footer-industrial {
+    margin-top: 0.5rem;
+}
 
-.toast-progress-container {
+.toast-action-link {
+    font-size: 11px;
+    font-weight: 850;
+    color: #4f46e5;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toast-action-link:hover {
+    color: #4338ca;
+    gap: 6px;
+}
+
+.toast-close-mini {
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.toast-close-mini:hover {
+    color: #64748b;
+}
+
+.toast-progress-industrial {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     height: 3px;
-    background: rgba(0, 0, 0, 0.03);
+    background: rgba(0, 0, 0, 0.02);
 }
 
-.toast-progress-bar {
+.toast-progress-bar-industrial {
     height: 100%;
     background: #cbd5e1;
     transition: width 0.1s linear;
 }
 
-.status-success .toast-progress-bar { background: #10b981; }
-.status-error .toast-progress-bar { background: #ef4444; }
-.status-market .toast-progress-bar { background: #6366f1; }
-.status-info .toast-progress-bar { background: #3b82f6; }
+.status-error .toast-progress-bar-industrial { background: #e11d48; }
+.status-success .toast-progress-bar-industrial { background: #059669; }

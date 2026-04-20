@@ -1,43 +1,52 @@
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/config/supabase';
-import { FiX, FiPlus, FiAlertCircle, FiLock, FiChevronRight, FiInfo } from 'react-icons/fi';
-import { useSites, createTank } from '@/hooks/useSupabase';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { createTank } from '@/hooks/useSupabase';
 import { AuditService } from '@/services/AuditService';
-import { Tank, Site } from '@/types';
+import { supabase } from '@/config/supabase';
+import { FiX, FiDroplet, FiCheckCircle, FiCpu, FiActivity, FiServer } from 'react-icons/fi';
 import './AddTankModal.css';
+import { NotificationService } from '@/services/NotificationService';
 
 interface AddTankModalProps {
-    stationId: string;
+    isOpen: boolean;
     onClose: () => void;
-    onSuccess?: (newTank: Tank) => void;
+    sites: any[];
+    onSuccess?: (newTank: any) => void;
 }
 
-export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, onSuccess }) => {
-    const { verifySettingsPassword } = useAuth();
-    const { sites, loading: sitesLoading } = useSites(stationId);
+export const AddTankModal: React.FC<AddTankModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    sites, 
+    onSuccess 
+}) => {
+    const { currentUser, verifySettingsPassword } = useAuth();
+    const stationId = currentUser?.stationId || '';
     
-    // Auth & Form State
+    // Auth-lock for Provisioning
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [authPassword, setAuthPassword] = useState('');
     const [verifying, setVerifying] = useState(false);
+    
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isHibernating, setIsHibernating] = useState(false);
 
     const [formData, setFormData] = useState({
         name: '',
         siteId: '',
         espId: '',
-        fuelType: 'Diesel' as Tank['fuelType'],
-        shape: 'capsule' as Tank['shape'],
-        capacity: 10000,
-        height: 200,
-        diameter: 250,
-        length: 0,
-        sensorHeight: 300,
-        sensorEmptyDistance: 290,
-        sensorFullDistance: 20,
-        sensorChannel: 1
+        fuelType: 'Diesel' as any,
+        shape: 'capsule' as any,
+        capacity: '' as number | '',
+        height: '' as number | '',
+        diameter: '' as number | '',
+        length: '' as number | '',
+        sensorHeight: '' as number | '',
+        sensorEmptyDistance: '' as number | '',
+        sensorFullDistance: '' as number | '',
+        sensorChannel: 1 as number | ''
     });
 
     useEffect(() => {
@@ -45,6 +54,8 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
             setFormData(prev => ({ ...prev, siteId: sites[0].id }));
         }
     }, [sites, formData.siteId]);
+
+    if (!isOpen) return null;
 
     const handleAuthorize = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -64,16 +75,41 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'number' ? (parseFloat(value) || 0) : value
-        }));
+        
+        if (name === 'espId') {
+            let rawHex = value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            if (rawHex.length > 12) rawHex = rawHex.slice(0, 12);
+            // Auto-format: XX:XX:XX...
+            const formatted = rawHex.match(/.{1,2}/g)?.join(':') || rawHex;
+            setFormData(prev => ({ ...prev, [name]: formatted }));
+            return;
+        }
+
+        if (type === 'number') {
+            if (value === '') {
+                setFormData(prev => ({ ...prev, [name]: '' }));
+                return;
+            }
+            // Enforce positive values only
+            const numVal = parseFloat(value);
+            if (numVal < 0) return;
+            setFormData(prev => ({ ...prev, [name]: value }));
+            return;
+        }
+
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleKeyDownNumeric = (e: React.KeyboardEvent) => {
+        if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name || !formData.siteId) {
-            setError('Please fill in required fields');
+        if (!formData.name || !formData.siteId || !formData.espId) {
+            setError('Identity and Hardware fields are mandatory');
             return;
         }
 
@@ -81,366 +117,258 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({ stationId, onClose, 
         setError(null);
 
         try {
+            // [HARDWARE UNIQUENESS]: Enforce global uniqueness for ESP ID
+            const { data: existingHardware } = await supabase
+                .from('tanks')
+                .select('id, tank_name')
+                .eq('sensor_id', formData.espId)
+                .maybeSingle();
+
+            if (existingHardware) {
+                setError(`Hardware Conflict: Serial ${formData.espId} is assigned to "${existingHardware.tank_name}". Every node must be unique.`);
+                setSubmitting(false);
+                return;
+            }
+
             const newTank = await createTank({
                 stationId,
                 siteId: formData.siteId,
                 name: formData.name,
-                sensorId: formData.espId, // Mapping to sensor_id
+                sensorId: formData.espId,
                 fuelType: formData.fuelType,
                 shape: formData.shape,
-                capacity: formData.capacity,
-                height: formData.height,
-                diameter: formData.diameter,
-                length: formData.length,
-                sensorHeight: formData.sensorHeight,
-                sensorEmptyDistance: formData.sensorEmptyDistance,
-                sensorFullDistance: formData.sensorFullDistance,
-                sensorChannel: formData.sensorChannel,
-                lowLevelThreshold: 20, // Reorder: 20%
-                criticalLevelThreshold: 10, // Emergency Stop: 10%
-                highLevelThreshold: 90, // Operator Warning: 90% (Handled as fallback)
-                temperatureAlertThreshold: 60 // High Temp Alert: 60°C
+                capacity: Number(formData.capacity) || 0,
+                height: Number(formData.height) || 0,
+                diameter: Number(formData.diameter) || 0,
+                length: Number(formData.length) || 0,
+                sensorHeight: Number(formData.sensorHeight) || 0,
+                sensorEmptyDistance: Number(formData.sensorEmptyDistance) || 0,
+                sensorFullDistance: Number(formData.sensorFullDistance) || 0,
+                sensorChannel: Number(formData.sensorChannel) || 1,
+                lowLevelThreshold: 20,
+                criticalLevelThreshold: 10,
+                highLevelThreshold: 95,
+                temperatureAlertThreshold: 65
+            });
+
+            // 🟢 Forensic Audit
+            await AuditService.log(
+                'SECURITY',
+                'HARDWARE_PROVISIONED',
+                stationId,
+                `Node Provisioned: [${formData.name}] bound to serial ${formData.espId} on Channel ${formData.sensorChannel}`,
+                'INFO',
+                { tankId: newTank.id, mac: formData.espId }
+            );
+
+            NotificationService.show('Provisioning Successful', {
+                body: `Hardware node ${formData.espId} is now actively telemetry-linked to ${formData.name}.`
             });
 
             if (onSuccess) onSuccess(newTank);
-
-            // 🟢 Forensic Log
-            await AuditService.log(
-                'DELIVERY',
-                'CREATE_TANK',
-                stationId,
-                `Terminal node provisioned: ${formData.name} (${formData.fuelType}) initialized with hardware serial ${formData.espId}`,
-                'INFO',
-                { tankId: newTank.id, siteId: formData.siteId }
-            );
-
-            // 🟠 REAL-TIME SHIFT SYNC: Forensic Snapshot Injection
-            // If a shift is currently open, we must capture this new tank's starting volume immediately
-            const { data: currentShift } = await supabase
-                .from('current_station_shifts')
-                .select('*')
-                .eq('station_id', stationId)
-                .single();
-
-            if (currentShift && currentShift.status === 'OPEN') {
-                const snapshots = currentShift.metadata?.tank_snapshots || {};
-                const nowString = new Date().toISOString();
-                
-                snapshots[newTank.id] = {
-                    opening_volume: newTank.currentVolume || 0,
-                    captured_at: nowString,
-                    is_manual_override: false,
-                    injection_type: 'hot_provision'
-                };
-
-                await supabase
-                    .from('current_station_shifts')
-                    .update({ metadata: { ...currentShift.metadata, tank_snapshots: snapshots } })
-                    .eq('station_id', stationId);
-
-                // Update legacy fallback
-                const legacySnapshots = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
-                legacySnapshots[newTank.id] = newTank.currentVolume || 0;
-                localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(legacySnapshots));
-            }
-
             onClose();
         } catch (err: any) {
-            setError(err.message || 'Failed to create tank');
+            setError(err.message || 'Provisioning failed. Check system logs.');
         } finally {
             setSubmitting(false);
         }
     };
 
-    return (
-        <div className="add-tank-modal-overlay">
-            <div className={`add-tank-modal-content ${!isAuthorized ? 'auth-mode' : ''}`}>
-                <div className="modal-header">
-                    <div className="header-text-container">
-                        <h2>Register New Tank Node</h2>
-                        <p>Initialize a new ESP32 telemetry point on your network</p>
-                        <div className="modal-header-badges">
-                            <span className="modal-badge cyan">Telemetry Point</span>
-                            <span className="modal-badge blue">SECURE</span>
+    const triggerHibernate = () => {
+        setIsHibernating(true);
+        setTimeout(() => setIsHibernating(false), 800);
+    };
+
+    const renderContent = () => {
+        if (!isAuthorized) {
+            return (
+                <div className="provisioning-lock-screen">
+                    <div className="lock-icon-wrapper">
+                        <FiCpu className="cpu-pulse" />
+                    </div>
+                    <h3>Provisioning Locked</h3>
+                    <p>Administrative authorization is required to modify terminal hardware identities.</p>
+                    
+                    <form onSubmit={handleAuthorize} className="lock-form">
+                        <input 
+                            type="password" 
+                            placeholder="Terminal Access Code"
+                            value={authPassword}
+                            onChange={e => setAuthPassword(e.target.value)}
+                            required
+                        />
+                        {error && <div className="error-message">{error}</div>}
+                        <button type="submit" disabled={verifying}>
+                            {verifying ? 'Verifying...' : 'Unlock Identity'}
+                        </button>
+                    </form>
+                </div>
+            );
+        }
+
+        return (
+            <div className="max-h-[70vh] overflow-y-auto px-1 pr-3 custom-scrollbar">
+                {/* SECTION 1: IDENTITY */}
+                <div className="atm-section">
+                    <div className="atm-section-header">
+                        <div className="atm-section-icon bg-indigo-500 text-white"><FiServer size={14} /></div>
+                        <span className="atm-section-title text-indigo-700">Identity & Binding</span>
+                    </div>
+                    <div className="atm-section-body atm-grid atm-grid-2">
+                        <div className="form-group">
+                            <label>Tank Display Name</label>
+                            <input 
+                                name="name" 
+                                value={formData.name} 
+                                onChange={handleChange} 
+                                placeholder="e.g. Tank 01 Main" 
+                                required 
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Site Assignment</label>
+                            <select 
+                                name="siteId" 
+                                value={formData.siteId} 
+                                onChange={handleChange} 
+                                required
+                            >
+                                <option value="">Select Depot / Site...</option>
+                                {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label>Hardware Identity (Serial/MAC)</label>
+                            <input 
+                                name="espId" 
+                                value={formData.espId} 
+                                onChange={handleChange} 
+                                placeholder="AA:BB:CC:DD:EE:FF" 
+                                maxLength={17}
+                                required 
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label>Hardware Channel (1-4)</label>
+                            <select 
+                                name="sensorChannel" 
+                                value={formData.sensorChannel} 
+                                onChange={handleChange}
+                            >
+                                <option value={1}>Channel 1 (Primary)</option>
+                                <option value={2}>Channel 2</option>
+                                <option value={3}>Channel 3</option>
+                                <option value={4}>Channel 4</option>
+                            </select>
+                        </div>
+                        <div className="form-group atm-col-2">
+                            <label>Product Fuel Type</label>
+                            <select name="fuelType" value={formData.fuelType} onChange={handleChange}>
+                                <option value="Diesel">Automotive Diesel (AGO)</option>
+                                <option value="Petrol">Premium Petrol (PMS)</option>
+                                <option value="Kerosene">Kerosene (IK)</option>
+                                <option value="Jet Fuel">Jet A-1 Aviation Fuel</option>
+                            </select>
                         </div>
                     </div>
-                    <button className="close-btn" onClick={onClose} title="Dismiss Provisioning Modal">
-                        <FiX size={18} />
-                    </button>
                 </div>
 
-                {error && (
-                    <div className="error-banner">
-                        <div className="error-icon-container">
-                            <FiAlertCircle className="error-icon" />
-                        </div>
-                        <div className="error-content">
-                            <strong>{isAuthorized ? 'Registration Failed' : 'Authorization Required'}</strong>
-                            <p>{error}</p>
-                            {error.toLowerCase().includes('auth_user_id') && (
-                                <div className="error-hint">
-                                    💡 This is likely a stale browser cache. Please refresh the page (Ctrl+R) and try again.
-                                </div>
-                            )}
-                        </div>
+                {/* SECTION 2: GEOMETRY */}
+                <div className="atm-section">
+                    <div className="atm-section-header">
+                        <div className="atm-section-icon bg-blue-500 text-white"><FiActivity size={14} /></div>
+                        <span className="atm-section-title text-blue-700">Geometry & Calibration</span>
                     </div>
-                )}
-
-                {!isAuthorized ? (
-                    <div className="password-gate">
-                        <div className="gate-icon-container">
-                            <FiLock className="gate-icon" />
+                    <div className="atm-section-body atm-grid atm-grid-2">
+                        <div className="form-group">
+                            <label>Geometric Profile</label>
+                            <select name="shape" value={formData.shape} onChange={handleChange}>
+                                <option value="capsule">Horizontal Cylindrical</option>
+                                <option value="rectangular">Rectangular / Flat</option>
+                                <option value="spherical">Spherical</option>
+                            </select>
                         </div>
-                        <h3>Security Verification</h3>
-                        <p>Accessing technical provisioning requires a master station password.</p>
-                        
-                        <form onSubmit={handleAuthorize} className="gate-form">
-                            <input
-                                type="password"
-                                value={authPassword}
-                                onChange={(e) => setAuthPassword(e.target.value)}
-                                placeholder="Enter Access Password"
-                                autoFocus
-                                required
+                        <div className="form-group">
+                            <label>Total Capacity (L)</label>
+                            <input 
+                                type="number" 
+                                name="capacity" 
+                                value={formData.capacity} 
+                                onChange={handleChange} 
+                                onKeyDown={handleKeyDownNumeric}
+                                placeholder="e.g. 10000" 
                             />
-                            <button type="submit" disabled={verifying}>
-                                {verifying ? 'Verifying...' : 'Unlock Provisioning' }
-                                <FiChevronRight className="ml-2" />
-                            </button>
-                        </form>
-                        
-                        <div className="gate-footer">
-                            <button onClick={onClose} className="btn-secondary">Dismiss</button>
+                        </div>
+                        <div className="form-group">
+                            <label>Tank Height (cm)</label>
+                            <input type="number" name="height" value={formData.height} onChange={handleChange} onKeyDown={handleKeyDownNumeric} placeholder="250.0" />
+                        </div>
+                        <div className="form-group">
+                            <label>Tank Length (cm)</label>
+                            <input type="number" name="length" value={formData.length} onChange={handleChange} onKeyDown={handleKeyDownNumeric} placeholder="420.0" />
                         </div>
                     </div>
-                ) : (
-                    <form onSubmit={handleSubmit} className="add-tank-form">
-                        
-                                                {/* SECTION 1: TANK IDENTIFICATION */}
-                        <div className="atm-section cyan">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiInfo size={14} /></div>
-                                <span className="atm-section-title">Tank Identification</span>
-                            </div>
-                            <div className="atm-section-body atm-grid atm-grid-2">
-                                <div className="form-group">
-                                    <label>Tank Name / Terminal identifier</label>
-                                    <input
-                                        type="text"
-                                        name="name"
-                                        value={formData.name}
-                                        onChange={handleChange}
-                                        placeholder="e.g., Underground Diesel 01"
-                                        required
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="site-selector">Physical Station (Site) {sitesLoading && <span className="loading-spinner-inline">(Loading...)</span>}</label>
-                                    <select 
-                                        id="site-selector"
-                                        name="siteId" 
-                                        value={formData.siteId} 
-                                        onChange={handleChange} 
-                                        required
-                                        title="Physical Station Location"
-                                        aria-required="true"
-                                    >
-                                        <option value="">{sitesLoading ? 'Loading locations…' : (sites.length ? 'Select a location...' : 'No sites available')}</option>
-                                        {sites.map((site: Site) => (
-                                            <option key={site.id} value={site.id}>{site.siteName || site.address || site.id}</option>
-                                        ))}
-                                    </select>
-                                    {!sitesLoading && sites.length === 0 && (
-                                        <div className="field-hint error-hint">
-                                            No physical station site found for this station. Create a site in the location settings before adding a tank.
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="esp-id-input">ESP ID (Hardware Serial)</label>
-                                    <input
-                                        id="esp-id-input"
-                                        type="text"
-                                        name="espId"
-                                        value={formData.espId}
-                                        onChange={handleChange}
-                                        placeholder="ESP-XXXX-XXXX"
-                                        aria-label="ESP32 Hardware Identity"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="esp-channel-selector">ESP Channel (1-4)</label>
-                                    <select 
-                                        id="esp-channel-selector"
-                                        name="sensorChannel" 
-                                        value={formData.sensorChannel} 
-                                        onChange={handleChange}
-                                        title="ESP32 Hardware Channel"
-                                    >
-                                        <option value={1}>Channel 1 (Primary)</option>
-                                        <option value={2}>Channel 2</option>
-                                        <option value={3}>Channel 3</option>
-                                        <option value={4}>Channel 4</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="fuel-type-selector">Fuel Product Type</label>
-                                    <select 
-                                        id="fuel-type-selector"
-                                        name="fuelType" 
-                                        value={formData.fuelType} 
-                                        onChange={handleChange}
-                                        title="Product Grade Selection"
-                                    >
-                                        <option value="Diesel">Automotive Diesel (AGO)</option>
-                                        <option value="Petrol">Premium Petrol (PMS)</option>
-                                        <option value="Kerosene">Kerosene (IK)</option>
-                                        <option value="Jet Fuel">Jet A-1 Aviation Fuel</option>
-                                        <option value="LPG">LPG (Liquid Gas)</option>
-                                    </select>
-                                </div>
-                                <div className="field-info-box">
-                                    <FiInfo className="info-icon" />
-                                    <p>Every port on your ESP hardware manages a separate tank. Select the physical channel currently wired to this tank.</p>
-                                </div>
-                            </div>
-                        </div>
+                </div>
 
-                                                {/* SECTION 2: TANK GEOMETRY */}
-                        <div className="atm-section blue">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiInfo size={14} /></div>
-                                <span className="atm-section-title">Tank Geometry</span>
-                            </div>
-                            
-                            <div className="atm-section-body atm-grid atm-grid-2">
-                                <div className="form-group">
-                                    <label>Geometry</label>
-                                    <select 
-                                        name="shape" 
-                                        value={formData.shape} 
-                                        onChange={handleChange}
-                                        title="Tank Geometric Profile"
-                                    >
-                                        <option value="capsule">Horizontal Cylindrical</option>
-                                        <option value="spherical">Spherical (Ball-Shaped)</option>
-                                        <option value="rectangular">Rectangular / Flat-Sided (Custom)</option>
-                                        <option value="compartmentalized">Compartmentalized (Internal)</option>
-                                    </select>
-                                </div>
-
-                                <div className="form-group">
-                                    <label htmlFor="capacity-input">Total Capacity (Liters)</label>
-                                    <input
-                                        id="capacity-input"
-                                        type="number"
-                                        name="capacity"
-                                        value={formData.capacity}
-                                        onChange={handleChange}
-                                        min="0"
-                                        title="Total Volumetric Capacity"
-                                        aria-required="true"
-                                    />
-                                </div>
-
-                                {/* Dimensions Block */}
-                                {formData.shape === 'capsule' && (
-                                    <>
-                                        <div className="form-group">
-                                            <label htmlFor="capsule-height">Diameter / Height (cm)</label>
-                                            <input id="capsule-height" type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required title="Tank Height / Vertical Diameter" aria-required="true" />
-                                        </div>
-                                        <div className="form-group">
-                                            <label htmlFor="capsule-length">Length (cm)</label>
-                                            <input id="capsule-length" type="number" name="length" value={formData.length} onChange={handleChange} min="0" required title="Horizontal Dimension (cm)" aria-required="true" />
-                                        </div>
-                                    </>
-                                )}
-
-                                {formData.shape === 'spherical' && (
-                                    <div className="form-group atm-col-2">
-                                        <label htmlFor="sphere-diameter">Sphere Diameter (cm)</label>
-                                        <input id="sphere-diameter" type="number" name="height" value={formData.height} onChange={(e) => { handleChange(e); setFormData(prev => ({...prev, diameter: parseFloat(e.target.value)})); }} min="0" required title="Spherical Diameter" aria-required="true" />
-                                    </div>
-                                )}
-
-                                {formData.shape === 'rectangular' && (
-                                    <>
-                                        <div className="form-group">
-                                            <label htmlFor="rect-height">Height / Depth (cm)</label>
-                                            <input id="rect-height" type="number" name="height" value={formData.height} onChange={handleChange} min="0" required title="Rectangular Height" aria-required="true" />
-                                        </div>
-                                        <div className="form-group">
-                                            <label htmlFor="rect-length">Length (cm)</label>
-                                            <input id="rect-length" type="number" name="length" value={formData.length} onChange={handleChange} min="0" required title="Horizontal Dimension (cm)" aria-required="true" />
-                                        </div>
-                                    </>
-                                )}
-
-                                {formData.shape === 'compartmentalized' && (
-                                    <div className="form-group atm-col-2">
-                                        <label htmlFor="comp-height">Max Height (cm)</label>
-                                        <input id="comp-height" type="number" name="height" value={formData.height} onChange={handleChange} min="0" required title="Maximum Compartment Height" aria-required="true" />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                                                {/* SECTION 3: SENSOR CONFIGURATION */}
-                        <div className="atm-section slate">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiInfo size={14} /></div>
-                                <span className="atm-section-title">Sensor Calibration</span>
-                            </div>
-                            
-                            <div className="atm-section-body">
-                                <div className="atm-sensor-row">
-                                    <div className="atm-sensor-label">
-                                        <span className="tag-mount">MOUNT</span>
-                                        Sensor to tank bottom
-                                    </div>
-                                    <div className="atm-sensor-input-wrap">
-                                        <input id="sensor-h-input" type="number" name="sensorHeight" value={formData.sensorHeight} onChange={handleChange} min="0" required title="Total Mounting Height" aria-required="true" />
-                                        <span className="atm-unit">cm</span>
-                                    </div>
-                                </div>
-
-                                <div className="atm-sensor-row empty">
-                                    <div className="atm-sensor-label" id="empty-read-label">
-                                        <span className="tag-empty">EMPTY</span>
-                                        Sensor read when empty
-                                    </div>
-                                    <div className="atm-sensor-input-wrap">
-                                        <input id="sensor-empty-input" type="number" name="sensorEmptyDistance" value={formData.sensorEmptyDistance} onChange={handleChange} min="0" required title="Digital Empty Reading (cm)" aria-labelledby="empty-read-label" aria-required="true" />
-                                        <span className="atm-unit">cm</span>
-                                    </div>
-                                </div>
-
-                                <div className="atm-sensor-row full">
-                                    <div className="atm-sensor-label" id="full-read-label">
-                                        <span className="tag-full">FULL</span>
-                                        Sensor read when full
-                                    </div>
-                                    <div className="atm-sensor-input-wrap">
-                                        <input id="sensor-full-input" type="number" name="sensorFullDistance" value={formData.sensorFullDistance} onChange={handleChange} min="0" required title="Digital Full Reading (cm)" aria-labelledby="full-read-label" aria-required="true" />
-                                        <span className="atm-unit">cm</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                    <div className="form-actions">
-                        <button type="button" className="btn-cancel" onClick={onClose}>
-                            Cancel
-                        </button>
-                        <button type="submit" className="btn-submit" disabled={submitting}>
-                            {submitting ? 'Registering...' : 'Provision Tank'}
-                            <FiPlus />
-                        </button>
+                {/* SECTION 3: SENSOR PARAMS */}
+                <div className="atm-section">
+                    <div className="atm-section-header">
+                        <div className="atm-section-icon bg-cyan-500 text-white"><FiDroplet size={14} /></div>
+                        <span className="atm-section-title text-cyan-700">Sensor Mounting & Delta</span>
                     </div>
+                    <div className="atm-section-body atm-grid atm-grid-3">
+                        <div className="form-group">
+                            <label>Empty Dist (cm)</label>
+                            <input type="number" name="sensorEmptyDistance" value={formData.sensorEmptyDistance} onChange={handleChange} onKeyDown={handleKeyDownNumeric} placeholder="260.0" />
+                        </div>
+                        <div className="form-group">
+                            <label>Full Dist (cm)</label>
+                            <input type="number" name="sensorFullDistance" value={formData.sensorFullDistance} onChange={handleChange} onKeyDown={handleKeyDownNumeric} placeholder="10.0" />
+                        </div>
+                        <div className="form-group">
+                            <label>Sensor Offset (cm)</label>
+                            <input type="number" name="sensorHeight" value={formData.sensorHeight} onChange={handleChange} onKeyDown={handleKeyDownNumeric} placeholder="5.0" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="tm-verification-card mt-4">
+                    <FiCheckCircle size={16} />
+                    <p>Provisioning will trigger an immediate hardware handshake to verify real-time telemetry.</p>
+                </div>
+
+                {error && <div className="error-message mt-4">{error}</div>}
+
+                <div className="form-actions mt-8 pb-4">
+                    <button type="button" className="btn-danger" onClick={onClose}>Discard</button>
+                    <button type="submit" className="btn-submit" disabled={submitting}>
+                        {submitting ? 'Provisioning...' : 'Initialize Node'}
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    return createPortal(
+        <div className="add-tank-modal-overlay animate-in fade-in duration-300" onClick={triggerHibernate}>
+            <div className="add-tank-modal-content max-w-2xl" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                    <div className="header-text-container">
+                        <h2>Node Infrastructure Setup</h2>
+                        <p>Provision a new terminal identity and sensory parameters.</p>
+                        <div className="modal-header-badges">
+                            <span className="modal-badge purple-solid">PROVISIONING</span>
+                            <span className="modal-badge cyan-glow">HARDWARE_LOCK</span>
+                        </div>
+                    </div>
+                    <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose} title="Close"><FiX size={18} /></button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="add-tank-form">
+                    {renderContent()}
                 </form>
-            )}
-        </div>
-    </div>
-);
+            </div>
+        </div>,
+        document.body
+    );
 };

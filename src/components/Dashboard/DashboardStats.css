@@ -8,8 +8,8 @@
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-    gap: 1.5rem;
-    align-items: stretch;
+    gap: 1rem;
+    align-items: flex-start;
 }
 
 @media (min-width: 1024px) {
@@ -63,12 +63,11 @@
 }
 
 .stat-card {
-    padding: 0.75rem 1rem;
+    padding: 0.65rem 0.85rem;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    min-height: 90px;
-    justify-content: space-between;
+    height: auto;
+    min-height: fit-content;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -90,10 +89,10 @@
 
 .stat-label {
     font-size: 0.75rem;
-    font-weight: 400;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .stat-icon {
@@ -390,48 +389,23 @@
    ───────────────────────────────────────────────────────────── */
 
 .ds-card-premium {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 24px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
     position: relative;
     overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 
-        0 4px 6px -1px rgba(0, 0, 0, 0.1), 
-        0 2px 4px -1px rgba(0, 0, 0, 0.06),
-        inset 0 0 20px rgba(255, 255, 255, 0.5);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .ds-card-premium::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(
-        circle at 30% 30%,
-        rgba(var(--glow-color-rgb), 0.08) 0%,
-        transparent 50%
-    );
-    pointer-events: none;
-    z-index: 0;
-    transition: transform 0.6s ease;
+    content: none;
 }
 
 .ds-card-premium:hover {
-    transform: translateY(-4px) scale(1.01);
-    border-color: rgba(var(--glow-color-rgb), 0.4);
-    box-shadow: 
-        0 20px 25px -5px rgba(0, 0, 0, 0.1), 
-        0 10px 10px -5px rgba(0, 0, 0, 0.04),
-        0 0 20px rgba(var(--glow-color-rgb), 0.1);
-}
-
-.ds-card-premium:hover::before {
-    transform: translate(5%, 5%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    border-color: #d1d5db;
 }
 
 .ds-card-premium .stat-content {
@@ -499,12 +473,11 @@
 
 /* Dashboard Typography Refinement */
 .stat-label-refined {
-    font-size: 0.65rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--color-text-secondary);
-    opacity: 0.6;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #6b7280;
     margin-bottom: 0.5rem;
     display: block;
 }
@@ -515,8 +488,8 @@
     gap: 0.25rem;
     padding: 2px 8px;
     border-radius: 999px;
-    font-size: 0.7rem;
-    font-weight: 800;
-    background: rgba(16, 185, 129, 0.1);
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: rgba(16, 185, 129, 0.08);
     color: #059669;
 }

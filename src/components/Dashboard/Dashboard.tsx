@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 // import { useNavigate } from 'react-router-dom';
 import { Tank } from '@/types';
-import { useTanks, useAlerts, useAllLatestReadings } from '@/hooks/useSupabase';
+import { useTanks, useAlerts, useAllLatestReadings, useSites } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
@@ -40,6 +40,7 @@ export const Dashboard: React.FC = () => {
     const { error: summaryError, refetch: refetchSummary } = useDashboardData();
 
     const { alerts } = useAlerts(stationId, false);
+    const { sites } = useSites(stationId);
     const [showAddModal, setShowAddModal] = useState(false);
     const hasPushedError = React.useRef(false);
 
@@ -107,8 +108,8 @@ export const Dashboard: React.FC = () => {
 
 
             <PageHeader
-                title="Operational Intelligence HUD"
-                description="Real-time telemetry, risk monitoring, and strategic insights"
+                title="Dashboard"
+                description="Live tank levels, alerts, and station performance at a glance."
             />
 
             <div className="dashboard-grid">
@@ -150,7 +151,8 @@ export const Dashboard: React.FC = () => {
 
                     {showAddModal && (
                         <AddTankModal 
-                            stationId={stationId}
+                            isOpen={showAddModal}
+                            sites={sites}
                             onClose={() => setShowAddModal(false)}
                             onSuccess={() => {
                                 localStorage.setItem('iotank_initial_tanks_provisioned', 'true');

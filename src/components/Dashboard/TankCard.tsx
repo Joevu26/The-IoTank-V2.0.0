@@ -99,13 +99,20 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
 
     const formatTime = (timestamp: number) => {
         const diff = now - timestamp;
-        const seconds = Math.floor(diff / 1000);
-        const minutes = Math.floor(seconds / 60);
+        const minutes = Math.floor(diff / 60000);
 
-        if (seconds < 30) return `Just now`;
-        if (seconds < 60) return `${seconds}s ago`;
+        if (minutes < 1) return `Just now`;
         if (minutes < 60) return `${minutes}m ago`;
-        return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours < 24) {
+            return `${hours}h ${mins}m ago`;
+        }
+        
+        const days = Math.floor(hours / 24);
+        const remainingHours = hours % 24;
+        return `${days}d ${remainingHours}h ago`;
     };
 
     // Asset value configuration link

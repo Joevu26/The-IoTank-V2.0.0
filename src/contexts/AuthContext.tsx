@@ -114,6 +114,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             
             const runQuery = async () => {
                 lastEnrichmentAttemptRef.current = Date.now(); // Record attempt start
+                
+                // [RECOVERY PANIC BYPASS]: If we detect a recovery link, we MUST NOT enrich or check boundaries.
+                // Doing so might trigger a sign-out for System-Admins landing on the Client portal.
+                if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+                    console.log("[DEBUG_LOG] ENRICHMENT: Recovery detected. Postponing enrichment to allow password reset.");
+                    return false;
+                }
+
                 // 1. FAST BUNDLE: Fetch everything in one single database round-trip
                 const { data: bundle, error } = await supabase.rpc('get_user_bundle_v2');
 
@@ -164,7 +172,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 const isSystemUser = bundle.identity_type === 'system';
 
-                // 2. SECURITY: Check is_active
+                // 2. SECURITY: Hard Application Boundary - Block System Users from Client Portal
+                // EXCEPTION: Allow recovery sessions to bypass the boundary so Admins can reset passwords.
+                const isRecoveryPath = window.location.pathname === '/reset-password' || window.location.hash.includes('type=recovery');
+                
+                if (isSystemUser && !isRecoveryPath) {
+                    await AuditService.log(
+                        'SECURITY',
+                        'UNAUTHORIZED_ACCESS_ATTEMPT',
+                        '',
+                        `Blocked: System Administrator (${sbUser.email}) attempted to load the Client Portal.`,
+                        'WARNING',
+                        { auth_id: sbUser.id }
+                    );
+                    
+                    console.error("[DEBUG_LOG] SECURITY: Application Boundary Enforced. System users cannot access the Client Portal. Forcing instant sign-out.");
+                    await supabase.auth.signOut();
+                    setCurrentUser(null);
+                    setLoading(false);
+                    return true;
+                }
+
+                // 2.1 SECURITY: Check is_active (Legacy check fallback)
                 if (isSystemUser && !bundle.is_active) {
                     await AuditService.log(
                         'SECURITY',
@@ -237,6 +266,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    // [RECOVERY DETECTOR]: Detect recovery fragments before routing or enrichment logic starts
+    useEffect(() => {
+        if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+            console.log("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
+            const targetUrl = `${window.location.origin}/reset-password${window.location.hash}`;
+            window.location.href = targetUrl;
+        }
+    }, []);
+
     // MFA CHECK DISABLED — Re-enable when MFA factors are configured in DB
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const checkAndTriggerMFA = async (_unused?: unknown): Promise<boolean> => {
@@ -247,8 +285,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const isBootingRef = useRef(true);
 
     useEffect(() => {
-        const isRecoveryFlow = window.location.pathname === '/reset-password';
-
+        
         // Safety Timeout: Force clear loading after 12 seconds to prevent permanent hang
         // Increased from 4s to 12s to prevent race conditions during DB cold-starts
         const safetyTimer = setTimeout(() => {
@@ -266,6 +303,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log("[DEBUG_LOG] BOOT: Launching secure handshake...");
             isBootingRef.current = true;
             handshakeInProgressRef.current = true;
+
+            // [RECOVERY SCAN]: Detect if the user landed on ANY page with a recovery hash
+            // This is a fail-safe for when Supabase ignores the redirectTo parameter.
+            if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+                console.log("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
+                
+                // Clear any potentially conflicting state
+                isBootingRef.current = false;
+                handshakeInProgressRef.current = false;
+                
+                const targetUrl = `${window.location.origin}/reset-password${window.location.hash}`;
+                if (window.location.pathname !== '/reset-password') {
+                    window.location.href = targetUrl;
+                }
+                updateLoadingState(false);
+                return;
+            }
             
             try {
                 // Determine initial session immediately
@@ -309,7 +363,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     }
 
                     // 2. BACKGROUND ENRICHMENT: Always verify against DB in background
-                    if (!isRecoveryFlow) {
+                    if (window.location.pathname !== '/reset-password') {
                         const enrichmentPromise = enrichUserFromSupabase(session.user);
                         // If no cache hit, we MUST wait for the first enrichment to show anything
                         if (!cachedData) {
@@ -335,7 +389,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log(`[DEBUG_LOG] AUTH_EVENT: ${event} (Booting: ${isBootingRef.current})`);
 
-            if (event === 'PASSWORD_RECOVERY' || isRecoveryFlow) {
+            if (event === 'PASSWORD_RECOVERY') {
+                console.log("[DEBUG_LOG] AUTH_EVENT: Password recovery detected. Forcing navigation to reset module.");
+                setLoading(false);
+                if (window.location.pathname !== '/reset-password') {
+                    // Use href to ensure a clean state break
+                    const target = `${window.location.origin}/reset-password${window.location.hash}`;
+                    window.location.href = target;
+                    return;
+                }
+                return;
+            }
+
+            if (window.location.pathname === '/reset-password') {
                 setLoading(false);
                 return;
             }
@@ -445,6 +511,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) {
             setLoading(false);
             throw error;
+        }
+
+        // APPLICATION BOUNDARY: Prevent Admins from logging into Client Portal
+        if (data?.user) {
+             const { data: bundle } = await supabase.rpc('get_user_bundle_v2');
+             if (bundle?.identity_type === 'system' || bundle?.role === 'super_admin') {
+                 await supabase.auth.signOut(); // Immediately terminate session
+                 setLoading(false);
+                 throw new Error("Application Boundary: Administrator accounts are restricted from the Client Portal. Please log in via the Super Admin Portal.");
+             }
         }
 
         // Emit forensic log for unified_events subscription (toast/navbar mapping)

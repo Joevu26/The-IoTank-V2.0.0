@@ -33,7 +33,7 @@ const DEFAULT_THRESHOLDS: AlertEngineThresholds = {
     refillDetectionThreshold: 10,
 };
 
-const SCAN_INTERVAL_MS = 10_000; // 10 seconds (High Sensitivity)
+const SCAN_INTERVAL_MS = 1800000; // 30 Minutes (Matches engineer workflow requirements)
 
 function computeRiskIndex(activeAlerts: Alert[]): RiskIndex {
     const fuelAlerts = activeAlerts.filter(a => a.type === 'low-level' || a.type === 'leak' || a.type === 'overfill');
@@ -92,6 +92,8 @@ export function useAlertEngine(
         lastInflowVolume: number;
     }>>({});
     const { status: shiftStatus } = useShiftStatus();
+    const toastedAlertsRef = useRef<Set<string>>(new Set());
+    const initialScanPerformedRef = useRef(false);
 
     // ── Subscribe to active alerts from Supabase ────────────────────────────
     useEffect(() => {
@@ -310,6 +312,16 @@ export function useAlertEngine(
 
             const uniqueDrafts = filterDuplicates(allDrafts, activeAlerts);
 
+            // Filter against "Toast Memory" to prevent re-toasting known active issues
+            const draftsToToast = uniqueDrafts.filter(draft => {
+                const key = `${draft.tankId}:${draft.type}`;
+                if (toastedAlertsRef.current.has(key)) return false;
+                
+                // Add to memory
+                toastedAlertsRef.current.add(key);
+                return true;
+            });
+
             if (uniqueDrafts.length > 0) {
                 const dbAlerts = uniqueDrafts.map(draft => ({
                     station_id: stationId,
@@ -325,6 +337,20 @@ export function useAlertEngine(
                 }));
 
                 await supabase.from('alerts').insert(dbAlerts);
+                
+                // [NEW]: Universal Toast Notification for every new system alert
+                // Uses the filtered "draftsToToast" to satisfy the "Optimal Frequency" requirement
+                draftsToToast.forEach(draft => {
+                    const isCritical = draft.severity === 'critical';
+                    window.dispatchEvent(new CustomEvent('system-toast', {
+                        detail: {
+                            title: isCritical ? `🔴 ${draft.title}` : draft.title,
+                            message: draft.message,
+                            type: isCritical ? 'error' : (draft.severity === 'warning' ? 'warning' : 'info'),
+                            attribution: 'SYSTEM_SENSE'
+                        }
+                    }));
+                });
 
                 // Browser-side & SMTP tactical security notification
                 uniqueDrafts.forEach(draft => {
@@ -408,8 +434,17 @@ export function useAlertEngine(
         if (reading && latestReadingsRef.current[tankId]?.id !== reading.id) {
             previousReadingsRef.current[tankId] = latestReadingsRef.current[tankId];
             latestReadingsRef.current[tankId] = reading;
+
+            // [FIX]: Dynamic Boot Scan - If this is the first set of data, fire an immediate scan
+            // This ensures notifications aren't 'silent' until the first 30min interval.
+            const allTanksHaveData = tanks.every(t => latestReadingsRef.current[t.id]);
+            if (allTanksHaveData && !initialScanPerformedRef.current) {
+                initialScanPerformedRef.current = true;
+                console.log('[AlertEngine] BOOT: Hardware data acquired. Firing initial bootstrap scan.');
+                runScan();
+            }
         }
-    }, []);
+    }, [tanks, runScan]);
 
     /**
      * Get correlated (composite) view of alerts — grouped by tank if 3+ present.

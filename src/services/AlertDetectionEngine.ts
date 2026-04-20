@@ -64,7 +64,18 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     // Safety check
     if (!tank || !latestReading) return [];
 
-    const fuelLevel = latestReading.fuelLevel;
+    const fuelLevel = (() => {
+        const raw = latestReading.fuelLevel;
+        if (raw !== undefined && raw > 0) return raw;
+        
+        // [FIX]: Forensic Fallback - Calculate level if missing or 0 but volume exists
+        const vol = latestReading.volumeCorrected || latestReading.volume || 0;
+        if (vol > 0 && tank.capacity) {
+            const calculated = (vol / tank.capacity) * 100;
+            return Math.min(100, Math.max(0, calculated));
+        }
+        return raw;
+    })();
 
     // ── 1. CRITICAL LEVEL BREACH (5%) ──────────────────────────────────────────
     if (fuelLevel !== undefined && fuelLevel <= 5) {
@@ -186,12 +197,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             tankId: tank.id,
             siteId: tank.siteId,
             type: 'telemetry-gap',
-            title: `Telemetry gap on ${tank.name}`,
-            description: `No reading received for ${gapMinutes} minutes. Sensor or connectivity issue likely.`,
-            message: `${tank.name}: ${gapMinutes}min telemetry gap`,
-            severity: 'warning',
-            severityLabel: label,
-            score,
+            title: `Offline: ${tank.name}`,
+            description: `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
+            message: `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
+            severity: gapMinutes > 1440 ? 'critical' : 'warning', // Escalate to critical after 24 hours
+            severityLabel: gapMinutes > 1440 ? 'CRITICAL' : label,
+            score: gapMinutes > 1440 ? 98 : score,
             source: 'system',
             state: 'ACTIVE',
             resolved: false,
@@ -371,6 +382,33 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     }
 
     return drafts;
+}
+
+/**
+ * Forensic Time Formatter: Converts minutes into a professional, high-density 
+ * string (e.g., 3h 10mins or 1d 4h), skipping units that are zero.
+ * [USER_SPEC]: No seconds allowed.
+ */
+export function formatForensicDuration(minutes: number): string {
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}mins`;
+
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+
+    if (hours < 24) {
+        let res = `${hours}h`;
+        if (mins > 0) res += ` ${mins}mins`;
+        return res;
+    }
+
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    
+    let res = `${days}d`;
+    if (remainingHours > 0) res += ` ${remainingHours}h`;
+    if (mins > 0) res += ` ${mins}mins`;
+    return res;
 }
 
 /**

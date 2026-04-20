@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../config/supabase';
 import Layout from '../components/Layout';
-import { 
-    FiPhone, FiMail, FiCheckCircle, FiXCircle, FiInfo, FiLoader, 
+import { FiPhone, FiMail, FiCheckCircle, FiXCircle, FiInfo, FiLoader, 
     FiPlus, FiRefreshCw, FiUser, FiShield, FiMapPin, FiCalendar, 
     FiSearch, FiAlertCircle, FiActivity, FiX, FiGlobe, FiZap,
     FiChevronLeft, FiChevronRight, FiDatabase, FiExternalLink, 
     FiDownload, FiTrendingUp, FiTrendingDown, FiArchive, FiClock
 } from 'react-icons/fi';
+import { useAuth } from '../hooks/useAuth';
 import './PendingRegistrations.css';
 
 interface PendingReg {
@@ -64,6 +65,7 @@ const TablePagination = ({
 };
 
 const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) => {
+  const { systemUser } = useAuth();
   const [registrations, setRegistrations] = useState<PendingReg[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -158,14 +160,36 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
       });
 
       if (error) {
-          if (error.status === 401 || (error.message && error.message.includes('401'))) {
-              console.error("[DEBUG_LOG] AUTH_FAILURE: Stale session detected. Purging.");
-              setToast({ show: true, type: 'error', title: 'Identity Desync', message: 'Security token mismatch. Forced re-authentication required.' });
-              localStorage.clear();
-              setTimeout(() => window.location.href = '/', 2000);
+          console.error("[PROVISIONING_HANDSHAKE_FAIL] Full Error Object:", error);
+          
+          const isAuthError = error.status === 401 || 
+                             (error.message && error.message.toLowerCase().includes('unauthorized'));
+
+          if (isAuthError) {
+              const hint = (error as any).hint || (error as any).detail?.hint || 'Your administrative session has timed out. Please sign in again.';
+              setToast({ 
+                show: true, 
+                type: 'error', 
+                title: 'Security Session Expired', 
+                message: hint
+              });
+              
+              supabase.auth.signOut().then(() => {
+                localStorage.clear();
+                setTimeout(() => window.location.href = '/', 3500);
+              });
               return;
           }
-          throw error;
+
+          // Handle generic invocation error
+          setToast({
+              show: true,
+              type: 'error',
+              title: "Provisioning Failed",
+              message: error.message || "The provisioning hub could not be reached.",
+              step: 'NETWORK_ERROR'
+          });
+          return;
       }
       
       if (data && data.success === false) {
@@ -173,21 +197,10 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
               show: true,
               type: 'error',
               title: "Provisioning Interrupted",
-              message: data.error || data.details?.message || "Logical desync in handshake.",
-              step: data.details?.step || 'PIPELINE_DESYNC'
+              message: data.error || (data.detail && typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) || "Logical desync in handshake.",
+              step: data.detail?.step || 'PIPELINE_DESYNC'
           });
           return;
-      }
-
-      if (functionError) {
-        setToast({
-            show: true,
-            type: 'error',
-            title: "Provisioning Failed",
-            message: functionError.message || "The provisioning hub could not be reached.",
-            step: 'SERVER_ERROR'
-        });
-        return;
       }
       
       setToast({
@@ -212,11 +225,12 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
     try {
       const { error } = await supabase.from('pending_registrations').update({ status: 'rejected' }).eq('id', reg.id);
       if (error) throw error;
+      
       setToast({ 
           show: true, 
-          type: 'error', 
-          title: 'Request Rejected', 
-          message: `Administrative access for ${reg.full_name} has been formally declined and archived.` 
+          type: 'success', 
+          title: 'Request Archived', 
+          message: `Administrative access for ${reg.full_name} has been declined and moved to blacklist.` 
       });
       setRejectingId(null);
       setSelectedReg(null); // Close modal if open
@@ -313,73 +327,74 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
         }
     };
 
-    return (
-        <div className="registration-overlay">
-            <div className="registration-modal-content">
-                <header className="modal-header">
+    return createPortal(
+        <div className="registration-overlay" style={{ zIndex: 9999 }}>
+            <div className="registration-modal-content max-w-2xl w-full animate-in zoom-in-95 duration-200">
+                <header className="px-6 py-6 border-b border-slate-100 flex items-start justify-between bg-slate-50 rounded-t-2xl">
                     <div className="header-text-container">
-                        <h2>Provision Executive Identity</h2>
-                        <p>Direct system-level deployment of administrative credentials.</p>
-                        <div className="modal-header-badges">
-                            <span className="modal-badge amethyst">Kernel Direct</span>
-                            <span className="modal-badge violet">SECURE_DEPLOY</span>
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 rounded-lg">
+                                <FiUser size={20} className="text-indigo-600" />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-800 m-0">Provision Executive Identity</h2>
+                        </div>
+                        <p className="text-slate-500 text-sm m-0 mt-1">Direct system-level deployment of administrative credentials.</p>
+                        <div className="flex gap-2 mt-3">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700">Kernel Direct</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700">SECURE_DEPLOY</span>
                         </div>
                     </div>
-                <button className="close-btn" onClick={() => setShowManualModal(false)}>
-                        <FiX size={18} />
+                <button className="text-slate-400 hover:text-slate-600 bg-slate-200/50 hover:bg-slate-200 p-2 rounded-full transition-colors" onClick={() => setShowManualModal(false)}>
+                        <FiX size={16} />
                     </button>
                 </header>
 
-                <div className="modal-body-scroll">
+                <div className="max-h-[70vh] overflow-y-auto px-6 pb-8 pt-4 bg-white rounded-b-2xl">
                     {localError && (
-                        <div className="error-banner mb-4">
-                            <div className="error-icon-container">
-                                <FiAlertCircle className="error-icon" />
-                            </div>
-                            <div className="error-content">
-                                <strong>Deployment Error</strong>
-                                <p>{localError}</p>
+                        <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl flex gap-3 text-sm font-medium mb-6">
+                            <FiAlertCircle size={18} className="shrink-0 mt-0.5" />
+                            <div>
+                                <strong className="block mb-1">Deployment Error</strong>
+                                <p className="m-0">{localError}</p>
                             </div>
                         </div>
                     )}
                     
-                    <form onSubmit={handleSubmit} className="premium-compact-form">
+                    <form onSubmit={handleSubmit} className="space-y-8 mt-2">
                         {/* SECTION 1: IDENTITY */}
-                        <div className="atm-section amethyst">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiUser size={14} /></div>
-                                <span className="atm-section-title">Executive Identity</span>
+                        <div className="atm-section">
+                            <div className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-4 uppercase tracking-widest border-b border-slate-100 pb-2">
+                                <FiUser size={14} /> Executive Identity
                             </div>
-                            <div className="atm-section-body atm-grid atm-grid-2">
-                                <div className="form-group">
-                                    <label>Full Legal Name</label>
-                                    <input required type="text" placeholder="John Kamau" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Full Legal Name</label>
+                                    <input required type="text" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none" placeholder="John Kamau" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} />
                                 </div>
-                                <div className="form-group">
-                                    <label>Business Email Address</label>
-                                    <input required type="email" placeholder="you@company.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Business Email Address</label>
+                                    <input required type="email" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none" placeholder="you@company.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                                 </div>
-                                <div className="form-group">
-                                    <label>Official Contact Number</label>
-                                    <input required type="tel" placeholder="+254..." value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Official Contact Number</label>
+                                    <input required type="tel" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none" placeholder="+254..." value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                                 </div>
-                                <div className="form-group">
-                                    <label>Station / Company Name</label>
-                                    <input required type="text" placeholder="e.g. Nairobi Central Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} />
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Station / Company Name</label>
+                                    <input required type="text" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none" placeholder="e.g. Nairobi Central Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} />
                                 </div>
                             </div>
                         </div>
 
                         {/* SECTION 2: LOCATION */}
-                        <div className="atm-section violet">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiGlobe size={14} /></div>
-                                <span className="atm-section-title">Administrative Region</span>
+                        <div className="atm-section">
+                            <div className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-4 uppercase tracking-widest border-b border-slate-100 pb-2">
+                                <FiGlobe size={14} /> Administrative Region
                             </div>
-                            <div className="atm-section-body">
-                                <div className="form-group">
-                                    <label>County / Region Headquarters</label>
-                                    <select required value={formData.county} onChange={e => setFormData({...formData, county: e.target.value})}>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">County / Region Headquarters</label>
+                                    <select required className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none" value={formData.county} onChange={e => setFormData({...formData, county: e.target.value})}>
                                         <option value="">Select County</option>
                                         {counties.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
@@ -388,16 +403,16 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                         </div>
 
                         {/* SECTION 3: DIRECTIVES */}
-                        <div className="atm-section plum">
-                            <div className="atm-section-header">
-                                <div className="atm-section-icon"><FiInfo size={14} /></div>
-                                <span className="atm-section-title">Special Directives</span>
+                        <div className="atm-section">
+                            <div className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-4 uppercase tracking-widest border-b border-slate-100 pb-2">
+                                <FiInfo size={14} /> Special Directives
                             </div>
-                            <div className="atm-section-body">
-                                <div className="form-group">
-                                    <label>Technical Requirements (Optional)</label>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="form-group flex flex-col gap-1.5">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Technical Requirements (Optional)</label>
                                     <textarea 
                                         rows={2}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all outline-none resize-y"
                                         placeholder="Any specific installation notes or equipment needs..." 
                                         value={formData.notes} 
                                         onChange={e => setFormData({...formData, notes: e.target.value})} 
@@ -406,109 +421,142 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                             </div>
                         </div>
                         
-                        <div className="form-actions mt-8">
-                            <button type="button" className="btn-cancel" onClick={() => setShowManualModal(false)}>Cancel</button>
-                            <button type="submit" className="btn-submit" disabled={submitting}>
+                        <div className="flex gap-4 pt-4 border-t border-slate-100">
+                            <button type="button" className="flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm transition-colors" onClick={() => setShowManualModal(false)}>Cancel</button>
+                            <button type="submit" className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-colors shadow-md shadow-indigo-600/20 flex justify-center items-center gap-2" disabled={submitting}>
                                 {submitting ? <FiLoader className="animate-spin" /> : <FiZap />}
-                                <span>Provision Executive Account</span>
+                                <span>PROVISION EXECUTIVE ACCOUNT</span>
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
   };
 
   const DetailAuditModal = ({ reg, onClose }: { reg: PendingReg; onClose: () => void }) => {
-    return (
-        <div className="registration-overlay" onClick={onClose}>
-            <div className="registration-modal-content audit-mode animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <header className="modal-header audit">
-                    <div className="header-text-container">
-                        <div className="flex items-center gap-3">
-                            <FiActivity size={20} className="text-indigo-400" />
-                            <h2>Forensic Audit: {reg.full_name}</h2>
+    return createPortal(
+        <div className="registration-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
+            <div className="registration-modal-content max-w-[640px] w-full animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <header className="px-8 py-6 relative rounded-t-2xl flex items-start justify-between" style={{ background: 'linear-gradient(135deg, #0f172a, #064e3b)' }}>
+                    <div className="text-white">
+                        <div className="flex items-center gap-3 mb-1">
+                            <FiActivity size={20} className="text-emerald-400" />
+                            <h2 className="text-[22px] font-bold m-0 tracking-tight text-white">Forensic Audit: {reg.full_name}</h2>
                         </div>
-                        <p>Identity bundle verification and station deployment metadata.</p>
+                        <p className="text-emerald-100/70 text-[13px] m-0 pl-[32px]">Identity bundle verification and station deployment metadata.</p>
                     </div>
-                    <button className="close-btn" onClick={onClose}>
-                        <FiX size={18} />
+                    <button className="text-white bg-rose-500 hover:bg-rose-600 p-2 rounded-full shadow-lg transition-transform hover:scale-105" onClick={onClose}>
+                        <FiX size={14} />
                     </button>
                 </header>
 
-                <div className="modal-body-scroll">
-                    <div className="audit-grid">
-                        <div className="audit-section">
-                            <label><FiUser size={12} /> Executive Identity</label>
-                            <div className="audit-field">
-                                <span className="label">Legal Name</span>
-                                <span className="value font-bold">{reg.full_name}</span>
-                            </div>
-                            <div className="audit-field">
-                                <span className="label">Primary Email</span>
-                                <span className="value font-mono text-indigo-600">{reg.email}</span>
-                            </div>
-                            <div className="audit-field">
-                                <span className="label">Contact Phone</span>
-                                <span className="value font-mono">{reg.phone}</span>
-                            </div>
-                        </div>
-
-                        <div className="audit-section">
-                            <label><FiMapPin size={12} /> Station Deployment</label>
-                            <div className="audit-field">
-                                <span className="label">Station Entity</span>
-                                <span className="value font-bold text-slate-700">{reg.station_name}</span>
-                            </div>
-                            <div className="audit-field">
-                                <span className="label">Assigned County</span>
-                                <span className="value region-tag inline-block mt-1">{reg.county}</span>
+                <div className="max-h-[70vh] overflow-y-auto bg-white rounded-b-2xl px-8 pb-8 pt-6">
+                    <div className="space-y-6">
+                        {/* Executive Identity */}
+                        <div>
+                            <h4 className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-3">
+                                <FiUser size={14} /> Executive Identity
+                            </h4>
+                            <div className="space-y-2">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-slate-500 text-[13px]">Legal Name</span>
+                                    <span className="text-slate-800 font-bold text-base bg-slate-50 px-3 py-2 rounded-lg">{reg.full_name}</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-slate-500 text-[13px]">Primary Email</span>
+                                    <span className="text-indigo-600 font-mono text-base bg-indigo-50 px-3 py-2 rounded-lg">{reg.email}</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-slate-500 text-[13px]">Contact Phone</span>
+                                    <span className="text-slate-700 text-base bg-slate-50 px-3 py-2 rounded-lg">{reg.phone}</span>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="audit-section full-width">
-                            <label><FiInfo size={12} /> Technical Objectives & Notes</label>
-                            <div className="audit-notes-box">
+                        {/* Station Deployment */}
+                        <div>
+                            <h4 className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-3">
+                                <FiMapPin size={14} /> Station Deployment
+                            </h4>
+                            <div className="space-y-2">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-slate-500 text-[13px]">Station Entity</span>
+                                    <span className="text-slate-800 font-bold text-base bg-slate-50 px-3 py-2 rounded-lg">{reg.station_name}</span>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-slate-500 text-[13px]">Assigned County</span>
+                                    <span className="text-slate-700 text-base bg-slate-50 px-3 py-2 rounded-lg">{reg.county}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                            <h4 className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-3">
+                                <FiInfo size={14} /> Technical Objectives & Notes
+                            </h4>
+                            <div className="text-slate-700 text-sm bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
                                 {reg.notes || "No additional technical directives provided."}
                             </div>
                         </div>
 
-                        <div className="audit-section full-width">
-                            <label><FiClock size={12} /> Protocol History</label>
-                            <div className="flex justify-between items-center py-2 border-b border-slate-50">
-                                <span className="text-[11px] font-bold text-slate-400 uppercase">Initial Handshake</span>
-                                <span className="text-[11px] font-mono text-slate-500">{new Date(reg.created_at).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-center py-2">
-                                <span className="text-[11px] font-bold text-slate-400 uppercase">Current Status</span>
-                                <span className={`status-badge-premium status--${reg.status}`}>{reg.status}</span>
+                        {/* Protocol History */}
+                        <div className="pb-4">
+                            <h4 className="flex items-center gap-2 text-slate-400 text-sm font-bold mb-3">
+                                <FiClock size={14} /> Protocol History
+                            </h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-800 font-bold">Initial Handshake</span>
+                                    <span className="text-slate-600">{new Date(reg.created_at).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-800 font-bold">Current Status</span>
+                                    <span className="text-slate-600">{reg.status}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {reg.status === 'pending' && (
-                        <div className="form-actions mt-8">
-                            {rejectingId === reg.id ? (
-                                <div className="flex items-center gap-3 animate-in slide-in-from-right-4 duration-300">
-                                    <span className="text-[10px] font-black uppercase text-rose-600">Archiving Identity?</span>
-                                    <button className="btn-confirm-reject" onClick={() => handleReject(reg)}>Confirm</button>
-                                    <button className="btn-cancel-reject" onClick={() => setRejectingId(null)}>Cancel</button>
-                                </div>
-                            ) : (
-                                <>
-                                    <button className="btn-audit-reject" onClick={() => setRejectingId(reg.id)}>Reject Identity</button>
-                                    <button className="btn-audit-approve" onClick={() => handleApproveAdmin(reg)} disabled={approving && processingId === reg.id}>
-                                        {approving && processingId === reg.id ? <FiLoader className="animate-spin" /> : <FiZap />}
-                                        <span>Provision Executive Account</span>
+                        <div className="mt-8">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-center mb-1">
+                                    <button 
+                                        className="text-slate-800 hover:text-rose-600 text-[15px] font-medium transition-colors" 
+                                        onClick={() => setRejectingId(rejectingId === reg.id ? null : reg.id)}
+                                    >
+                                        Reject Identity
                                     </button>
-                                </>
-                            )}
+                                </div>
+                                
+                                {rejectingId === reg.id && (
+                                    <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 mb-2 animate-in slide-in-from-top-2 duration-300">
+                                        <div className="text-rose-800 text-sm font-bold mb-3">Confirm Executive Identity Rejection?</div>
+                                        <div className="flex gap-3">
+                                            <button className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg text-sm transition-colors" onClick={() => handleReject(reg)}>Yes, Reject</button>
+                                            <button className="flex-1 bg-white border border-rose-200 text-slate-700 hover:bg-slate-50 font-bold py-2 rounded-lg text-sm transition-colors" onClick={() => setRejectingId(null)}>Cancel</button>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                <button 
+                                    className="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-4 rounded-xl text-[15px] transition-all shadow-md flex items-center justify-center gap-2" 
+                                    onClick={() => handleApproveAdmin(reg)} 
+                                    disabled={(approving && processingId === reg.id) || systemUser?.auth_level !== 1}
+                                >
+                                    {approving && processingId === reg.id ? <FiLoader className="animate-spin" /> : <FiZap />}
+                                    <span className="uppercase tracking-wide">Provision Executive Account</span>
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
             </div>
-        </div>
+        </div>, document.body
     );
   };
 
@@ -688,12 +736,18 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                                         {reg.status === 'pending' ? (
                                             <div className="flex justify-end gap-2 pr-2">
                                                 {rejectingId === reg.id ? (
-                                                    <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                                                        <button className="action-circle-small confirm" onClick={(e) => { e.stopPropagation(); handleReject(reg); }} title="Confirm Reject">
-                                                            <FiCheckCircle size={14} />
+                                                    <div className="flex items-center justify-end gap-3 pr-2 animate-in fade-in duration-200">
+                                                        <button 
+                                                            className="text-[14px] font-medium text-slate-800 hover:text-rose-600 transition-colors" 
+                                                            onClick={(e) => { e.stopPropagation(); handleReject(reg); }}
+                                                        >
+                                                            Confirm Reject
                                                         </button>
-                                                        <button className="action-circle-small cancel" onClick={(e) => { e.stopPropagation(); setRejectingId(null); }} title="Cancel">
-                                                            <FiX size={14} />
+                                                        <button 
+                                                            className="text-slate-800 hover:text-slate-500 transition-colors pt-0.5" 
+                                                            onClick={(e) => { e.stopPropagation(); setRejectingId(null); }} 
+                                                        >
+                                                            <FiX size={18} />
                                                         </button>
                                                     </div>
                                                 ) : (
@@ -701,8 +755,8 @@ const PendingRegistrations: React.FC<{ isHubView?: boolean }> = ({ isHubView }) 
                                                         <button 
                                                             className="action-circle approve" 
                                                             onClick={(e) => { e.stopPropagation(); handleApproveAdmin(reg); }} 
-                                                            disabled={approving && processingId === reg.id} 
-                                                            title="Approve Request"
+                                                            disabled={(approving && processingId === reg.id) || systemUser?.auth_level !== 1} 
+                                                            title={systemUser?.auth_level !== 1 ? "Super Admin Clearance Required" : "Approve Request"}
                                                         >
                                                             {approving && processingId === reg.id ? <FiLoader className="animate-spin" /> : <FiCheckCircle size={18} />}
                                                         </button>

@@ -42,7 +42,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
     } | null>(null);
     const isGhost = tank.id === 'ghost-tank';
 
-    const fillPercent = tank.capacity ? ((tank.currentVolume || 0) / tank.capacity) * 100 : 0;
+    const fillPercent = tank.capacity ? Math.round(((tank.currentVolume || 0) / tank.capacity) * 10000) / 100 : 0;
 
     // Status classification with expanded Amethyst logic
     let statusLabel = tank.currentState ? tank.currentState.replace('_', ' ').toUpperCase() : 'NORMAL';
@@ -134,7 +134,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                             <span className="dot"></span>
                             {statusLabel}
                         </div>
-                        <div className={`sync-status flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest ${!tank.lastReading ? 'sync-waiting' : 'text-slate-400'}`}>
+                        <div className={`sync-status flex items-center gap-2.5 text-xs font-medium ${!tank.lastReading ? 'sync-waiting' : 'text-slate-400'}`}>
                             <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white border border-slate-100 shadow-sm">
                                 {tank.lastReading ? <FiActivity size={12} className="text-purple-500" /> : <FiRefreshCw size={12} className="sync-spinner text-purple-600" />}
                             </div>
@@ -188,28 +188,28 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                     <div className="stat-card">
                                         <span className="stat-label">Corrected Inventory</span>
                                         <span className="stat-value">{isGhost ? '0 L' : formatVolume(tank.currentVolume || latestReading?.volumeCorrected || 0)}</span>
-                                        <div className="flex justify-between border-t border-slate-50 mt-2 pt-3">
+                                        <div className="flex justify-between border-t border-slate-100 mt-3 pt-3">
                                             <div className="mini-metric">
                                                 <span className="mini-label">Capacity</span>
                                                 <span className="mini-value">{isGhost ? '0' : tank.capacity.toLocaleString()} L</span>
                                             </div>
                                             <div className="mini-metric text-right">
                                                 <span className="mini-label">Empty Space</span>
-                                                <span className="mini-value text-primary">{isGhost ? '0' : (tank.capacity - (tank.currentVolume || 0)).toLocaleString()} L</span>
+                                                <span className="mini-value text-primary">{isGhost ? '0' : Math.round(tank.capacity - (tank.currentVolume || 0)).toLocaleString()} L</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="stat-card">
                                         <span className="stat-label">Dispense Rate</span>
-                                        <span className="stat-value">{isGhost ? '0.0' : analytics.defillRate.toFixed(1)} L/hr</span>
+                                        <span className="stat-value">{isGhost ? '0.0' : analytics.defillRate.toFixed(2)} L/hr</span>
                                         <span className={`stat-trend ${analytics.isTheftSuspected ? 'text-red-500' : 'text-gray-400'}`}>
-                                            {isGhost ? '---' : (analytics.isTheftSuspected ? 'URGENT: Rapid Loss' : `TREND: ${analytics.trend.toUpperCase()}`)}
+                                            {isGhost ? '—' : (analytics.isTheftSuspected ? 'Rapid loss detected' : `Trend: ${analytics.trend.charAt(0).toUpperCase() + analytics.trend.slice(1)}`)}
                                         </span>
                                     </div>
                                     <div className="stat-card">
                                         <span className="stat-label">Integrity Index (CSLD)</span>
                                         <span className={`stat-value ${!isGhost && (tank.leakProbability || 0) > 20 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                            {isGhost ? '0%' : `${tank.leakProbability || 0}%`}
+                                            {isGhost ? '0%' : `${parseFloat((tank.leakProbability || 0).toFixed(2))}%`}
                                         </span>
                                         <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                             <div 
@@ -262,7 +262,7 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                     ].map((d) => (
                                         <button
                                             key={d.id}
-                                            className={`px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${timeDomain === d.id ? 'bg-white text-primary shadow-sm scale-105' : 'text-slate-400 hover:text-slate-600'}`}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${timeDomain === d.id ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                                             onClick={() => setTimeDomain(d.id as any)}
                                         >
                                             {d.label}
@@ -372,33 +372,33 @@ export const TankDetailsView: React.FC<TankDetailsViewProps> = ({
                                     <table className="tdv-transaction-table">
                                         <thead>
                                             <tr>
-                                                <th>TIMESTAMP</th>
-                                                <th>VOLUME (L)</th>
-                                                <th>TEMPERATURE</th>
-                                                <th>LEVEL %</th>
-                                                <th>VAR (L)</th>
-                                                <th>STATUS</th>
+                                                <th>Timestamp</th>
+                                                <th>Volume (L)</th>
+                                                <th>Temperature</th>
+                                                <th>Level %</th>
+                                                <th>Var (L)</th>
+                                                <th>Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {readings.slice(0, 10).reverse().map((reading: any) => (
                                                 <tr key={reading.timestamp}>
-                                                    <td className="font-mono">{new Date(reading.timestamp).toLocaleString()}</td>
-                                                    <td className="font-bold">{reading.volumeCorrected?.toLocaleString() || reading.volume?.toLocaleString()} L</td>
-                                                    <td>{reading.temperature.toFixed(1)}°C</td>
+                                                    <td className="font-mono text-xs">{new Date(reading.timestamp).toLocaleString()}</td>
+                                                    <td className="font-medium">{reading.volumeCorrected?.toLocaleString() || reading.volume?.toLocaleString()} L</td>
+                                                    <td>{reading.temperature.toFixed(2)}°C</td>
                                                     <td>
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                                 <div 
                                                                     className={`progress-bar-fill-dynamic ${reading.fuelLevel < 20 ? 'bg-red-500' : 'bg-primary'}`} 
-                                                                    ref={(el) => { if (el) el.style.width = `${reading.fuelLevel}%`; }}
+                                                                    ref={(el) => { if (el) el.style.width = `${Math.min(reading.fuelLevel, 100).toFixed(2)}%`; }}
                                                                 ></div>
                                                             </div>
-                                                            {reading.fuelLevel.toFixed(1)}%
+                                                            {parseFloat(reading.fuelLevel.toFixed(2))}%
                                                         </div>
                                                     </td>
-                                                    <td className={Math.abs(reading.volumeCorrected - reading.volume) > 5 ? 'text-red-500 font-bold' : 'text-slate-400'}>
-                                                        {(reading.volumeCorrected - (reading.volume || 0)).toFixed(1)}
+                                                    <td className={Math.abs(reading.volumeCorrected - reading.volume) > 5 ? 'text-red-500 font-medium' : 'text-slate-400'}>
+                                                        {(reading.volumeCorrected - (reading.volume || 0)).toFixed(2)}
                                                     </td>
                                                     <td>
                                                         <span className={`status-pill ${reading.fuelLevel < 20 ? 'status-critical' : 'status-normal'}`}>

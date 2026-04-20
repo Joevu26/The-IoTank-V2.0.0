@@ -58,6 +58,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
+    // [RECOVERY BYPASS]: Do not attempt system_user mapping if we are in a recovery flow
+    if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+      console.log("[DEBUG_LOG] ADMIN_AUTH: Recovery flow detected. Skipping system_user enrichment.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const isRecoveryFlow = window.location.pathname === '/reset-password';
 
@@ -169,6 +176,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // [RECOVERY DETECTOR]: Global catch for password recovery hashes
+  useEffect(() => {
+    if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+        console.log("[DEBUG_LOG] BOOT: Recovery hash detected in Super Admin portal. Routing to reset.");
+        const targetUrl = `${window.location.origin}/reset-password${window.location.hash}`;
+        window.location.href = targetUrl;
+    }
+  }, []);
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -251,43 +267,77 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const currentUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const isRecoveryFlow = window.location.pathname === '/reset-password';
-
+    // [DYNAMIC RECOVERY PATH]: Check current state instead of relying on mount-time constant
+    const getCurrentIsRecovery = () => window.location.pathname === '/reset-password';
+    
     // 1. Check active session on mount
-    supabase.auth.getSession().then(async ({ data: { session }, error: sessionError }) => {
-      // CATCH: Invalid Refresh Token or other session recovery failures
-      if (sessionError) {
-        const isInvalidToken = sessionError.message?.toLowerCase().includes('refresh token') || 
-                              sessionError.message?.toLowerCase().includes('invalid token') ||
-                              (sessionError as any).status === 400;
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (isInvalidToken) {
-            console.warn("[DEBUG_LOG] BOOT: Session data corrupted or expired. Performing silent purge.");
-            // Sign out but without throwing more errors
-            await supabase.auth.signOut().catch(() => {});
-            setUser(null);
-            setSystemUser(null);
-            setLoading(false);
-            return;
+        if (sessionError) {
+          const isInvalidToken = sessionError.message?.toLowerCase().includes('refresh token') || 
+                                sessionError.message?.toLowerCase().includes('invalid token') ||
+                                (sessionError as any).status === 400;
+          
+          if (isInvalidToken) {
+              console.warn("[DEBUG_LOG] BOOT: Session data corrupted or expired. Performing silent purge.");
+              await supabase.auth.signOut().catch(() => {});
+              setUser(null);
+              setSystemUser(null);
+              setLoading(false);
+              return;
+          }
         }
-      }
 
-      if (session?.user) {
-        currentUserRef.current = session.user.id;
-        if (!isRecoveryFlow) {
-          fetchSystemUser(session.user);
+        if (session?.user) {
+          currentUserRef.current = session.user.id;
+          
+          // [RECOVERY REDIRECT]: If we are on ANY page except reset-password but have a recovery hash, MOVE.
+          if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
+              console.log("[DEBUG_LOG] BOOT: Admin recovery link active. Redirecting to reset module.");
+              if (window.location.pathname !== '/reset-password') {
+                  window.location.href = `${window.location.origin}/reset-password${window.location.hash}`;
+                  return;
+              }
+              setLoading(false);
+              return;
+          }
+
+          if (window.location.pathname !== '/reset-password') {
+            await fetchSystemUser(session.user);
+          } else {
+            setLoading(false);
+          }
         } else {
           setLoading(false);
         }
-      } else {
-        setLoading(false);
+      } catch (err: any) {
+        // Handle navigator.locks timeout or other fatal getSession errors
+        if (err.message && err.message.includes('lock')) {
+          console.warn("[DEBUG_LOG] Auth lock contention detected. Retrying in 1s...");
+          setTimeout(checkSession, 1000);
+        } else {
+          setLoading(false);
+        }
       }
-    });
+    };
+
+    checkSession();
 
     // 2. Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Allow ResetPassword page to handle recovery session without interference
-      if (event === 'PASSWORD_RECOVERY' || isRecoveryFlow) {
+      // [RECOVERY HANDLER]: Explicitly route to reset module if events or path detect it
+      if (event === 'PASSWORD_RECOVERY') {
+        setLoading(false);
+        if (window.location.pathname !== '/reset-password') {
+            window.location.href = `${window.location.origin}/reset-password${window.location.hash}`;
+            return;
+        }
+        return;
+      }
+
+      if (window.location.pathname === '/reset-password') {
         setLoading(false);
         return;
       }
