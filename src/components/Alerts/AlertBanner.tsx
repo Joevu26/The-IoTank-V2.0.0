@@ -72,6 +72,8 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alert, floating }) => 
         setDismissed(true);
     };
 
+    const isRegulatory = alert.type === 'regulatory_update' || alert.type === 'market_news';
+
     if (dismissed) return null;
 
     return (
@@ -104,7 +106,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({ alert, floating }) => 
             </div>
 
             <div className="alert-banner-actions">
-                {(alert.type === 'market-news' || alert.type === 'regulatory-update') && (
+                {isRegulatory && (
                     <button
                         onClick={() => navigate(`/market?tab=news`)}
                         className="btn btn-sm btn-accent"

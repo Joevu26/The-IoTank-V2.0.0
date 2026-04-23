@@ -409,3 +409,27 @@ export async function enforceDurableRateLimit(
 
   return { ok: true };
 }
+
+export async function requireAdminOrCron(req: Request, corsHeaders: CorsHeaders) {
+  const authHeader = req.headers.get('Authorization') || '';
+  const cronSecret = Deno.env.get('CRON_SECRET') || '';
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+  const isAuthorized =
+    (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
+    (serviceKey && authHeader === `Bearer ${serviceKey}`);
+
+  if (!isAuthorized) {
+    return {
+      response: new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }),
+    };
+  }
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+  const supabaseAdmin = createClient(SUPABASE_URL, serviceKey);
+
+  return { ok: true, supabaseAdmin };
+}

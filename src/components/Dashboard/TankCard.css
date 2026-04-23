@@ -336,6 +336,16 @@
     .metric-label {
         font-size: 9px;
     }
+
+    .command-center-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        justify-items: center;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .view-details-btn-premium {

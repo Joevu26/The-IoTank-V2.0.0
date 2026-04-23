@@ -11,13 +11,13 @@
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    background: rgba(15, 23, 42, 0.6);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: rgba(15, 23, 42, 0.75);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
 }
 
 .rv-modal {
-    background: rgba(255, 255, 255, 0.95);
+    background: #ffffff;
     width: 100%;
     max-width: 480px;
     max-height: 90vh;
@@ -27,7 +27,7 @@
     display: flex;
     flex-direction: column;
     animation: rv-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid #e2e8f0;
 }
 
 @keyframes rv-slide-up {

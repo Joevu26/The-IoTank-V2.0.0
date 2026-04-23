@@ -69,114 +69,113 @@ export const ProvisioningGuard: React.FC<ProvisioningGuardProps> = ({ children }
         }
     };
 
-    return (
-        <>
-            {children}
-            {!isProvisioned && !isSystem && currentUser && (
-                <div className="provisioning-overlay">
-                    <div className="provisioning-card">
-                        <div className="provisioning-header">
-                            <div className="provisioning-logo-box">
-                                <FiServer />
-                            </div>
-                            <h2 className="provisioning-title">System Initialization</h2>
-                            <p className="provisioning-subtitle">Configuring your secure enterprise environment</p>
+    if (!isProvisioned && !isSystem && currentUser) {
+        return (
+            <div className="provisioning-overlay">
+                <div className="provisioning-card">
+                    <div className="provisioning-header">
+                        <div className="provisioning-logo-box">
+                            <FiServer />
+                        </div>
+                        <h2 className="provisioning-title">System Initialization</h2>
+                        <p className="provisioning-subtitle">Configuring your secure enterprise environment</p>
+                    </div>
+
+                    <div className="provisioning-body">
+                        <div className="provisioning-loader-wrap">
+                            <div className="provisioning-pulse" />
+                            <FiLoader className="provisioning-main-spinner" />
                         </div>
 
-                        <div className="provisioning-body">
-                            <div className="provisioning-loader-wrap">
-                                <div className="provisioning-pulse" />
-                                <FiLoader className="provisioning-main-spinner" />
+                        <p className="provisioning-status-msg">{statusMessage}</p>
+
+                        <div className="provisioning-steps-list">
+                            {/* Step 1: Identity */}
+                            <div className={`provisioning-step ${activeStep > 1 ? 'complete' : 'active'}`}>
+                                <div className="provisioning-step-left">
+                                    <FiShield className="provisioning-step-icon" />
+                                    <span>Identity Clearance</span>
+                                </div>
+                                {activeStep > 1 ? <FiCheckCircle className="provisioning-step-done" /> : <div className="provisioning-step-pending" />}
                             </div>
 
-                            <p className="provisioning-status-msg">{statusMessage}</p>
-
-                            <div className="provisioning-steps-list">
-                                {/* Step 1: Identity */}
-                                <div className={`provisioning-step ${activeStep > 1 ? 'complete' : 'active'}`}>
-                                    <div className="provisioning-step-left">
-                                        <FiShield className="provisioning-step-icon" />
-                                        <span>Identity Clearance</span>
-                                    </div>
-                                    {activeStep > 1 ? <FiCheckCircle className="provisioning-step-done" /> : <div className="provisioning-step-pending" />}
+                            {/* Step 2: Securing Channel */}
+                            <div className={`provisioning-step ${activeStep === 2 ? 'active' : activeStep > 2 ? 'complete' : ''}`}>
+                                <div className="provisioning-step-left">
+                                    <FiLock className="provisioning-step-icon" />
+                                    <span>Securing Channel</span>
                                 </div>
-
-                                {/* Step 2: Securing Channel */}
-                                <div className={`provisioning-step ${activeStep === 2 ? 'active' : activeStep > 2 ? 'complete' : ''}`}>
-                                    <div className="provisioning-step-left">
-                                        <FiLock className="provisioning-step-icon" />
-                                        <span>Securing Channel</span>
-                                    </div>
-                                    {activeStep > 2 ? <FiCheckCircle className="provisioning-step-done" /> : activeStep === 2 ? <div className="provisioning-step-pending" /> : <div className="provisioning-step-pending inactive" />}
-                                </div>
-
-                                {/* Step 3: Allocation */}
-                                <div className={`provisioning-step ${activeStep === 3 ? 'active' : activeStep > 3 ? 'complete' : ''}`}>
-                                    <div className="provisioning-step-left">
-                                        <FiCpu className="provisioning-step-icon" />
-                                        <span>Station Allocation</span>
-                                    </div>
-                                    {activeStep > 3 ? <FiCheckCircle className="provisioning-step-done" /> : activeStep === 3 ? <div className="provisioning-step-pending" /> : <div className="provisioning-step-pending inactive" />}
-                                </div>
-
-                                {/* Step 4: Telemetry */}
-                                <div className={`provisioning-step ${activeStep === 4 ? 'active' : ''}`}>
-                                    <div className="provisioning-step-left">
-                                        <FiActivity className="provisioning-step-icon" />
-                                        <span>Telemetry Uplink</span>
-                                    </div>
-                                    <div className={`provisioning-step-pending ${activeStep === 4 ? '' : 'inactive'}`} />
-                                </div>
+                                {activeStep > 2 ? <FiCheckCircle className="provisioning-step-done" /> : activeStep === 2 ? <div className="provisioning-step-pending" /> : <div className="provisioning-step-pending inactive" />}
                             </div>
 
-                            <div className="provisioning-btn-group">
+                            {/* Step 3: Allocation */}
+                            <div className={`provisioning-step ${activeStep === 3 ? 'active' : activeStep > 3 ? 'complete' : ''}`}>
+                                <div className="provisioning-step-left">
+                                    <FiCpu className="provisioning-step-icon" />
+                                    <span>Station Allocation</span>
+                                </div>
+                                {activeStep > 3 ? <FiCheckCircle className="provisioning-step-done" /> : activeStep === 3 ? <div className="provisioning-step-pending" /> : <div className="provisioning-step-pending inactive" />}
+                            </div>
+
+                            {/* Step 4: Telemetry */}
+                            <div className={`provisioning-step ${activeStep === 4 ? 'active' : ''}`}>
+                                <div className="provisioning-step-left">
+                                    <FiActivity className="provisioning-step-icon" />
+                                    <span>Telemetry Uplink</span>
+                                </div>
+                                <div className={`provisioning-step-pending ${activeStep === 4 ? '' : 'inactive'}`} />
+                            </div>
+                        </div>
+
+                        <div className="provisioning-btn-group">
+                            <button 
+                                onClick={handleRetry}
+                                disabled={isRetrying}
+                                className="provisioning-btn-primary"
+                            >
+                                <FiRefreshCw className={isRetrying ? 'provisioning-btn-icon-rotating' : ''} />
+                                {isRetrying ? 'Synchronizing...' : 'Force System Sync'}
+                            </button>
+                            
+                            <button 
+                                onClick={() => signOut()}
+                                className="provisioning-btn-secondary"
+                            >
+                                Re-authenticate Session
+                            </button>
+                        </div>
+
+                        {/* Diagnostic Toggle & Info */}
+                        <div className="diagnostic-toggle" onClick={() => setShowDiagnostics(!showDiagnostics)}>
+                            {showDiagnostics ? 'Hide Technical Details' : 'Show Technical Details'}
+                        </div>
+
+                        {showDiagnostics && (
+                            <div className="diagnostic-panel">
+                                <code>
+                                    User ID: {currentUser?.authUserId || 'N/A'}<br />
+                                    Station ID: {currentUser?.stationId || 'MISSING'}<br />
+                                    Role: {currentUser?.role || 'provisional'}<br />
+                                    Level: {currentUser?.authLevel || 0}<br />
+                                    Events: {activeStep} / 4
+                                </code>
                                 <button 
-                                    onClick={handleRetry}
-                                    disabled={isRetrying}
-                                    className="provisioning-btn-primary"
+                                    className="btn btn-ghost mt-2 text-[10px] h-auto px-2 py-1" 
+                                    onClick={handleDiagnostic}
                                 >
-                                    <FiRefreshCw className={isRetrying ? 'provisioning-btn-icon-rotating' : ''} />
-                                    {isRetrying ? 'Synchronizing...' : 'Force System Sync'}
-                                </button>
-                                
-                                <button 
-                                    onClick={() => signOut()}
-                                    className="provisioning-btn-secondary"
-                                >
-                                    Re-authenticate Session
+                                    Run Database Diagnostic
                                 </button>
                             </div>
+                        )}
+                    </div>
 
-                            {/* Diagnostic Toggle & Info */}
-                            <div className="diagnostic-toggle" onClick={() => setShowDiagnostics(!showDiagnostics)}>
-                                {showDiagnostics ? 'Hide Technical Details' : 'Show Technical Details'}
-                            </div>
-
-                            {showDiagnostics && (
-                                <div className="diagnostic-panel">
-                                    <code>
-                                        User ID: {currentUser?.authUserId || 'N/A'}<br />
-                                        Station ID: {currentUser?.stationId || 'MISSING'}<br />
-                                        Role: {currentUser?.role || 'provisional'}<br />
-                                        Level: {currentUser?.authLevel || 0}<br />
-                                        Events: {activeStep} / 4
-                                    </code>
-                                    <button 
-                                        className="btn btn-ghost mt-2 text-[10px] h-auto px-2 py-1" 
-                                        onClick={handleDiagnostic}
-                                    >
-                                        Run Database Diagnostic
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="provisioning-footer-tag">
-                            TRACE_ID: {currentUser.authUserId.slice(0, 8).toUpperCase()} // NODE_0{activeStep}
-                        </div>
+                    <div className="provisioning-footer-tag">
+                        TRACE_ID: {currentUser?.authUserId?.slice(0, 8).toUpperCase() || 'UNKNOWN'} // NODE_0{activeStep}
                     </div>
                 </div>
-            )}
-        </>
-    );
+            </div>
+        );
+    }
+
+    return <>{children}</>;
 };

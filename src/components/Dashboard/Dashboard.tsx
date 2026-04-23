@@ -34,7 +34,7 @@ export const Dashboard: React.FC = () => {
     useShiftStatus();
     
     // Fetch latest readings for all tanks to get RSSI
-    const { readings } = useAllLatestReadings(stationId, (tanks || []).map(t => t.id));
+    const { readings } = useAllLatestReadings(stationId, (tanks || []).map((t: import('@/types').Tank) => t.id));
     
     // Use the new dashboard data hook that hits our Supabase helper function
     const { error: summaryError, refetch: refetchSummary } = useDashboardData();

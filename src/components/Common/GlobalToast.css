@@ -1,21 +1,35 @@
 /* GlobalToast.css - Industrial Action Queue Notification System */
 
-.precision-toast-container {
+.precision-toast-stack {
     position: fixed;
     top: 24px;
     right: 24px;
     z-index: 99999; /* Ensure high visibility over modals */
-    width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     pointer-events: none;
+    max-height: 100vh;
+    overflow: visible;
+}
+
+.precision-toast-container {
+    width: 360px;
+    pointer-events: auto;
     transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
-    transform: translateY(-20px) scale(0.95);
+    transform: translateX(50px) scale(0.95);
     opacity: 0;
 }
 
 .precision-toast-container.active {
-    pointer-events: auto;
-    transform: translateY(0) scale(1);
+    transform: translateX(0) scale(1);
     opacity: 1;
+}
+
+.precision-toast-container.exiting {
+    transform: translateX(50px) scale(0.95);
+    opacity: 0;
+    margin-bottom: -100px; /* Collapse the gap during exit */
 }
 
 .precision-toast-card-industrial {

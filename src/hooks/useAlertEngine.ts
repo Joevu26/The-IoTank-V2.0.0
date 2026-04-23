@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Alert, TankReading, RiskIndex } from '@/types';
+import { Alert, TankReading, RiskIndex, Tank } from '@/types';
 import { supabase } from '@/config/supabase';
 import { useTanks } from './useSupabase';
 import { useShiftStatus } from './useShiftStatus';
@@ -33,12 +33,13 @@ const DEFAULT_THRESHOLDS: AlertEngineThresholds = {
     refillDetectionThreshold: 10,
 };
 
-const SCAN_INTERVAL_MS = 1800000; // 30 Minutes (Matches engineer workflow requirements)
+const SCAN_INTERVAL_MS = 60000; // 60 Seconds (Rapid detection for first alert)
+const NOTIFICATION_DEBOUNCE_MS = 1800000; // 30 Minutes (Avoid consecutive alert noise)
 
 function computeRiskIndex(activeAlerts: Alert[]): RiskIndex {
-    const fuelAlerts = activeAlerts.filter(a => a.type === 'low-level' || a.type === 'leak' || a.type === 'overfill');
-    const systemAlerts = activeAlerts.filter(a => a.type === 'sensor-failure' || a.type === 'telemetry-gap' || a.type === 'connectivity-lost');
-    const complianceAlerts = activeAlerts.filter(a => a.type === 'compliance-deadline' || a.type === 'delivery-variance');
+    const fuelAlerts = activeAlerts.filter(a => ['low_level', 'leak_detected', 'overfill', 'theft_detected', 'unauthorized_refill'].includes(a.type));
+    const systemAlerts = activeAlerts.filter(a => ['sensor_failure', 'telemetry_gap', 'connectivity_lost', 'high_temperature'].includes(a.type));
+    const complianceAlerts = activeAlerts.filter(a => ['compliance_deadline', 'delivery_variance', 'market_news', 'regulatory_update'].includes(a.type));
 
     const topFuelScore = fuelAlerts.length > 0
         ? Math.max(...fuelAlerts.map(a => a.score ?? 0))
@@ -82,6 +83,11 @@ export function useAlertEngine(
         compliance: { score: 0, label: 'STABLE' },
     });
     const [isScanning, setIsScanning] = useState(false);
+    const [hasLoadedAlerts, setHasLoadedAlerts] = useState(false);
+    const [lastScanTime, setLastScanTime] = useState<number>(() => {
+        const saved = localStorage.getItem(`iotank_last_scan_${stationId}`);
+        return saved ? parseInt(saved) : 0;
+    });
     const latestReadingsRef = useRef<Record<string, TankReading | null>>({});
     const previousReadingsRef = useRef<Record<string, TankReading | null>>({});
     const refillSessionsRef = useRef<Record<string, { 
@@ -92,8 +98,28 @@ export function useAlertEngine(
         lastInflowVolume: number;
     }>>({});
     const { status: shiftStatus } = useShiftStatus();
-    const toastedAlertsRef = useRef<Set<string>>(new Set());
+    // Memory for toasted alerts with TTL: { 'tankId:type': timestamp }
+    // [PERSISTENCE UPGRADE]: Load from localStorage to survive refreshes
+    const [toastedAlerts, setToastedAlertsState] = useState<Map<string, number>>(() => {
+        const saved = localStorage.getItem(`iotank_toast_memory_${stationId}`);
+        if (saved) {
+            try {
+                return new Map(JSON.parse(saved));
+            } catch (e) {
+                return new Map();
+            }
+        }
+        return new Map();
+    });
+
+    const toastedAlertsRef = useRef<Map<string, number>>(toastedAlerts);
     const initialScanPerformedRef = useRef(false);
+
+    // Sync ref and localStorage when state changes
+    useEffect(() => {
+        toastedAlertsRef.current = toastedAlerts;
+        localStorage.setItem(`iotank_toast_memory_${stationId}`, JSON.stringify(Array.from(toastedAlerts.entries())));
+    }, [toastedAlerts, stationId]);
 
     // ── Subscribe to active alerts from Supabase ────────────────────────────
     useEffect(() => {
@@ -126,6 +152,7 @@ export function useAlertEngine(
                 const sorted = mappedAlerts.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
                 setActiveAlerts(sorted);
                 setRiskIndex(computeRiskIndex(sorted));
+                setHasLoadedAlerts(true);
             } catch (err) {
                 console.error('[AlertEngine] Alert fetch error:', err);
             }
@@ -151,11 +178,18 @@ export function useAlertEngine(
 
     // ── Detection scan ───────────────────────────────────────────────────────
     const runScan = useCallback(async () => {
-        if (!tanks.length || isScanning) return;
+        if (!tanks.length || isScanning || !hasLoadedAlerts) return;
+        
+        // Prevent redundant scans if performed very recently (within 10s)
+        const now = Date.now();
+        if (now - lastScanTime < 10000) return;
+
         setIsScanning(true);
+        setLastScanTime(now);
+        localStorage.setItem(`iotank_last_scan_${stationId}`, now.toString());
 
         try {
-            const allDrafts = tanks.flatMap(tank => {
+            const allDrafts = tanks.flatMap((tank: Tank) => {
                 const latestReading = latestReadingsRef.current[tank.id];
                 const previousReading = previousReadingsRef.current[tank.id];
                 
@@ -255,7 +289,7 @@ export function useAlertEngine(
                             const refillAlert = {
                                 station_id: stationId,
                                 tank_id: tank.id,
-                                alert_type: isUnauthorized ? 'unauthorized-refill' : 'refill',
+                                alert_type: isUnauthorized ? 'unauthorized_refill' : 'refill',
                                 severity: isUnauthorized ? 'critical' : 'info',
                                 title: isUnauthorized 
                                     ? `🔴 Unauthorized Out-of-Hours Refill: ${tank.name}`
@@ -265,7 +299,6 @@ export function useAlertEngine(
                                     : `Automatic detection completed. Net Sensory Delivery: ${deliveredVolume.toFixed(1)}L. (Start: ${session.startVolume.toFixed(1)}L -> End: ${endVolume.toFixed(1)}L)`,
                                 alert_data: { score: isUnauthorized ? 98 : 95 },
                                 is_resolved: false,
-                                auth_user_id: 'system',
                                 metadata: {
                                     type: isUnauthorized ? 'UNAUTHORIZED_REFILL_COMPLETE' : 'REFILL_COMPLETE',
                                     startVolume: session.startVolume,
@@ -306,8 +339,8 @@ export function useAlertEngine(
                     }
                 }
 
-                // Filter out 'refill-detected' from drafts as we handle it statefully above
-                return drafts.filter(d => d.type !== 'refill-detected');
+                // Filter out 'refill_detected' from drafts as we handle it statefully above
+                return drafts.filter(d => d.type !== 'refill_detected');
             });
 
             const uniqueDrafts = filterDuplicates(allDrafts, activeAlerts);
@@ -315,10 +348,19 @@ export function useAlertEngine(
             // Filter against "Toast Memory" to prevent re-toasting known active issues
             const draftsToToast = uniqueDrafts.filter(draft => {
                 const key = `${draft.tankId}:${draft.type}`;
-                if (toastedAlertsRef.current.has(key)) return false;
+                const lastToastTime = toastedAlertsRef.current.get(key);
+                const now = Date.now();
                 
-                // Add to memory
-                toastedAlertsRef.current.add(key);
+                if (lastToastTime && (now - lastToastTime) < NOTIFICATION_DEBOUNCE_MS) {
+                    return false;
+                }
+                
+                // Add/Update memory
+                setToastedAlertsState(prev => {
+                    const next = new Map(prev);
+                    next.set(key, now);
+                    return next;
+                });
                 return true;
             });
 
@@ -332,7 +374,6 @@ export function useAlertEngine(
                     message: draft.message,
                     alert_data: { score: draft.score },
                     is_resolved: false,
-                    auth_user_id: 'system', // Alert engine acts as system
                     metadata: draft.metadata || {}
                 }));
 
@@ -421,13 +462,18 @@ export function useAlertEngine(
 
     // ── On-load + 60s polling ────────────────────────────────────────────────
     useEffect(() => {
-        if (!tanks.length) return;
+        if (!tanks.length || !hasLoadedAlerts) return;
 
-        runScan();
+        // On first mount after data load, check if we need an immediate scan
+        const now = Date.now();
+        if (now - lastScanTime >= SCAN_INTERVAL_MS) {
+            runScan();
+        }
+
         const interval = setInterval(runScan, SCAN_INTERVAL_MS);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tanks.length, stationId]);
+    }, [tanks.length, stationId, hasLoadedAlerts]);
 
     // ── Expose reading cache setter so parent can update it ──────────────────
     const updateReading = useCallback((tankId: string, reading: TankReading | null) => {
@@ -437,7 +483,7 @@ export function useAlertEngine(
 
             // [FIX]: Dynamic Boot Scan - If this is the first set of data, fire an immediate scan
             // This ensures notifications aren't 'silent' until the first 30min interval.
-            const allTanksHaveData = tanks.every(t => latestReadingsRef.current[t.id]);
+            const allTanksHaveData = tanks.every((t: Tank) => latestReadingsRef.current[t.id]);
             if (allTanksHaveData && !initialScanPerformedRef.current) {
                 initialScanPerformedRef.current = true;
                 console.log('[AlertEngine] BOOT: Hardware data acquired. Firing initial bootstrap scan.');

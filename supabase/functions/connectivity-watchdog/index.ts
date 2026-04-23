@@ -5,6 +5,22 @@ import { corsHeaders } from "../_shared/cors.ts"
 serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+    // CRIT-001: Authenticate caller — must be pg_cron (CRON_SECRET) or a service-role call
+    const authHeader = req.headers.get('Authorization') || '';
+    const cronSecret   = Deno.env.get('CRON_SECRET') || '';
+    const serviceKey   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+    const isAuthorized =
+        (cronSecret  && authHeader === `Bearer ${cronSecret}`) ||
+        (serviceKey  && authHeader === `Bearer ${serviceKey}`);
+
+    if (!isAuthorized) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+
     try {
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') || '',

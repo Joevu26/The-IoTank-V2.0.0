@@ -30,11 +30,11 @@ export const InadequateClearancePage: React.FC = () => {
         <div className="clearance-page-wrapper">
             <div className="clearance-card">
                 <div className="clearance-icon-header">
-                    <div className="shield-ring animate-pulse">
-                        <FiShield size={40} className="text-rose-500" />
+                    <div className="shield-ring">
+                        <FiShield size={40} className="clearance-shield-icon" />
                     </div>
                     <div className="lock-overlay">
-                        <FiLock size={18} className="text-white" />
+                        <FiLock size={18} className="clearance-lock-icon" />
                     </div>
                 </div>
 
@@ -45,7 +45,7 @@ export const InadequateClearancePage: React.FC = () => {
                     </p>
                     
                     <div className="clearance-alert-box">
-                        <FiAlertTriangle className="text-amber-500 shrink-0" />
+                        <FiAlertTriangle className="clearance-alert-icon" />
                         <span>Security Protocol 403-A: Access Attempt has been logged to the central audit timeline.</span>
                     </div>
 
@@ -56,7 +56,7 @@ export const InadequateClearancePage: React.FC = () => {
 
                     <div className="clearance-actions">
                         <button 
-                            className="btn btn-primary clearance-btn"
+                            className="clearance-btn-primary"
                             onClick={() => navigate('/dashboard')}
                         >
                             <FiArrowLeft /> Return to Dashboard

@@ -478,7 +478,7 @@
         width: 100%;
         max-width: 320px;
         /* Make inputs tighter and centered */
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.8rem;
     }
 
     .form-group input,
@@ -502,6 +502,12 @@
         max-width: 400px !important;
         margin: 0.5rem auto !important;
         box-sizing: border-box;
+    }
+
+    .form-group-utility {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px;
     }
 
     /* Scale hCaptcha for very small screens to prevent card expansion */

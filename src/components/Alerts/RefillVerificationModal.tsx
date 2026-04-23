@@ -20,7 +20,7 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
     const atgStartVolume = meta.startVolume || 0;
     const atgEndVolume = meta.endVolume || 0;
     const atgDeliveredVolume = meta.deliveredVolume || (atgEndVolume - atgStartVolume);
-    const isUnauthorized = alertProp.type === 'unauthorized-refill';
+    const isUnauthorized = alertProp.type === 'unauthorized_refill';
 
     // Form State
     const [invoiceVolume, setInvoiceVolume] = useState<number>(atgDeliveredVolume);

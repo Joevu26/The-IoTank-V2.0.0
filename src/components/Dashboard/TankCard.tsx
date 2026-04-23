@@ -5,10 +5,17 @@ import { useLatestReading, useHistoricalReadings } from '@/hooks/useSupabase';
 import { useConsumptionAnalytics } from '@/hooks/useConsumptionAnalytics';
 import { formatVolume, formatTemperature } from '@/utils/formatUtils';
 import { getFuelStatus } from '@/utils/dashboardUtils';
-import { FiMapPin, FiClock, FiRefreshCw, FiActivity, FiThermometer, FiAlertCircle } from 'react-icons/fi';
+import { 
+    FiMapPin, FiClock, FiRefreshCw, FiActivity, 
+    FiThermometer, FiAlertCircle, FiTrash2, FiShield, FiLock, FiX 
+} from 'react-icons/fi';
 
 import { useNavigate } from 'react-router-dom';
 import { AuditService } from '@/services/AuditService';
+import { useAuth } from '@/hooks/useAuth';
+import { deleteTank } from '@/hooks/useSupabase';
+import { PermissionGate } from '../Auth/PermissionGate';
+
 import '../Common/DesignSystemCards.css';
 import './TankCard.css';
 
@@ -21,6 +28,12 @@ interface TankCardProps {
 export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, initialReading }) => {
     const navigate = useNavigate();
     const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const { verifySettingsPassword } = useAuth();
     
     // 1. Fetch live updates only if manually requested or if we don't have an initial reading
     // This dramatically reduces initial dashboard connection overhead
@@ -68,6 +81,38 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                 { tankId: tank.id, tankName: tank.name }
             ).catch(() => {});
         }, 1000);
+    };
+
+    const handleDelete = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsDeleting(true);
+        setDeleteError(null);
+
+        try {
+            // 1. Verify Password
+            await verifySettingsPassword(deletePassword);
+
+            // 2. Execute Deletion
+            await deleteTank(tank.id);
+
+            // 3. Success Toast
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Asset Purged',
+                    message: `Tank ${tank.name} and all historical data permanently removed.`,
+                    type: 'success',
+                    attribution: 'GOVERNANCE CORE'
+                }
+            }));
+
+            // 4. Close and Refresh (UI will handle the disappearance via useTanks invalidation)
+            setShowDeleteModal(false);
+        } catch (err: any) {
+            console.error("Deletion Failed:", err);
+            setDeleteError(err.message || "Authorization failed. Please verify password.");
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleCardClick = () => {
@@ -306,9 +351,92 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                         >
                             <FiRefreshCw />
                         </button>
+
+                        <PermissionGate level={5}>
+                            <button
+                                className="sync-btn text-rose-500 hover:bg-rose-500/10"
+                                onClick={(e) => { e.stopPropagation(); setShowDeleteModal(true); }}
+                                title="Permanent Asset Deletion"
+                            >
+                                <FiTrash2 />
+                            </button>
+                        </PermissionGate>
                     </div>
                 </div>
             </div>
+
+            {/* ── SECURE DELETION MODAL ─────────────────────────────────────── */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                    <div className="glass-panel max-w-md w-full !p-8 border border-rose-500/30 animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3 text-rose-500">
+                                <FiShield className="text-2xl" />
+                                <h3 className="text-xl font-black uppercase tracking-tighter">Secure Purge Protocol</h3>
+                            </div>
+                            <button onClick={() => setShowDeleteModal(false)} className="text-secondary hover:text-white">
+                                <FiX size={20} />
+                            </button>
+                        </div>
+
+                        <div className="bg-rose-500/10 border-l-4 border-rose-500 p-4 mb-6">
+                            <p className="text-sm text-rose-200 leading-relaxed">
+                                <strong className="text-rose-500 uppercase">Warning:</strong> You are about to permanently delete 
+                                <span className="font-bold text-white px-1">{tank.name}</span> 
+                                and all its historical telemetry data from the governance database. This action is <strong className="underline">irreversible</strong>.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleDelete} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-secondary uppercase tracking-widest">Administrator Clearance</label>
+                                <div className="relative">
+                                    <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
+                                    <input 
+                                        type="password"
+                                        placeholder="Enter Settings Password"
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 pl-10 pr-4 text-white focus:border-rose-500 outline-none transition-all"
+                                        value={deletePassword}
+                                        onChange={(e) => setDeletePassword(e.target.value)}
+                                        required
+                                        autoFocus
+                                    />
+                                </div>
+                                {deleteError && (
+                                    <p className="text-xs text-rose-500 font-bold mt-2 animate-pulse">{deleteError}</p>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="flex-1 py-3 font-bold text-secondary hover:text-white transition-colors"
+                                >
+                                    ABORT
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={isDeleting || !deletePassword}
+                                    className="flex-[2] bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-900/20"
+                                >
+                                    {isDeleting ? (
+                                        <>
+                                            <FiRefreshCw className="animate-spin" />
+                                            PURGING...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FiTrash2 />
+                                            CONFIRM PURGE
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 });

@@ -65,26 +65,18 @@ export const Toast: React.FC<ToastProps> = ({
     return createPortal(
         <AnimatePresence mode="wait">
             <div className={`toast-portal-root toast-${type}`}>
-                {/* Fixed Overlay Backdrop */}
                 <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="toast-modal-overlay"
+                    initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 200 }}
+                    className="toast-card"
                 >
-                    {/* Modern High-Fidelity Card */}
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="toast-modal-card"
-                    >
-                        {/* Premium Icon Ring / Mesh Gradient Wrapper */}
+                    <div className="toast-content-wrapper">
                         <div className="toast-icon-container">
                             <motion.div 
                                 animate={{ 
-                                    boxShadow: ['0 0 20px rgba(99, 102, 241, 0.2)', '0 0 40px rgba(99, 102, 241, 0.5)', '0 0 20px rgba(99, 102, 241, 0.2)']
+                                    boxShadow: ['0 0 10px rgba(99, 102, 241, 0.1)', '0 0 20px rgba(99, 102, 241, 0.2)', '0 0 10px rgba(99, 102, 241, 0.1)']
                                 }}
                                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
                                 className="toast-icon-wrapper"
@@ -94,43 +86,40 @@ export const Toast: React.FC<ToastProps> = ({
                                     {getIcon()}
                                 </div>
                             </motion.div>
-                            
-                            <div className="toast-icon-pulse animate-pulse" />
                         </div>
 
-                        {/* Impactful Header Section */}
-                        <h3 className="toast-title">
-                            {getTitle()}
-                        </h3>
-                        
-                        <p className="toast-message">
-                            {message}
-                        </p>
+                        <div className="toast-text-content">
+                            <h3 className="toast-title">
+                                {getTitle()}
+                            </h3>
+                            <p className="toast-message">
+                                {message}
+                            </p>
+                        </div>
+                    </div>
 
-                        {/* Action Buttons Stack */}
-                        <div className="toast-actions">
-                            {actionLabel && (
-                                <motion.button 
-                                    whileHover={{ scale: 1.02, translateY: -2 }}
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={handleAction}
-                                    className="btn-toast-primary"
-                                >
-                                    {actionLabel}
-                                    <FiArrowRight size={18} />
-                                </motion.button>
-                            )}
-                            
+                    <div className="toast-actions">
+                        {actionLabel && (
                             <motion.button 
-                                whileHover={{ scale: 1.02 }}
+                                whileHover={{ scale: 1.02, translateY: -1 }}
                                 whileTap={{ scale: 0.98 }}
-                                onClick={onClose}
-                                className="btn-toast-secondary"
+                                onClick={handleAction}
+                                className="btn-toast-primary"
                             >
-                                {actionLabel ? 'Close and solve later' : 'Understood, proceed'}
+                                {actionLabel}
+                                <FiArrowRight size={14} />
                             </motion.button>
-                        </div>
-                    </motion.div>
+                        )}
+                        
+                        <motion.button 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={onClose}
+                            className="btn-toast-secondary uppercase tracking-widest text-[10px]"
+                        >
+                            {actionLabel ? 'CLOSE' : 'DISMISS'}
+                        </motion.button>
+                    </div>
                 </motion.div>
             </div>
         </AnimatePresence>,

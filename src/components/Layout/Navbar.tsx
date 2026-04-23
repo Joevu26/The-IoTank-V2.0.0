@@ -69,19 +69,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     const isReportModalOpen = activeModal === 'report';
     const isOrderModalOpen = activeModal === 'order';
 
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [isOnline, setIsOnline] = useState(true);
+    const [pendingCommandCount, setPendingCommandCount] = useState(0);
+    const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
+    const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
+
     // Fetch alerts for the notification tray
     const { alerts } = useAlerts(stationId, false);
-    const unreadAlerts = alerts.filter(a => !a.resolved);
+    const unreadAlerts = alerts.filter((a: any) => !a.resolved && !hiddenAlerts.has(a.id));
 
     // Use click outside hooks
     const profileMenuRef = useClickOutside(() => setShowProfileMenu(false));
     const notificationRef = useClickOutside(() => setShowNotifications(false));
     const quickActionsRef = useClickOutside(() => setShowQuickActions(false));
-
-    const [currentTime, setCurrentTime] = useState(new Date());
-    const [isOnline, setIsOnline] = useState(true);
-    const [pendingCommandCount, setPendingCommandCount] = useState(0);
-    const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
 
     const handleResolve = async (e: React.MouseEvent, alertId: string) => {
         e.stopPropagation();
@@ -97,6 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             setTimeout(async () => {
                 try {
                     await resolveAlert(alertId, currentUser.authUserId);
+                    setHiddenAlerts(prev => new Set(prev).add(alertId));
                 } catch (err) {
                     console.error('Error resolving alert:', err);
                     // Rollback on failure
@@ -127,16 +129,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
         try {
             setTimeout(async () => {
                 try {
-                    const { error } = await supabase
-                        .from('unified_events')
-                        .update({ is_resolved: true })
-                        .eq('id', eventId);
+                    const { error } = await supabase.rpc('resolve_unified_event', { p_event_id: eventId });
                     
                     if (error) throw error;
 
                     setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
-                } catch (err) {
+                } catch (err: any) {
                     console.error('Error resolving event:', err);
+                    
+                    if (err?.code === 'PGRST202') {
+                        setToast({
+                            message: 'Database security schema is synchronizing. Please try again in 1-2 minutes.',
+                            type: 'warning'
+                        });
+                    }
+                    
                     // Rollback on failure
                     setResolvingIds(prev => {
                         const next = new Set(prev);
@@ -204,7 +211,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                 .order('created_at', { ascending: false })
                 .limit(15);
             
-            if (data) setUnifiedEvents(data);
+            if (data) {
+                // [FILTER]: Remove routine forensic noise from the state to ensure accurate badge counts
+                const filtered = data.filter((ev: any) => {
+                    const desc = ev.description || '';
+                    const isSpam = desc.includes('Forensic audit: INSERT on alerts') || 
+                                 desc.includes('Forensic audit: UPDATE detected on tanks');
+                    return !isSpam;
+                });
+                setUnifiedEvents(filtered);
+            }
         };
 
         fetchUnifiedEvents();
@@ -221,13 +237,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     filter: `station_id=eq.${stationId}`
                 },
                 (payload) => {
-                    setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
+                    const desc = payload.new.description || '';
+                    const isSpam = desc.includes('Forensic audit: INSERT on alerts') || 
+                                 desc.includes('Forensic audit: UPDATE detected on tanks');
+                    
+                    if (!isSpam) {
+                        setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
+                    }
                     const cat = payload.new.event_category || 'SYSTEM';
                     const isCritical = payload.new.severity === 'CRITICAL';
                     const description = payload.new.description || '';
 
                     // [FILTER]: Ignore routine forensic updates on tanks to prevent UI spam during refills
                     if (cat === 'SYSTEM' && description.includes('Forensic audit: UPDATE detected on tanks')) {
+                        return;
+                    }
+                    if (cat === 'SECURITY' && description.includes('Forensic audit: INSERT on alerts')) {
                         return;
                     }
 
@@ -479,15 +504,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                             <div className="dropdown-content custom-scrollbar overflow-y-auto max-h-[380px]">
                                 {unreadAlerts.length > 0 || unifiedEvents.length > 0 ? (
                                     <>
-                                        {/* Security Alerts Section */}
-                                        {unreadAlerts.length > 0 && (
-                                            <div className="section-label-tactical">
-                                                Active Risk Vectors
-                                            </div>
-                                        )}
+
                                         {unreadAlerts.map((alert: Alert) => {
                                             const category = alert.severity === 'critical' || alert.message.includes('THEFT') || alert.message.includes('LEAK') ? 'security' : 
-                                                           alert.type === 'low-level' ? 'delivery' : 'system';
+                                                           alert.type.startsWith('low_level') ? 'delivery' : 'system';
                                             return (
                                                 <div
                                                     key={alert.id}
@@ -501,7 +521,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                         <div className="notif-placeholder">
                                                             {alert.message.includes('THEFT') ? '🚨' :
                                                              alert.message.includes('LEAK') ? '💧' :
-                                                             alert.type === 'low-level' ? '📉' : '⚠️'}
+                                                             alert.type.startsWith('low_level') ? '📉' : '⚠️'}
                                                         </div>
                                                         <div className="notification-body">
                                                             <span className="font-black text-[13px] leading-tight block mb-1">
@@ -528,16 +548,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             );
                                         })}
 
-                                        {/* Forensic Audit Section */}
-                                        <div className="section-label-tactical">
-                                            Forensic Action Logs
-                                        </div>
-                                        {unifiedEvents.slice(0, 15).map((event: any) => {
-                                            const toRelative = (iso: string) => {
-                                                const ms = Date.now() - new Date(iso).getTime();
-                                                const mins = Math.max(Math.floor(ms / 60000), 1);
-                                                return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
-                                            };
+
+                                        {unifiedEvents
+                                            .slice(0, 15)
+                                            .map((event: any) => {
                                             const category = event.event_category?.toLowerCase() || 'system';
                                             return (
                                                 <div key={event.id} className={`notification-item cat-${category} ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
@@ -549,24 +563,24 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                                              event.event_category === 'TEAM' ? <FiUserPlus /> : <FiInfo />}
                                                         </div>
                                                         <div className="notification-body">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                                                    {event.event_category || 'Log Entry'}
+                                                            <span className="font-black text-[13px] leading-tight block mb-1">
+                                                                {sanitizeIds(event.description.split('.')[0])}
+                                                            </span>
+                                                            <div className="notification-meta flex justify-between items-center opacity-70">
+                                                                <span className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-tighter">
+                                                                    {new Date(event.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </span>
-                                                                <span className="text-[10px] font-black text-[#1e1b4b] opacity-60">
-                                                                    {toRelative(event.created_at)}
+                                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/5 font-black uppercase">
+                                                                    {event.event_category || 'INFO'}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-[12px] text-[#1e1b4b] font-medium leading-tight">
-                                                                {sanitizeIds(event.description)}
-                                                            </p>
                                                         </div>
                                                         <button
-                                                            className="rounded-full bg-slate-100 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center justify-center w-[24px] h-[24px]"
+                                                            className="btn-mark-read hover:bg-emerald-50 hover:text-emerald-600 transition-colors bg-slate-100 rounded-full p-1.5 ml-2 flex items-center justify-center w-[24px] h-[24px]"
                                                             onClick={(e) => handleResolveEvent(e, event.id)}
                                                             title="Mark as acknowledge"
                                                         >
-                                                            <MdCheck size={14} />
+                                                            <MdCheck size={14} className="text-emerald-500 font-bold" />
                                                         </button>
                                                     </div>
                                                 </div>

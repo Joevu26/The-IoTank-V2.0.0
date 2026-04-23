@@ -16,7 +16,8 @@ import {
     ResponsiveContainer, AreaChart, Area,
     XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { getStrategicRecommendations } from '@/utils/reportingLogic';
 import '../Common/DesignSystemCards.css';
 import './AnalyticsPage.css';
 
@@ -58,14 +59,23 @@ export const AnalyticsPage: React.FC = () => {
 
     // [ONE TRUTH]: Calculate Overall Station Variance matching the WRe module
     const startVolumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
-    const totalOpening = tanks.reduce((sum, t) => sum + (startVolumes[t.id] || t.currentVolume || 0), 0);
-    const totalMeasured = tanks.reduce((sum, t) => sum + (t.currentVolume || 0), 0);
+    const totalOpening = tanks.reduce((sum: number, t: import('@/types').Tank) => sum + (startVolumes[t.id] || t.currentVolume || 0), 0);
+    const totalMeasured = tanks.reduce((sum: number, t: import('@/types').Tank) => sum + (t.currentVolume || 0), 0);
     const totalDeliveries = transactions.filter(tx => tx.type === 'delivery').reduce((sum, tx) => sum + tx.amount, 0);
     const totalSales = transactions.filter(tx => tx.type === 'sale').reduce((sum, tx) => sum + tx.amount, 0);
     const totalExpected = totalOpening + totalDeliveries - totalSales;
     const totalVariance = totalMeasured - totalExpected;
     const totalVariancePct = totalExpected > 0 ? (totalVariance / totalExpected) * 100 : 0;
     // const inventoryTurnover = totalOpening > 0 ? (totalSales / totalOpening) : 0;
+
+    // --- Predictive Intelligence ---
+    const thirtyDaysAgo = subDays(new Date(), 30);
+    const recentSales = transactions.filter(tx => tx.type === 'sale' && new Date(tx.timestamp) >= thirtyDaysAgo);
+    const totalRecentSales = recentSales.reduce((sum, tx) => sum + tx.amount, 0);
+    const avgDailySales = totalRecentSales / 30;
+    const daysOfCover = avgDailySales > 0 ? totalMeasured / avgDailySales : 99;
+
+    const recommendations = getStrategicRecommendations(totalVariancePct, daysOfCover, 0);
 
     const chartData = transactions
         .filter(t => t.timestamp)
@@ -212,7 +222,7 @@ export const AnalyticsPage: React.FC = () => {
                             </div>
                             <div className="acp-tile border-l-[3px] border-[#f59e0b] !p-2">
                                 <div className="acp-tile-label">Days of Cover</div>
-                                <span className="acp-tile-val amber !text-sm">14.2 Days</span>
+                                <span className="acp-tile-val amber !text-sm">{daysOfCover.toFixed(1)} Days</span>
                             </div>
                         </div>
 
@@ -265,7 +275,7 @@ export const AnalyticsPage: React.FC = () => {
                              <div className="acp-progress-bar">
                                  <div 
                                     className="acp-progress-fill acp-progress-purple" 
-                                    ref={(el) => { if (el) el.style.width = '42%'; }}
+                                    style={{ width: `${Math.min(100, Math.max(5, 50 + totalVariancePct * 20))}%` }}
                                  ></div>
                              </div>
                             <div className="acp-variance-note">Critical Threshold: 0.5% &nbsp;|&nbsp; Drift detected in Site A flow sensors</div>
@@ -315,45 +325,25 @@ export const AnalyticsPage: React.FC = () => {
                             <FiTrendingUp className="acp-icon-trend-up" /> Strategic Recommendations
                         </div>
                         <div className="acp-rec-list">
-                            <div className="acp-rec-item critical">
-                                <div className="flex-1">
-                                    <div className="acp-rec-top">
-                                        <span className="acp-rec-priority">🔴 Critical</span>
-                                        <div className="acp-rec-scores">
-                                            <span className="acp-rec-risk-score">Risk Score: 92/100</span>
-                                            <span className="acp-rec-confidence">Confidence: 78%</span>
+                            {recommendations.map(rec => (
+                                <div key={rec.id} className={`acp-rec-item ${rec.priority}`}>
+                                    <div className="flex-1">
+                                        <div className="acp-rec-top">
+                                            <span className="acp-rec-priority">
+                                                {rec.priority === 'critical' && '🔴 Critical'}
+                                                {rec.priority === 'watch' && '🟡 Watch'}
+                                                {rec.priority === 'optimize' && '🟢 Optimize'}
+                                            </span>
+                                            <div className="acp-rec-scores">
+                                                <span className="acp-rec-risk-score">Risk Score: {rec.riskScore}/100</span>
+                                                <span className="acp-rec-confidence">Confidence: {rec.confidence}%</span>
+                                            </div>
                                         </div>
+                                        <p className="acp-rec-title">{rec.title}</p>
+                                        <p className="acp-rec-desc">{rec.description}</p>
                                     </div>
-                                    <p className="acp-rec-title">Emergency Refill (Site B)</p>
-                                    <p className="acp-rec-desc">Impact: $4.2k potential loss</p>
                                 </div>
-                            </div>
-                            <div className="acp-rec-item watch">
-                                <div className="flex-1">
-                                    <div className="acp-rec-top">
-                                        <span className="acp-rec-priority">🟡 Watch</span>
-                                        <div className="acp-rec-scores">
-                                            <span className="acp-rec-risk-score">Risk Score: 45/100</span>
-                                            <span className="acp-rec-confidence">Confidence: 62%</span>
-                                        </div>
-                                    </div>
-                                    <p className="acp-rec-title">Demand Surge Expected</p>
-                                    <p className="acp-rec-desc">Time Horizon: 48h</p>
-                                </div>
-                            </div>
-                            <div className="acp-rec-item optimize">
-                                <div className="flex-1">
-                                    <div className="acp-rec-top">
-                                        <span className="acp-rec-priority">🟢 Optimize</span>
-                                        <div className="acp-rec-scores">
-                                            <span className="acp-rec-risk-score">Risk Score: 12/100</span>
-                                            <span className="acp-rec-confidence">Confidence: 85%</span>
-                                        </div>
-                                    </div>
-                                    <p className="acp-rec-title">Price Hedging Opportunity</p>
-                                    <p className="acp-rec-desc">ROI Estimate: 5.4%</p>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 

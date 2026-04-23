@@ -3,8 +3,9 @@ export const SECURITY_CONFIG = {
     // DEPRECATED: Use account-level password verification via Supabase Auth instead.
     MASTER_ACCESS_PASSWORD: import.meta.env.VITE_MASTER_ACCESS_PASSWORD || '',
 
-    // reCAPTCHA v3 Configuration
-    RECAPTCHA_V3_SITEKEY: import.meta.env.VITE_RECAPTCHA_V3_SITEKEY || '6LfgSHgsAAAAAHlWl9ZRVO1IvJGsEkyj8_lYVF2i',
+    // MED-006: Hardcoded fallback removed — key MUST be set in .env / .env.production.
+    // If missing in production, reCAPTCHA will fail and the login form will surface an error.
+    RECAPTCHA_V3_SITEKEY: import.meta.env.VITE_RECAPTCHA_V3_SITEKEY as string,
     RECAPTCHA_V3_SCORE_THRESHOLD: 0.5, // Score 0.0 - 1.0, reject if below this
 
     // Future security configurations can be added here

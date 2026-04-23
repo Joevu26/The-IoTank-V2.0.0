@@ -1,11 +1,12 @@
 // supabase/functions/deepseek-proxy/index.ts
+// DeepSeek is TankIQ-only — always requires authentication
 
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { enforceDurableRateLimit, requireProxyScope } from '../_shared/auth.ts'
-import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt } from '../_shared/prompts.ts'
+import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt, sanitizeContextForAI } from '../_shared/prompts.ts'
 declare const Deno: any;
 
-const MAX_PER_WINDOW = 20;
+const MAX_PER_WINDOW = 15;
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'))
@@ -14,6 +15,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // HIGH-002: DeepSeek is TankIQ only — always require a real authenticated account
     const authz = await requireProxyScope(req, corsHeaders);
     if ('response' in authz) return authz.response;
 
@@ -30,46 +32,46 @@ Deno.serve(async (req) => {
           ...(body.messages || [])
        ];
     } else if (action === 'intelligence') {
-       const systemPrompt = buildIntelligencePrompt(context?.signals || [], context?.risks || [], context?.notices || []);
+       // MED-004: Sanitize context before sending to AI
+       const safeSignals = (context?.signals || []).map((s: any) => sanitizeContextForAI(JSON.stringify(s)));
+       const safeRisks   = (context?.risks   || []).map((r: any) => sanitizeContextForAI(JSON.stringify(r)));
+       const safeNotices = (context?.notices || []).map((n: any) => sanitizeContextForAI(JSON.stringify(n)));
+       const systemPrompt = buildIntelligencePrompt(safeSignals, safeRisks, safeNotices);
        body.messages = [{ role: 'user', content: systemPrompt }];
     } else {
-       throw new Error('Valid action (chat or intelligence) is required');
+       return new Response(JSON.stringify({ error: 'Valid action (chat or intelligence) is required' }), {
+         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+       });
     }
+
     const payloadString = JSON.stringify(body);
-    if (payloadString.length > 102400) { // 100KB limit
-      throw new Error('Payload size exceeds 100KB safety limit');
+    if (payloadString.length > 102400) {
+      return new Response(JSON.stringify({ error: 'Payload size exceeds 100KB safety limit' }), {
+        status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const apiKey = Deno.env.get('DEEPSEEK_API_KEY')
+    if (!apiKey) throw new Error('DeepSeek API key not configured')
 
-    if (!apiKey) {
-      throw new Error('DeepSeek API key not configured')
-    }
-
-    const response = await fetch(
-      'https://api.deepseek.com/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body)
-      }
-    )
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body)
+    })
 
     const data = await response.json()
-
-    return new Response(
-      JSON.stringify(data),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify(data), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
 
   } catch (error: any) {
-    console.error('Function error:', error.message);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('DeepSeek proxy error:', error.message);
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })

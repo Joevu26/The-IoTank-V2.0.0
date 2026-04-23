@@ -426,7 +426,7 @@ export const MarketPage: React.FC = () => {
     // Dynamic Fuel Types from Tanks
     const registeredFuelTypes = React.useMemo(() => {
         const types = new Set<string>();
-        tanks.forEach(t => {
+        tanks.forEach((t: import('@/types').Tank) => {
             if (t.fuelType) {
                 // Normalize e.g. gasoline -> Petrol, diesel -> Diesel
                 let label = t.fuelType.charAt(0).toUpperCase() + t.fuelType.slice(1).toLowerCase();

@@ -207,7 +207,9 @@
     }
 
     .section-header .btn {
-        align-self: flex-start;
+        align-self: stretch;
+        text-align: center;
+        justify-content: center;
     }
 }
 

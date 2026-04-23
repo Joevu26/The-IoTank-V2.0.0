@@ -106,7 +106,7 @@ export const InventoryPage: React.FC = () => {
 
     const tanksToRender = tanks.length > 0 ? tanks : [ghostTank];
     const isGhostMode = tanks.length === 0;
-    const activeTank = tanksToRender.find(t => t.id === (activeTankId || tanksToRender[0].id)) || tanksToRender[0];
+    const activeTank = tanksToRender.find((t: Tank) => t.id === (activeTankId || tanksToRender[0].id)) || tanksToRender[0];
 
     if ((tanksLoading || txLoading) && tanks.length === 0) {
         return <div className="inventory-page-container"><SkeletonDashboard /></div>;

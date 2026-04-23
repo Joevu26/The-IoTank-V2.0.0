@@ -30,7 +30,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
     }, [loading]);
 
-    if (loading) {
+    const isFailingAuth = (requiredRole && !hasRole(requiredRole)) || (requiredLevel !== undefined && !canSee(requiredLevel));
+    const shouldShowLoader = loading || (currentUser?.isProvisional && isFailingAuth);
+
+    if (shouldShowLoader) {
         return (
             <div className="clearance-overlay">
                 <div className="clearance-content">

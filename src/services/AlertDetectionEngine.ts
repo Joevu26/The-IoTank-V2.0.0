@@ -1,14 +1,14 @@
 /**
- * AlertDetectionEngine — Client-side alert detection for IoTank (Spark-plan safe).
+ * AlertDetectionEngine — Client-side alert detection for IoTank (Supabase/Postgres).
  *
  * Runs entirely in the browser using:
- *  - Tank data + latest readings from Firestore listeners
+ *  - Tank data + latest readings from Supabase Realtime
  *  - On-load scan + 60s polling interval (orchestrated by useAlertEngine hook)
- *  - Writes to Firestore only when no duplicate active alert exists
+ *  - Writes to Supabase only when no duplicate active alert exists
  *
  * Detection triggers:
  *  1. Level threshold breach (critical / low)
- *  2. Telemetry gap (last reading too old)
+ *  2. Connectivity lost (last reading too old)
  *  3. Delivery variance (invoice vs measured %)
  *  4. Sensor failure (signal quality < 30)
  *  5. SHIFT-AWARE Forensic Logic:
@@ -18,6 +18,7 @@
 
 import { Tank, TankReading, Alert } from '@/types';
 import { scoreByType } from './AlertScoringEngine';
+import { calculateTimeBasedSlope } from './algorithms';
 
 export interface DetectionContext {
     tank: Tank;
@@ -34,25 +35,25 @@ export interface DetectionContext {
 export interface DraftAlert {
     tankId: string;
     siteId: string;
-    type: Alert['type'];
+    type: string;
     title: string;
     description: string;
     message: string;
     severity: Alert['severity'];
-    severityLabel: Alert['severityLabel'];
+    severityLabel: string;
     score: number;
     source: 'system';
     state: 'ACTIVE';
     resolved: boolean;
-    detectionMethod: Alert['detectionMethod'];
+    detectionMethod: string;
     aiConfidence?: number;
-    rootCauseLink?: Alert['rootCauseLink'];
-    metadata?: Alert['metadata'];
+    rootCauseLink?: { type: string; id: string; label: string };
+    metadata?: any;
 }
 
 /**
  * Run all detection checks for a single tank and return draft alerts.
- * Does NOT write to Firestore — that is the caller's responsibility.
+ * Does NOT write to Supabase — that is the caller's responsibility.
  */
 export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     const { tank, latestReading } = ctx;
@@ -79,11 +80,11 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
 
     // ── 1. CRITICAL LEVEL BREACH (5%) ──────────────────────────────────────────
     if (fuelLevel !== undefined && fuelLevel <= 5) {
-        const { score, label } = scoreByType('low-level-critical', 0.95);
+        const { score, label } = scoreByType('low_level_critical', 0.95);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'low-level',
+            type: 'low_level',
             title: `CRITICAL LOW: ${tank.name} (Dead Stock Breach)`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Pump protection activated at 5%. Shutdown imminent.`,
             message: `${tank.name} level critical: ${fuelLevel.toFixed(1)}%`,
@@ -98,17 +99,17 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
     }
-    // ── 2. LOW LEVEL WARNING (20%) ─────────────────────────────────────────────
+    // ── 2. LOW LEVEL WARNING (15%) ─────────────────────────────────────────────
     else if (
         fuelLevel !== undefined &&
         fuelLevel > 5 &&
-        fuelLevel <= 20
+        fuelLevel <= 15 // Standardized with Backend
     ) {
-        const { score, label } = scoreByType('low-level-warning', 0.80);
+        const { score, label } = scoreByType('low_level_warning', 0.80);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'low-level',
+            type: 'low_level',
             title: `LOW LEVEL: ${tank.name} Reorder Point`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Recommend reordering fuel to maintain operations.`,
             message: `${tank.name} fuel level low: ${fuelLevel.toFixed(1)}%`,
@@ -123,34 +124,10 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
     }
-    // ── 2.5 INFORMATIONAL ALERT (50%) ──────────────────────────────────────────
-    else if (
-        fuelLevel !== undefined &&
-        Math.abs(fuelLevel - 50) <= 0.5 // More robust check
-    ) {
-        const { score, label } = scoreByType('reporting-ready', 0.50);
-        drafts.push({
-            tankId: tank.id,
-            siteId: tank.siteId,
-            type: 'info',
-            title: `Informational: ${tank.name} at 50%`,
-            description: `Tank has reached the 50% capacity milestone. Current level: ${fuelLevel.toFixed(1)}%.`,
-            message: `${tank.name} half-capacity reached.`,
-            severity: 'info',
-            severityLabel: label || 'INFO',
-            score,
-            source: 'system',
-            state: 'ACTIVE',
-            resolved: false,
-            detectionMethod: 'deterministic',
-            aiConfidence: 0.90,
-            rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-        });
-    }
 
     // ── 2.6 HIGH LEVEL & OVERFILL (95% / 98%) ──────────────────────────────────
     if (fuelLevel !== undefined && fuelLevel >= 98) {
-        const { score, label } = scoreByType('composite-supply-risk', 0.98);
+        const { score, label } = scoreByType('composite_supply_risk', 0.98);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
@@ -168,41 +145,22 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             aiConfidence: 0.98,
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
-    } else if (fuelLevel !== undefined && fuelLevel >= 95) {
-        const { score, label } = scoreByType('low-level-warning', 0.85); // Redirecting warning logic
-        drafts.push({
-            tankId: tank.id,
-            siteId: tank.siteId,
-            type: 'overfill',
-            title: `High Level Alert: ${tank.name}`,
-            description: `Level at ${fuelLevel.toFixed(1)}%. Slow inflow/monitor closely to prevent spill.`,
-            message: `High Level: ${tank.name} at ${fuelLevel.toFixed(1)}%`,
-            severity: 'warning',
-            severityLabel: label,
-            score,
-            source: 'system',
-            state: 'ACTIVE',
-            resolved: false,
-            detectionMethod: 'deterministic',
-            aiConfidence: 0.90,
-            rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-        });
     }
 
-    // ── 3. TELEMETRY GAP ─────────────────────────────────────────────────────
+    // ── 3. CONNECTIVITY LOST ─────────────────────────────────────────────────────
     if (latestReading && (now - latestReading.timestamp) > telemetryGapMs) {
         const gapMinutes = Math.round((now - latestReading.timestamp) / 60000);
-        const { score, label } = scoreByType('telemetry-gap', 0.85);
+        const { score, label } = scoreByType('telemetry_gap', 0.85);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'telemetry-gap',
+            type: 'connectivity_lost',
             title: `Offline: ${tank.name}`,
             description: `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
             message: `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
-            severity: gapMinutes > 1440 ? 'critical' : 'warning', // Escalate to critical after 24 hours
-            severityLabel: gapMinutes > 1440 ? 'CRITICAL' : label,
-            score: gapMinutes > 1440 ? 98 : score,
+            severity: gapMinutes > 60 ? 'critical' : 'warning', // Standardized with Backend (1h = critical)
+            severityLabel: gapMinutes > 60 ? 'CRITICAL' : label,
+            score: gapMinutes > 60 ? 98 : score,
             source: 'system',
             state: 'ACTIVE',
             resolved: false,
@@ -220,11 +178,11 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     };
 
     if (latestReading && isQualityFailing(latestReading.signalQuality)) {
-        const { score, label } = scoreByType('sensor-failure', 0.78);
+        const { score, label } = scoreByType('sensor_failure', 0.78);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'sensor-failure',
+            type: 'sensor_failure',
             title: `Sensor degradation on ${tank.name}`,
             description: `Signal quality at ${latestReading.signalQuality}%. Readings may be unreliable.`,
             message: `${tank.name}: sensor signal quality ${latestReading.signalQuality}%`,
@@ -244,27 +202,28 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     const { isShiftOpen = false, previousReading } = ctx;
 
     if (latestReading && previousReading) {
-        const timeDiffHrs = Math.max(0.016, (latestReading.timestamp - previousReading.timestamp) / (1000 * 60 * 60));
         const prevVol = previousReading.volumeCorrected || previousReading.volume || 0;
         const currVol = latestReading.volumeCorrected || latestReading.volume || 0;
         
+        const points = [
+            { x: previousReading.timestamp, y: prevVol },
+            { x: latestReading.timestamp, y: currVol }
+        ];
+        
         const volumeDrop = prevVol - currVol; // Positive if consuming
-        const dropRate = volumeDrop / timeDiffHrs; // L/hr
+        const dropRate = -calculateTimeBasedSlope(points); // Slope is negative for drop, we want positive L/hr
 
         // Heuristics
-        const rapidDropThreshold = tank.rapidDefillThreshold || 50; // L/hr (Forensic Theft) - REDUCED FROM 100
+        const rapidDropThreshold = tank.rapidDefillThreshold || 50; // L/hr (Forensic Theft)
         const leakThreshold = tank.leakageThreshold || 2;           // L/hr (Maintenance Leak)
         
-        // Physical Capacity Limit: 
-        // Standard pumps ~40-60 L/min (2400-3600 L/hr). 
-        // If drop rate > Max Capacity, it's theft even if shift is OPEN.
         const maxPumpFlow = (ctx.maxPumpFlowRateLpm || 80) * 60; // Default 4800 L/hr
 
         if (!isShiftOpen) {
             // CASE A: Shift is CLOSED. Any drop is suspicious.
-            const MIN_THEFT_VOLUME = 2.0; // Liters - REDUCED FROM 5.0 to increase sensitivity
+            const MIN_THEFT_VOLUME = 2.0; 
             if (volumeDrop > MIN_THEFT_VOLUME && dropRate > rapidDropThreshold) {
-                const { score, label } = scoreByType('composite-supply-risk', 0.98);
+                const { score, label } = scoreByType('composite_supply_risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
                     siteId: tank.siteId,
@@ -281,10 +240,10 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     detectionMethod: 'deterministic',
                     aiConfidence: 0.98,
                     rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                    metadata: { type: 'theft_closed', dropRate, volumeLost: volumeDrop } as any
+                    metadata: { type: 'theft_closed', dropRate, volumeLost: volumeDrop }
                 });
             } else if (dropRate > leakThreshold) {
-                const { score, label } = scoreByType('infrastructure-degradation', 0.85);
+                const { score, label } = scoreByType('leak_detected', 0.85);
                 drafts.push({
                     tankId: tank.id,
                     siteId: tank.siteId,
@@ -301,18 +260,18 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     detectionMethod: 'deterministic',
                     aiConfidence: 0.85,
                     rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                    metadata: { type: 'leak_suspicion', dropRate } as any
+                    metadata: { type: 'leak_suspicion', dropRate }
                 });
             }
         } else {
             // CASE B: Shift is OPEN. Drop is expected, but siphoning (Parallel Pull) is theft.
-            const MIN_THEFT_VOLUME = 2.0; // Liters - REDUCED FROM 5.0
+            const MIN_THEFT_VOLUME = 2.0; 
             if (volumeDrop > MIN_THEFT_VOLUME && dropRate > maxPumpFlow) {
-                const { score, label } = scoreByType('composite-supply-risk', 0.95);
+                const { score, label } = scoreByType('composite_supply_risk', 0.95);
                 drafts.push({
                     tankId: tank.id,
                     siteId: tank.siteId,
-                    type: 'anomaly',
+                    type: 'theft_detected',
                     title: `PARALLEL PULL THEFT: ${tank.name}`,
                     description: `Anomalous discharge of ${dropRate.toFixed(0)} L/hr detected. This exceeds the maximum physical capacity of the terminal pumps (${maxPumpFlow} L/hr). Siphoning suspected during operations.`,
                     message: `CRITICAL: Parallel theft suspected on ${tank.name} (Open Shift)`,
@@ -325,30 +284,28 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     detectionMethod: 'deterministic',
                     aiConfidence: 0.95,
                     rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                    metadata: { type: 'THEFT_OPEN_PARALLEL', dropRate, maxPumpFlow } as any
+                    metadata: { type: 'THEFT_OPEN_PARALLEL', dropRate, maxPumpFlow }
                 });
             }
         }
 
         // ── 6. REFILL DETECTION (Automated Delivery Sensing) ───────────────────────
-        // [HARDENING]: Normalize threshold to 1% of capacity, fallback to 20L for safety
         const refillThreshold = ctx.tank.capacity ? (ctx.tank.capacity * 0.01) : (ctx.refillDetectionThreshold || 20);
         const volumeIncrease = currVol - prevVol;
 
         if (volumeIncrease > refillThreshold) {
-            // [HARDENING]: Ensure refill doesn't exceed physical tank capacity (Refill Integrity)
-            const isOverCapacity = tank.capacity && (currVol > tank.capacity * 1.02); // 2% buffer for thermal expansion
+            const isOverCapacity = tank.capacity && (currVol > tank.capacity * 1.02);
             const isUnauthorized = !isShiftOpen;
 
             const { score, label } = scoreByType(
-                isOverCapacity ? 'composite-supply-risk' : (isUnauthorized ? 'composite-supply-risk' : 'refill-detected'), 
+                isOverCapacity ? 'composite_supply_risk' : (isUnauthorized ? 'composite_supply_risk' : 'refill_detected'), 
                 0.90
             );
 
             drafts.push({
                 tankId: tank.id,
                 siteId: tank.siteId,
-                type: isOverCapacity ? 'anomaly' : (isUnauthorized ? 'unauthorized-refill' : 'refill-detected'),
+                type: isOverCapacity ? 'anomaly' : (isUnauthorized ? 'unauthorized_refill' : 'refill_detected'),
                 title: isOverCapacity 
                     ? `INTEGRITY BREACH: Over-Capacity detected on ${tank.name}` 
                     : (isUnauthorized ? `🔴 UNAUTHORIZED REFILL: ${tank.name}` : `Refill Identified (Add Delivery)`),
@@ -376,18 +333,18 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     volumeIncrease, 
                     currVol, 
                     tankCapacity: tank.capacity 
-                } as any
+                }
             });
         }
     }
 
-    return drafts;
+    // Filter out 'refill_detected' from drafts as we handle it statefully above
+    return drafts.filter(d => d.type !== 'refill_detected');
 }
 
 /**
  * Forensic Time Formatter: Converts minutes into a professional, high-density 
  * string (e.g., 3h 10mins or 1d 4h), skipping units that are zero.
- * [USER_SPEC]: No seconds allowed.
  */
 export function formatForensicDuration(minutes: number): string {
     if (minutes < 1) return 'Just now';
@@ -425,9 +382,8 @@ export function filterDuplicates(drafts: DraftAlert[], activeAlerts: Alert[]): D
 }
 
 /**
- * Group or correlate alerts if needed (e.g., if 3+ tanks have the same issue).
+ * Group or correlate alerts if needed.
  */
 export function correlateAlerts(alerts: Alert[]): Alert[] {
-    // Simple pass-through for now, can be extended for site-wide anomaly detection
     return alerts;
 }

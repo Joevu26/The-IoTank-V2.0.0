@@ -93,16 +93,16 @@ export const MainLayout: React.FC = () => {
     const { alerts } = useAlerts(stationId, false);
     const { tanks } = useTanks(stationId);
     
-    const tankIds = React.useMemo(() => tanks.map(t => t.id), [tanks]);
+    const tankIds = React.useMemo(() => tanks.map((t: import('@/types').Tank) => t.id), [tanks]);
     const { readings } = useAllLatestReadings(stationId, tankIds);
 
-    const unreadAlerts = alerts.filter(a => !a.resolved).slice(0, 1);
+    const unreadAlerts = alerts.filter((a: import('@/types').Alert) => !a.resolved).slice(0, 1);
 
     // [FORENSIC GLOBAL TRIGGER]: Automatically pop reconciliation modal for new refill completions
     const [activeRefillAlert, setActiveRefillAlert] = useState<any>(null);
     React.useEffect(() => {
-        const latestRefill = alerts.find(a => 
-            (a.type === 'refill' || a.type === 'refill-detected' || a.type === 'unauthorized-refill') && 
+        const latestRefill = alerts.find((a: import('@/types').Alert) => 
+            (a.type === 'refill' || a.type === 'refill_detected' || a.type === 'unauthorized_refill') && 
             !a.resolved && 
             (a.metadata?.type === 'REFILL' || a.metadata?.type === 'UNAUTHORIZED_REFILL' || a.metadata?.type === 'REFILL_COMPLETE' || a.metadata?.type === 'UNAUTHORIZED_REFILL_COMPLETE') &&
             // Only auto-pop if it happened in the last 5 minutes to avoid stale pops on login
@@ -116,8 +116,8 @@ export const MainLayout: React.FC = () => {
     // [SECURITY GLOBAL TRIGGER]: Automatically pop security intrusion modal for THEFT/LEAK
     const [activeSecurityAlert, setActiveSecurityAlert] = useState<any>(null);
     React.useEffect(() => {
-        const latestSecurity = alerts.find(a => 
-            (a.type === 'anomaly' || a.type === 'leak' || a.type === 'theft_detected' || a.type === 'leak_detected') && 
+        const latestSecurity = alerts.find((a: import('@/types').Alert) => 
+            (a.type === 'anomaly' || a.type === 'leak_detected' || a.type === 'theft_detected') && 
             !a.resolved && 
             (a.metadata?.type?.includes('THEFT') || a.metadata?.type?.includes('LEAK')) &&
             // Filter out stale alerts (5 min window)

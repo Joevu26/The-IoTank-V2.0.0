@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
     FiShield, FiLock, FiPlus, FiX, FiBriefcase, FiSave, FiCamera, FiRefreshCw,
     FiUser, FiZap, FiCheckCircle, FiEye, FiEyeOff, FiArrowRight, FiCpu,
-    FiActivity, FiTerminal, FiAlertTriangle, FiTrash2
+    FiActivity, FiTerminal, FiAlertTriangle, FiTrash2, FiAlertCircle
 } from 'react-icons/fi';
 import { MdWifi, MdRefresh } from 'react-icons/md';
 import { DeviceCommandService, DeviceCommand } from '@/services/DeviceCommandService';
@@ -150,6 +150,51 @@ export const SettingsPage: React.FC = () => {
 
     // Price Draft State (String buffered for decimal entry support)
     const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+    // Tank Deletion State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletionStep, setDeletionStep] = useState<'warning' | 'password'>('warning');
+    const [tankToDelete, setTankToDelete] = useState<any | null>(null);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const handleDeleteTank = async () => {
+        if (!deletePassword) {
+            setDeleteError("Password is required.");
+            return;
+        }
+        if (!tankToDelete) return;
+        
+        setIsDeleting(true);
+        setDeleteError(null);
+        try {
+            await verifySettingsPassword(deletePassword);
+            
+            const { error: delError } = await supabase.from('tanks').delete().eq('id', tankToDelete.id);
+            if (delError) throw delError;
+            
+            setIsDeleteModalOpen(false);
+            setTankToDelete(null);
+            setDeletePassword('');
+            setToast({
+                message: `Tank ${tankToDelete.name} and all associated data have been permanently removed.`,
+                type: 'success'
+            });
+            
+            await AuditService.log(
+                'SYSTEM', 
+                'DELETE_TANK', 
+                stationId, 
+                `Permanently deleted tank: ${tankToDelete.name}`,
+                'CRITICAL',
+                { tankId: tankToDelete.id }
+            ).catch(() => {});
+            
+        } catch (err: any) {
+            setDeleteError(err.message || 'Verification failed. Incorrect password.');
+            setIsDeleting(false);
+        }
+    };
 
     const handlePriceCommit = async (tankId: string) => {
         const draftValue = priceDrafts[tankId];
@@ -174,7 +219,7 @@ export const SettingsPage: React.FC = () => {
         const normalizedPrice = Math.round(retailPrice * 100) / 100;
 
         try {
-            const tankToUpdate = tanks.find(t => t.id === tankId);
+            const tankToUpdate = tanks.find((t: any) => t.id === tankId);
             if (!tankToUpdate) return;
             
             const oldPrice = (tankToUpdate as any).metadata?.retailPrice || 0;
@@ -201,7 +246,7 @@ export const SettingsPage: React.FC = () => {
                 }
             }));
             await AuditService.log(
-                'CALIBRATION',
+                'FINANCE',
                 'SETTINGS_CHANGED',
                 currentUser?.stationId || 'SYSTEM',
                 `Manual Retail Price Correction: [${tankToUpdate.fuelType.toUpperCase()}] price adjusted from ${oldPrice} Ksh to ${normalizedPrice} Ksh per litre.`,
@@ -213,7 +258,7 @@ export const SettingsPage: React.FC = () => {
             await createAlert({
                 station_id: currentUser?.stationId || '',
                 tankId: tankId,
-                type: 'compliance-deadline', // Using a suitable existing type, or we could add 'price-update'
+                type: 'compliance_deadline', // Normalized to snake_case
                 severity: 'info',
                 title: 'Fuel Price Calibration',
                 message: `${fuelName} unit price adjusted from ${oldPrice} to ${normalizedPrice} Ksh. Shift valuation updated.`,
@@ -289,7 +334,7 @@ export const SettingsPage: React.FC = () => {
         tanks
             .filter((t: any) => (t.stationId || t.station_id) === stationId)
             .map((t: any) => t.sensorId || t.sensor_id)
-            .filter(id => id)
+            .filter((id: any) => id)
     ));
 
     useEffect(() => {
@@ -1314,7 +1359,7 @@ Action
 <tbody>
                                         {
 tanks.length >
- 0 ? tanks.map((tank) =>(                                            
+ 0 ? tanks.map((tank: any) =>(                                            
 <tr key={
 tank.id
 }>
@@ -1382,7 +1427,7 @@ priceDrafts[tank.id] !== undefined && (
                                                 
 <td className="text-right">
                                                     
-<button className="text-blue-600 font-bold text-xs hover:underline" onClick={
+<button className="text-blue-600 font-bold text-xs hover:underline mr-4" onClick={
 () => {
  setSelectedDevice(tank.sensorId || '');
  setActiveTab('devices');
@@ -1394,6 +1439,18 @@ tank.name
 }`
 }>
 C2 Control
+</button>
+
+<button 
+    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+    onClick={() => {
+        setTankToDelete(tank);
+        setDeletionStep('warning');
+        setIsDeleteModalOpen(true);
+    }}
+    title={`Permanently delete ${tank.name}`}
+>
+    <FiTrash2 size={16} />
 </button>
                                                 
 </td>
@@ -1565,18 +1622,18 @@ Target Hardware ID
 <select                                         id="target-device"                                        className="settings-input"                                         value={
 selectedDevice
 }                                         onChange={
-(e) =>
+(e: React.ChangeEvent<HTMLSelectElement>) =>
  setSelectedDevice(e.target.value)
 }                                        aria-label="Select Target Hardware ID"                                        title="Select Device for Remote Commands"                                    >
                                         
 <option value="">
 Select a registered device...
 </option>
-                                        {uniqueDevices.map(id => (                                            
-                                            <option key={id} value={id}>
-                                                ESP-NODE: {(id as string).toUpperCase()}
-                                            </option>
-                                        ))}                                    
+                                         {uniqueDevices.map((id: any) => (                                            
+                                             <option key={id} value={id}>
+                                                 ESP-NODE: {String(id).toUpperCase()}
+                                             </option>
+                                         ))}                                    
 </select>
                                 
 </div>
@@ -2153,7 +2210,7 @@ mfaStep === 'verify' && (
 }                                        value={
 mfaVerifyCode
 }                                        onChange={
-(e) => {
+(e: React.ChangeEvent<HTMLInputElement>) => {
                                             const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                                             setMfaVerifyCode(val);
                                             if (val.length === 6 && !mfaLoading) {
@@ -2235,10 +2292,89 @@ handleCropComplete
 }))
 }                />
             )
-}        
-</div>
+}            {/* Password Protected Deletion Modal - 2 STEP */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-slate-900 border border-slate-700/50 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                        
+                        {deletionStep === 'warning' ? (
+                            <>
+                                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                    <FiAlertTriangle className="text-red-500" />
+                                    Critical Action Required
+                                </h3>
+                                <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+                                    You are initiating a <strong className="text-red-400 underline underline-offset-4">Hard Delete</strong> for <strong className="text-white">{tankToDelete?.name}</strong>. 
+                                    <br /><br />
+                                    This will permanently purge all telemetry records, historical consumption data, and configuration logs from the secure vault. This action is <span className="font-black italic">irreversible</span>.
+                                </p>
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg transition-all shadow-lg shadow-red-900/20 uppercase text-xs tracking-widest"
+                                        onClick={() => setDeletionStep('password')}
+                                    >
+                                        I Understand, Proceed to Verify
+                                    </button>
+                                    <button
+                                        className="w-full py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                                        onClick={() => { setIsDeleteModalOpen(false); setTankToDelete(null); }}
+                                    >
+                                        Cancel and Keep Data
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                                    <FiShield className="text-blue-400" />
+                                    Identity Verification
+                                </h3>
+                                <p className="text-xs text-slate-400 mb-4 uppercase tracking-tighter">
+                                    Security challenge for {tankToDelete?.name} deletion
+                                </p>
+                                
+                                <div className="mb-4">
+                                    <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">
+                                        Admin Authorization Key
+                                    </label>
+                                    <input
+                                        type="password"
+                                        className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-red-500 transition-colors shadow-inner"
+                                        placeholder="Enter secure password"
+                                        value={deletePassword}
+                                        onChange={(e) => setDeletePassword(e.target.value)}
+                                        autoFocus
+                                    />
+                                    {deleteError && (
+                                        <div className="flex items-center gap-2 mt-3 p-2 bg-red-500/10 border border-red-500/20 rounded">
+                                            <FiAlertCircle className="text-red-500" size={14} />
+                                            <p className="text-red-400 text-[10px] font-bold leading-tight">{deleteError}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                
+                                <div className="flex justify-between items-center gap-4 mt-6">
+                                    <button
+                                        className="text-xs font-bold text-slate-500 hover:text-white transition-colors"
+                                        onClick={() => setDeletionStep('warning')}
+                                        disabled={isDeleting}
+                                    >
+                                        Back
+                                    </button>
+                                    <button
+                                        className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg transition-all shadow-lg shadow-red-900/20 text-xs tracking-widest uppercase disabled:opacity-30"
+                                        onClick={handleDeleteTank}
+                                        disabled={isDeleting || !deletePassword}
+                                    >
+                                        {isDeleting ? 'Purging...' : 'Confirm Purge'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
     );
-
 };
-
-

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useShifts } from '@/hooks/useShifts';
+import { useShifts, useActiveShift } from '@/hooks/useShifts';
 import { useAuth } from '@/hooks/useAuth';
 import { FiUser, FiAlertCircle, FiClipboard, FiAlertTriangle, FiFileText } from 'react-icons/fi';
 import { format } from 'date-fns';
@@ -7,7 +7,33 @@ import { format } from 'date-fns';
 export const ShiftAnalyticsTable: React.FC = () => {
     const { currentUser } = useAuth();
     const stationId = currentUser?.stationId || '';
-    const { shifts, loading, error } = useShifts(stationId);
+    const { shifts, loading: historyLoading, error: historyError } = useShifts(stationId);
+    const { activeShift, loading: activeLoading } = useActiveShift(stationId);
+
+    const loading = historyLoading || activeLoading;
+    const error = historyError;
+
+    // Combine active shift with historical shifts
+    const allShifts = React.useMemo(() => {
+        if (!activeShift) return shifts;
+        
+        // Convert activeShift to the ShiftDocument format expected by the table
+        const mappedActive: any = {
+            id: activeShift.id || `active-${activeShift.station_id}`,
+            station_id: activeShift.station_id,
+            opened_at: activeShift.created_at || activeShift.updated_at,
+            status: 'OPEN',
+            operation_type: 'OPEN',
+            operatorName: activeShift.metadata?.opened_by?.display || 'Active Operator',
+            notes: 'Shift currently in progress...',
+            received_collections: { total: 0 },
+            variance_data: { amount: 0 }
+        };
+
+        // Avoid duplication if the active shift is somehow already in the list
+        const exists = shifts.some(s => s.id === activeShift.id);
+        return exists ? shifts : [mappedActive, ...shifts];
+    }, [activeShift, shifts]);
 
     if (loading) return (
         <div style={{ padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
@@ -64,7 +90,7 @@ export const ShiftAnalyticsTable: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {shifts.length === 0 ? (
+                        {allShifts.length === 0 ? (
                             <tr>
                                 <td colSpan={7}>
                                     <div className="audit-empty-state">
@@ -74,10 +100,10 @@ export const ShiftAnalyticsTable: React.FC = () => {
                                     </div>
                                 </td>
                             </tr>
-                        ) : shifts.map((shift: any) => {
+                        ) : allShifts.map((shift: any) => {
                             const received = shift.received_collections || {};
                             const variance = shift.variance_data || {};
-                            const operatorName = received.opened_by?.display || shift.operatorName || 'Unknown';
+                            const operatorName = shift.operatorName || received.opened_by?.display || 'Unknown';
                             const closingVol = received.closing_volume || 0;
                             const revenue = received.total || 0;
                             const isOpening = (shift.operation_type || 'CLOSE') === 'OPEN';
@@ -112,7 +138,7 @@ export const ShiftAnalyticsTable: React.FC = () => {
                                             <div className="td-operator-avatar">{initials || <FiUser size={14} />}</div>
                                             <div>
                                                 <span className="td-operator-name">{operatorName}</span>
-                                                <span className="td-operator-id">#{shift.id.slice(0, 8)}</span>
+                                                <span className="td-operator-id">#{shift.id?.slice(0, 8) || 'SYSTEM'}</span>
                                             </div>
                                         </div>
                                     </td>
@@ -174,8 +200,8 @@ export const ShiftAnalyticsTable: React.FC = () => {
                                     {/* Status */}
                                     <td>
                                         <div className="td-status-dot">
-                                            <div className="status-dot" />
-                                            Synced
+                                            <div className={`status-dot ${isOpening && shift.status === 'OPEN' ? 'bg-emerald-500 animate-pulse' : ''}`} />
+                                            {isOpening && shift.status === 'OPEN' ? 'Active Now' : 'Synced'}
                                         </div>
                                     </td>
                                 </tr>

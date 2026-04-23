@@ -36,14 +36,21 @@ export class IntelligenceAIService {
         };
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            const { data: { session }, error } = await supabase.auth.getSession();
             
-            if (isValidToken && session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
+            if (error || !session?.access_token) {
+                throw new Error('TankIQ intelligence requires an active authenticated session.');
             }
-        } catch (e) {
-            console.warn('[IntelligenceAIService] Auth check failed, proceeding anonymously.');
+            
+            const isValidToken = session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true;
+            if (!isValidToken) {
+                throw new Error('TankIQ session expired. Please re-authenticate.');
+            }
+
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+        } catch (e: any) {
+            console.error('[IntelligenceAIService] Authentication enforcement failed:', e);
+            throw new Error('TankIQ requires a registered account to process operational data. ' + e.message);
         }
 
         return headers;
@@ -61,12 +68,14 @@ export class IntelligenceAIService {
 
         for (const provider of providers) {
             try {
+                console.info(`[IntelligenceAIService] Attempting insight generation with: ${provider}`);
                 const response = await this.callProvider(provider, context, 'intelligence');
                 if (response) {
+                    console.info(`[IntelligenceAIService] Success with: ${provider}`);
                     return this.parseResponse(provider as any, response, promptLog, provider, signals, risks, tankId);
                 }
             } catch (error) {
-                console.warn(`IntelligenceAIService: ${provider} failed, trying next...`, error);
+                console.warn(`[IntelligenceAIService] ${provider} failed, falling back to next provider...`, error);
                 continue;
             }
         }
@@ -103,12 +112,14 @@ export class IntelligenceAIService {
 
         for (const provider of providers) {
             try {
+                console.info(`[IntelligenceAIService] Attempting directive generation with: ${provider}`);
                 const response = await this.callProvider(provider, context, 'directive');
                 if (response) {
+                    console.info(`[IntelligenceAIService] Success with: ${provider}`);
                     return this.parseDirectiveResponse(provider, response);
                 }
             } catch (error) {
-                console.warn(`TankIQ (${provider}): Failed to generate directive, falling back...`, error);
+                console.warn(`[IntelligenceAIService] ${provider} failed, falling back to next provider...`, error);
                 continue;
             }
         }
@@ -132,34 +143,12 @@ export class IntelligenceAIService {
     ): Promise<any> {
         try {
             const headers = await this.getSafeAuthHeaders();
-            let body: any;
-
-            if (provider === 'gemini') {
-                // Map to Google Generative AI format
-                body = {
-                    contents: messages.map(m => ({
-                        role: m.role === 'assistant' ? 'model' : 'user',
-                        parts: [{ text: m.content }]
-                    })),
-                    tools: tools ? [{
-                        function_declarations: tools.map(t => ({
-                            name: t.function.name,
-                            description: t.function.description,
-                            parameters: t.function.parameters
-                        }))
-                    }] : undefined,
-                    tool_config: tools ? {
-                        function_calling_config: { mode: 'AUTO' }
-                    } : undefined
-                };
-            } else {
-                // OpenAI-compatible format (Groq, DeepSeek)
-                body = {
-                    messages,
-                    tools,
-                    tool_choice: tools ? 'auto' : undefined
-                };
-            }
+            // OpenAI-compatible format (mapped automatically by proxy for Gemini)
+            const body = {
+                messages,
+                tools,
+                tool_choice: tools ? 'auto' : undefined
+            };
 
             const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
             const response = await fetch(`${supabaseUrl}/functions/v1/${provider}-proxy`, {
@@ -244,7 +233,7 @@ export class IntelligenceAIService {
                     context,
                     endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
-                        generationConfig: { temperature: 0.7, responseMimeType: 'application/json' },
+                        generationConfig: { temperature: 0.7 },
                     }
                 })
             });

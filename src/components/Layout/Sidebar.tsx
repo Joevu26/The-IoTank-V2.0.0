@@ -65,25 +65,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
 
     const menuItems = [
-        { name: 'Core Operations', isSection: true, path: 'sec-core', level: 7 },
-        { name: t('dashboard'), path: '/dashboard', icon: <MdDashboard />, level: 7 },
-        { name: t('inventory'), path: '/inventory', icon: <MdStorage />, level: 7 },
+        { name: 'Core Operations', isSection: true, path: 'sec-core', level: 8 },
+        { name: t('dashboard'), path: '/dashboard', icon: <MdDashboard />, level: 8 },
+        { name: t('inventory'), path: '/inventory', icon: <MdStorage />, level: 8 },
         { name: 'Shift Audit', path: '/shifts', icon: <MdOutlineEventNote />, level: 6 },
         { name: 'Deliveries', path: '/deliveries', icon: <FiTruck />, level: 6 },
         { name: t('analytics'), path: '/analytics', icon: <MdBarChart />, level: 6 },
 
-        { name: 'Intelligence & Monitoring', isSection: true, path: 'sec-intel', level: 7 },
+        { name: 'Intelligence & Monitoring', isSection: true, path: 'sec-intel', level: 8 },
         { name: 'Event Log', path: '/event-log', icon: <MdOutlineEventNote />, level: 6 },
-        { name: t('market'), path: '/market', icon: <MdTrendingUp />, level: 7 },
-        { name: t('alerts'), path: '/alerts', icon: <MdWarning />, level: 7 },
+        { name: t('market'), path: '/market', icon: <MdTrendingUp />, level: 8 },
+        { name: t('alerts'), path: '/alerts', icon: <MdWarning />, level: 8 },
         { name: t('reporting'), path: '/reporting', icon: <MdAssessment />, level: 6 },
 
         { name: 'Administration', isSection: true, path: 'sec-admin', level: 6 },
         { name: 'User Management', path: '/users', icon: <MdSecurity />, level: 5 },
         { name: 'Billing & Usage', path: '/billing', icon: <MdCreditCard />, level: 5 },
-        ...(enableGovernanceConsole ? [{ name: t('governance'), path: '/governance', icon: <MdSecurity />, level: 5 }] : []),
-        { name: t('settings'), path: '/settings', icon: <MdSettings />, level: 6 },
-        { name: t('help'), path: '/help', icon: <MdHelp />, level: 7 },
+        ...(enableGovernanceConsole ? [{ name: t('governance'), path: '/governance', icon: <MdSecurity />, level: 4 }] : []),
+        { name: t('settings'), path: '/settings', icon: <MdSettings />, level: 5 },
+        { name: t('help'), path: '/help', icon: <MdHelp />, level: 8 },
     ].filter(item => canSee(item.level));
 
 

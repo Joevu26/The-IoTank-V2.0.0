@@ -133,14 +133,21 @@ export function useEventLog(stationId: string) {
         }
     };
 
+    async function resolveEvent(eventId: string) {
+        if (!eventId) return;
+        try {
+            const { error } = await supabase.rpc('resolve_unified_event', { p_event_id: eventId });
+            if (error) throw error;
+            fetchEvents();
+        } catch (err) {
+            console.error('Error resolving event:', err);
+        }
+    }
+
     async function acknowledgeAll() {
         if (!stationId) return;
         try {
-            const { error } = await supabase
-                .from('unified_events')
-                .update({ is_resolved: true })
-                .eq('station_id', stationId)
-                .eq('is_resolved', false);
+            const { error } = await supabase.rpc('resolve_all_station_events', { p_station_id: stationId });
             
             if (error) throw error;
             fetchEvents();
@@ -194,6 +201,7 @@ export function useEventLog(stationId: string) {
         filters,
         updateFilter,
         resetFilters,
+        resolveEvent,
         acknowledgeAll,
         categoryCounts: { 
             telemetry: events.filter(e => e.category === 'telemetry').length, 

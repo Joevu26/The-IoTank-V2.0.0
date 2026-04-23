@@ -270,24 +270,34 @@ export class ExportService {
                     data.generated_by || 'FORENSIC_RECON',
                     { start: data.window?.split(' → ')[0] || 'Unknown', end: data.window?.split(' → ')[1] || 'Unknown' },
                     { 
-                        totalThroughput: data.metrics?.tank_count ? (data.metrics.tank_count * 15000) : 0, 
-                        totalDeliveries: data.metrics?.delivery_count || 0,
-                        averageVariancePct: data.metrics?.avg_variance || 0,
-                        incidents: data.metrics?.incident_count || 0
+                        totalThroughput: data.metrics?.totalThroughput || 0, 
+                        totalDeliveries: data.metrics?.totalDeliveries || 0,
+                        averageVariancePct: data.metrics?.avgVariancePct || 0,
+                        incidents: data.metrics?.incidentCount || 0
                     },
                     data.logs || []
                 );
             } else {
                 // Generalized Forensic PDF reconstruction
+                const headers = ['Date', 'Theoretical', 'Actual', 'Variance (L)', 'Variance (%)'];
+                const body = (data.logs || []).map((l: any) => [
+                    l.date,
+                    l.theoretical?.toFixed(1) || '0.0',
+                    l.closing?.toFixed(1) || '0.0',
+                    l.variance?.toFixed(1) || '0.0',
+                    (l.variancePct?.toFixed(2) || '0.00') + '%'
+                ]);
+
                 this.generateGenericPDF(
                     reportName,
                     orgName,
-                    ['Metric', 'Scientific Value'],
-                    Object.entries(data.metrics || {}).map(([k, v]) => [k, String(v)]),
+                    headers,
+                    body,
                     { 
-                        'Reconstructed From ID': data.generated_by || 'Unknown',
-                        'Original Timestamp': data.generated_at || 'Unknown',
-                        'Reporting Window': data.window || 'Unknown'
+                        'Period': data.window || 'Unknown',
+                        'Total Throughput': `${(data.metrics?.totalThroughput || 0).toLocaleString()} L`,
+                        'Net Variance': `${(data.metrics?.netVariance || 0).toFixed(1)} L`,
+                        'Avg Variance %': `${(data.metrics?.avgVariancePct || 0).toFixed(2)}%`
                     }
                 );
             }

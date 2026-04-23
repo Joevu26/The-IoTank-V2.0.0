@@ -12,7 +12,7 @@ import { NotificationService } from '../../services/NotificationService';
 import { Alert, AlertSeverityLabel } from '@/types';
 import { getSeverityClass } from '../../services/AlertScoringEngine';
 import { SkeletonDashboard, SkeletonTable } from '../Common/SkeletonLoader';
-import { resolveAllAlerts } from '@/hooks/useSupabase';
+import { resolveAllAlerts, propagateStationThresholds } from '@/hooks/useSupabase';
 import { sanitizeIds } from '@/utils/formatUtils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -45,8 +45,8 @@ function getAlertSeverityLabel(alert: Alert): AlertSeverityLabel {
 // ── Sub-Components ─────────────────────────────────────────────────────────────
 
 const RiskIndexCards: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts }) => {
-    const fuelRiskCount = activeAlerts.filter(a => ['leak-detected', 'theft-detected', 'low-fuel'].includes(a.type)).length;
-    const systemRiskCount = activeAlerts.filter(a => ['telemetry-gap', 'sensor-failure'].includes(a.type)).length;
+    const fuelRiskCount = activeAlerts.filter(a => ['leak_detected', 'theft_detected', 'low_level', 'overfill'].includes(a.type)).length;
+    const systemRiskCount = activeAlerts.filter(a => ['telemetry_gap', 'sensor_failure', 'connectivity_lost'].includes(a.type)).length;
     const complianceCount = activeAlerts.filter(a => a.severity === 'info').length;
 
     return (
@@ -154,6 +154,24 @@ export const AlertsCenter: React.FC = () => {
     const { alerts: rawActiveAlerts, loading: activeLoading } = useAlerts(stationId, false);
     const { tanks, loading: tanksLoading } = useTanks(stationId);
 
+    const [isPropagating, setIsPropagating] = useState(false);
+
+    const handlePropagateLogic = async () => {
+        if (!stationId) return;
+        setIsPropagating(true);
+        try {
+            await propagateStationThresholds(stationId);
+            // Invalidate tanks query to show updated values if they were visible
+            // Note: useTanks hook will automatically refetch due to realtime subscription or query invalidation
+            // but we can add a toast or similar if we had a toast provider here.
+            // For now, the Audit log is enough for the backend.
+        } catch (err) {
+            console.error('Failed to propagate logic:', err);
+        } finally {
+            setIsPropagating(false);
+        }
+    };
+
     useEffect(() => {
         setIsLoading(true);
         const timer = setTimeout(() => setIsLoading(false), 800);
@@ -167,7 +185,7 @@ export const AlertsCenter: React.FC = () => {
 
 
     const activeAlerts = useMemo(() => {
-        return rawActiveAlerts.map(a => ({
+        return rawActiveAlerts.map((a: Alert) => ({
             ...a,
             severityLabel: a.severityLabel ?? getAlertSeverityLabel(a),
         }));
@@ -175,7 +193,7 @@ export const AlertsCenter: React.FC = () => {
 
     const filteredActive = useMemo(() => {
         if (severityFilter === 'ALL') return activeAlerts;
-        return activeAlerts.filter(a => getAlertSeverityLabel(a) === severityFilter);
+        return activeAlerts.filter((a: Alert) => getAlertSeverityLabel(a) === severityFilter);
     }, [activeAlerts, severityFilter]);
 
     // Removed filteredHistory as it's not used in current tabs
@@ -183,7 +201,7 @@ export const AlertsCenter: React.FC = () => {
     const handleResolve = async (id: string) => { 
         await resolveAlert(id, currentUser?.authUserId || 'SYSTEM'); 
         
-        const alert = activeAlerts.find(a => a.id === id);
+        const alert = activeAlerts.find((a: Alert) => a.id === id);
         await AuditService.log(
             'SYSTEM',
             'ALERT_RESOLVED',
@@ -296,8 +314,15 @@ export const AlertsCenter: React.FC = () => {
                             </div>
                         )}
                         {activeTab === 'thresholds' && (
-                            <button className="tactical-btn-primary btn-sm" title="Propagate threshold logic to all tanks" aria-label="Propagate Logic">
-                                <FiCheckCircle /> Propagate Logic
+                            <button 
+                                className={`tactical-btn-primary btn-sm ${isPropagating ? 'loading' : ''}`} 
+                                onClick={handlePropagateLogic}
+                                disabled={isPropagating}
+                                title="Propagate threshold logic to all tanks" 
+                                aria-label="Propagate Logic"
+                            >
+                                {isPropagating ? <FiActivity className="animate-spin" /> : <FiCheckCircle />}
+                                {isPropagating ? 'Propagating...' : 'Propagate Logic'}
                             </button>
                         )}
                 </header>
@@ -353,7 +378,7 @@ export const AlertsCenter: React.FC = () => {
                                                                 </td>
                                                             </tr>
                                                         ) : (
-                                                            filteredActive.map(alert => {
+                                                            filteredActive.map((alert: Alert) => {
                                                                 const label = alert.severityLabel ?? getAlertSeverityLabel(alert);
                                                                 const cssClass = getSeverityClass(label);
                                                                 const age = getAlertAge(alert.timestamp);
@@ -368,7 +393,7 @@ export const AlertsCenter: React.FC = () => {
                                                                                 <span className="vector-title">{sanitizeIds(alert.title ?? alert.message)}</span>
                                                                             </div>
                                                                         </td>
-                                                                        <td><span className="signature-pill">{alert.type.replace(/-/g, ' ')}</span></td>
+                                                                        <td><span className="signature-pill">{alert.type.replace(/[-_]/g, ' ')}</span></td>
                                                                         <td>
                                                                             <span className={`severity-tag ${cssClass}`}>
                                                                                 {alert.score != null && <span className="score-hint">{alert.score}</span>}
@@ -429,7 +454,7 @@ export const AlertsCenter: React.FC = () => {
 
                                         <div className="calibration-scroller-grid">
                                             {tanksLoading ? <SkeletonTable /> : (
-                                                tanks.map(tank => {
+                                                tanks.map((tank: import('@/types').Tank) => {
                                                     const capacity = tank.capacity || 0;
                                                     return (
                                                         <div key={tank.id} className="tank-logic-card">

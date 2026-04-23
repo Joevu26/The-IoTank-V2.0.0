@@ -104,7 +104,6 @@ function App() {
                                         <Route path="deliveries" element={<Suspense fallback={<PublicLoader />}><DeliveriesPage /></Suspense>} />
                                         <Route path="shifts" element={<Suspense fallback={<PublicLoader />}><ShiftManagementPage /></Suspense>} />
                                         <Route path="inventory/transactions" element={<Suspense fallback={<PublicLoader />}><DeliveriesPage /></Suspense>} />
-                                        <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                         <Route path="event-log" element={<Suspense fallback={<PublicLoader />}><EventLogPage /></Suspense>} />
                                     </Route>
 
@@ -112,6 +111,8 @@ function App() {
                                     <Route element={<ProtectedRoute requiredLevel={5}><MainLayout /></ProtectedRoute>}>
                                         <Route path="billing" element={<Suspense fallback={<PublicLoader />}><BillingPage /></Suspense>} />
                                         <Route path="users" element={<Suspense fallback={<PublicLoader />}><TeamManagement /></Suspense>} />
+                                        {/* HIGH-006: Settings moved from Level 6 to Level 5 — Admin-only */}
+                                        <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                     </Route>
                                     
                                     {/* Protected Application Routes - Level 4 (Governance/Super Admin) */}

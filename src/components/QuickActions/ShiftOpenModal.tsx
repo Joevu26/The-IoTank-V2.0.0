@@ -9,6 +9,7 @@ import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { AuditService } from '@/services/AuditService';
 import { validateIdleStability } from '@/utils/telemetryMath';
 import { differenceInHours } from 'date-fns';
+import { Tank } from '@/types';
 import './ShiftOpenModal.css';
 
 interface ShiftOpenModalProps {
@@ -19,7 +20,7 @@ interface ShiftOpenModalProps {
 export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
     const { tanks } = useTanks(currentUser?.stationId || '');
-    const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map(t => t.id));
+    const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map((t: Tank) => t.id));
     const [isStarting, setIsStarting] = React.useState(false);
 
     if (!isOpen) return null;
@@ -45,7 +46,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 const hrsClosed = Math.max(0.1, differenceInHours(now, closedAt));
                 const prevReadings = lastShift.pump_readings || {};
 
-                tanks.forEach(async (tank) => {
+                tanks.forEach(async (tank: Tank) => {
                     // Search for this tank's closure in the polymorphic pumpReadings object
                     // In ShiftCloseModal, it's saved as: pumpReadings[t.name] = { start, end }
                     const tankClosureData = prevReadings[tank.name];
@@ -138,7 +139,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
             // 3. Persistent Start Volumes (Cloud Synchronized Snapshot)
             const startVolumes: Record<string, { opening_volume: number, captured_at: string, is_manual_override: boolean }> = {};
-            tanks.forEach(t => {
+            tanks.forEach((t: Tank) => {
                 const currentReading = readings[t.id];
                 const liveVolume = currentReading?.volumeCorrected || currentReading?.volume || t.currentVolume || 0;
                 startVolumes[t.id] = {

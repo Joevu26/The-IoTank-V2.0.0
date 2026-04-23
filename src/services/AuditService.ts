@@ -97,22 +97,7 @@ export class AuditService {
             console.error('[AuditService] Critical failure during logging:', error);
         }
     }
-
-    /**
-     * Deletes a specific event (Station Admin only - enforced by RLS)
-     */
-    static async deleteEvent(eventId: string) {
-        try {
-            const { error } = await supabase
-                .from('unified_events')
-                .delete()
-                .eq('id', eventId);
-            
-            if (error) throw error;
-            return true;
-        } catch (err) {
-            console.error('Failed to delete event:', err);
-            return false;
-        }
-    }
+    // CRIT-003: deleteEvent() removed — unified_events entries are immutable.
+    // Deletion is blocked at DB level by the prevent_unified_events_mutation trigger.
+    // Use the Supabase service_role console for GDPR purge operations only.
 }

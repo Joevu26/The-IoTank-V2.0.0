@@ -70,19 +70,23 @@ export function getSeverityClass(label: AlertSeverityLabel): string {
  * Each profile defines { impact, urgency, confidence } on a 0–10 scale.
  */
 export const TRIGGER_PROFILES: Record<string, { impact: number; urgency: number; confidence: number }> = {
-    'low-level-critical': { impact: 9, urgency: 9, confidence: 9 },  // 94 → CRITICAL
-    'low-level-warning': { impact: 6, urgency: 7, confidence: 8 },  // 68 → WATCH
-    'leak': { impact: 10, urgency: 10, confidence: 8 }, // 99 → CRITICAL
+    'low_level_critical': { impact: 9, urgency: 9, confidence: 9 },  // 94 → CRITICAL
+    'low_level_warning': { impact: 6, urgency: 7, confidence: 8 },  // 68 → WATCH
+    'leak_detected': { impact: 8, urgency: 7, confidence: 8 },     // 77 → HIGH
     'overfill': { impact: 8, urgency: 9, confidence: 9 },   // 87 → HIGH
-    'sensor-failure': { impact: 7, urgency: 8, confidence: 6 },   // 73 → HIGH
-    'telemetry-gap': { impact: 5, urgency: 6, confidence: 7 },   // 55 → WATCH
-    'delivery-variance': { impact: 7, urgency: 5, confidence: 8 },   // 63 → WATCH
-    'high-temperature': { impact: 6, urgency: 7, confidence: 8 },   // 68 → WATCH
-    'connectivity-lost': { impact: 5, urgency: 7, confidence: 9 },   // 62 → WATCH
-    'night-drawdown': { impact: 8, urgency: 7, confidence: 6 },   // 76 → HIGH
-    'compliance-deadline': { impact: 6, urgency: 8, confidence: 9 },   // 72 → HIGH
-    'composite-supply-risk': { impact: 9, urgency: 8, confidence: 7 },   // 84 → HIGH
-    'refill-detected': { impact: 2, urgency: 3, confidence: 9 },   // 25 → INFO
+    'sensor_failure': { impact: 7, urgency: 8, confidence: 6 },   // 73 → HIGH
+    'telemetry_gap': { impact: 5, urgency: 6, confidence: 7 },   // 55 → WATCH
+    'delivery_variance': { impact: 7, urgency: 5, confidence: 8 },   // 63 → WATCH
+    'high_temperature': { impact: 6, urgency: 7, confidence: 8 },   // 68 → WATCH
+    'connectivity_lost': { impact: 5, urgency: 7, confidence: 9 },   // 62 → WATCH
+    'night_drawdown': { impact: 8, urgency: 7, confidence: 6 },   // 76 → HIGH
+    'compliance_deadline': { impact: 6, urgency: 8, confidence: 9 },   // 72 → HIGH
+    'composite_supply_risk': { impact: 9, urgency: 8, confidence: 7 },   // 84 → HIGH
+    'refill_detected': { impact: 2, urgency: 3, confidence: 9 },   // 25 → INFO
+    'unauthorized_refill': { impact: 9, urgency: 10, confidence: 9 }, // 94 → CRITICAL
+    'theft_detected': { impact: 10, urgency: 10, confidence: 9 },  // 97 → CRITICAL
+    'anomaly': { impact: 7, urgency: 8, confidence: 7 },           // 72 → HIGH
+    'info': { impact: 2, urgency: 2, confidence: 9 },              // 22 → INFO
 };
 
 /**

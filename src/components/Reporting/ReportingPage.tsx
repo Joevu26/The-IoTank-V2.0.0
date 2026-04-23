@@ -11,10 +11,12 @@ import { generateShiftPDF, exportShiftsToExcel } from '@/utils/exportUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTanks } from '@/hooks/useSupabase';
+import { Tank } from '@/types';
 import { useReports } from '@/hooks/useReports';
 import { supabase } from '@/config/supabase';
 import { ExportService } from '@/services/ExportService';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { scanStationHistory, getReportHighlights } from '@/utils/reportingLogic';
 import '../Common/DesignSystemCards.css';
 import './ReportingPage.css';
 
@@ -196,7 +198,7 @@ export const ReportingPage: React.FC = () => {
 
     const tankNames = useMemo(() => {
         const m: Record<string, string> = {};
-        tanks.forEach(t => { m[t.id] = t.name; });
+        tanks.forEach((t: Tank) => { m[t.id] = t.name; });
         return m;
     }, [tanks]);
 
@@ -226,43 +228,57 @@ export const ReportingPage: React.FC = () => {
 
     const handleGenerate = async () => {
         if (!selectedTemplate || !stationId) return;
-        
-        setIsPreviewing(true); // Show loading state
         const now = new Date();
-        const dateStr = format(now, 'yyyyMMdd');
-        const seq = String(savedReports.length + 1).padStart(4, '0');
-        const id = `RPT-${dateStr}-${seq}`;
+        const nowIso = now.toISOString();
 
-        // Prepare professional forensic data for storage
+        setIsPreviewing(true); // Show loading state
+        // 1. Calculate time window
+        let start = subDays(now, 30);
+        let end = now;
+
+        if (timeRange === '7d') start = subDays(now, 7);
+        else if (timeRange === '90d') start = subDays(now, 90);
+        else if (timeRange === 'custom') {
+            start = customStart ? new Date(customStart) : subDays(now, 30);
+            end = customEnd ? new Date(customEnd) : now;
+        }
+
+        // 2. Execute Forensic Scan
+        const { logs, metrics } = await scanStationHistory(stationId, start, end, selectedTankId || undefined);
+
+        // 3. Prepare professional forensic data for storage
+        const dynamicHighlights = getReportHighlights(selectedTemplate.id, metrics);
+        
         const reportData = {
             window: windowLabel,
-            generated_at: now.toISOString(),
+            generated_at: nowIso,
             generated_by: userName,
             filters: {
                 tank_id: selectedTankId || 'all',
                 product: selectedProduct || 'all',
                 time_range: timeRange
             },
-            // High-fidelity snapshot of current state
-            highlights: selectedTemplate.highlights,
+            highlights: dynamicHighlights,
             metrics: {
+                ...metrics,
                 tank_count: tanks.length,
-                shift_count: shifts.length,
-            }
+                shift_count: (shifts || []).length,
+            },
+            logs: logs // Detailed logs for reconstructions
         };
 
         try {
-            const { error } = await supabase.from('reports').insert([{
+            const { data, error } = await supabase.from('reports').insert([{
                 station_id: stationId,
                 name: selectedTemplate.name,
                 report_type: selectedTemplate.id,
                 report_data: reportData,
                 generated_by: currentUser?.authUserId
-            }]);
+            }]).select().single();
 
             if (error) throw error;
 
-            setDocId(id);
+            setDocId(data.id);
             setGeneratedAt(now);
             setIsGenerated(true);
             refreshReports(); // Refresh the list from DB
@@ -301,15 +317,20 @@ export const ReportingPage: React.FC = () => {
         // New Report Factory exports using ExportService
         try {
             if (selectedTemplate.id === 'compliance-pack' && fmt === 'PDF') {
+                const logs = reconstructionData?.report_data?.logs || [];
+                const metrics = reconstructionData?.report_data?.metrics || { totalThroughput: 0, totalDeliveries: 0, avgVariancePct: 0, incidents: 0 };
+                
                 ExportService.generateCompliancePack(
                     currentUser?.companyName || 'IoTank Station',
                     userName,
                     { start: customStart || '2026-01-01', end: customEnd || '2026-03-31' },
-                    { totalThroughput: 145000, totalDeliveries: 12, averageVariancePct: 0.4, incidents: 2 },
-                    [
-                        { date: '2026-02-14', opening: 12000, closing: 10500, deliveries: 0, sales: 1450, variance: 50 },
-                        { date: '2026-02-15', opening: 10500, closing: 18000, deliveries: 10000, sales: 2450, variance: -50 }
-                    ]
+                    { 
+                        totalThroughput: metrics.totalThroughput, 
+                        totalDeliveries: metrics.totalDeliveries, 
+                        averageVariancePct: metrics.avgVariancePct, 
+                        incidents: metrics.incidentCount 
+                    },
+                    logs
                 );
                 return;
             }
@@ -478,7 +499,7 @@ export const ReportingPage: React.FC = () => {
                                 disabled={!selectedId}
                             >
                                 <option value="">All Tanks</option>
-                                {tanks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                {tanks.map((t: Tank) => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </select>
                         </div>
                         <div className="rp-select-group">
@@ -611,7 +632,11 @@ export const ReportingPage: React.FC = () => {
                         <div className="rp-output-highlights">
                             <div className="rp-highlights-label">Summary Highlights</div>
                             <ul className="rp-highlights-list">
-                                {selectedTemplate.highlights.map((h, i) => (
+                                {(savedReports.find(r => r.id === docId || r.name === selectedTemplate.name)?.report_data as any)?.highlights?.map((h: string, i: number) => (
+                                    <li key={i} className="rp-highlight-item">
+                                        <ColorDot color={selectedTemplate.color} /> {h}
+                                    </li>
+                                )) || selectedTemplate.highlights.map((h, i) => (
                                     <li key={i} className="rp-highlight-item">
                                         <ColorDot color={selectedTemplate.color} /> {h}
                                     </li>

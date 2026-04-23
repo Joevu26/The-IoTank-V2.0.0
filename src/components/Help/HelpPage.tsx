@@ -175,8 +175,8 @@ export const HelpPage: React.FC = () => {
                                     >
                                         <option value="">All tanks</option>
                                         {tanks
-                                            .filter(t => !ticketForm.siteId || t.siteId === ticketForm.siteId)
-                                            .map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                            .filter((t: import('@/types').Tank) => !ticketForm.siteId || t.siteId === ticketForm.siteId)
+                                            .map((t: import('@/types').Tank) => <option key={t.id} value={t.id}>{t.name}</option>)}
                                     </select>
                                 </div>
                             </div>

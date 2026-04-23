@@ -16,6 +16,8 @@ const SCRAPER_CONFIG = [
   }
 ];
 
+import { enforceDurableRateLimit, requireProxyScope } from "../_shared/auth.ts"
+
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'))
   if (req.method === 'OPTIONS') {
@@ -23,6 +25,11 @@ serve(async (req) => {
   }
 
   try {
+    const authz = await requireProxyScope(req, corsHeaders);
+    if ('response' in authz) return authz.response;
+
+    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'official-scraper', 5);
+    if ('response' in limit) return limit.response;
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

@@ -465,23 +465,16 @@
     text-align: center;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
     .ids-container {
         grid-template-columns: 1fr;
-        gap: 40px;
+        gap: 24px;
     }
-    
-    .ids-content {
-        text-align: center;
-        align-items: center;
-    }
-}
 
-@media (max-width: 640px) {
     .dash-grid-mock {
         grid-template-columns: 1fr;
         padding: 16px;
+        gap: 16px;
     }
     
     .main-tank {
@@ -490,5 +483,14 @@
     
     .ids-dashboard-frame {
         min-height: auto;
+    }
+
+    .price-forecast {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .ids-title {
+        font-size: 2rem;
     }
 }

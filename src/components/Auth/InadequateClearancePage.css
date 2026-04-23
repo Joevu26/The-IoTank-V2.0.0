@@ -44,6 +44,20 @@
     align-items: center;
     justify-content: center;
     border: 1px solid rgba(244, 63, 94, 0.2);
+    animation: shield-pulse 3s infinite ease-in-out;
+}
+
+@keyframes shield-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.4); }
+    50% { transform: scale(1.05); opacity: 0.8; box-shadow: 0 0 30px 10px rgba(244, 63, 94, 0.2); }
+}
+
+.clearance-shield-icon {
+    color: #f43f5e;
+}
+
+.clearance-lock-icon {
+    color: white;
 }
 
 .lock-overlay {
@@ -59,6 +73,12 @@
     justify-content: center;
     box-shadow: 0 4px 12px rgba(244, 63, 94, 0.4);
     border: 2px solid #0f172a;
+    animation: lock-bob 2s infinite ease-in-out;
+}
+
+@keyframes lock-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
 }
 
 .clearance-title {
@@ -87,6 +107,11 @@
     align-items: center;
     text-align: left;
     margin-bottom: 32px;
+}
+
+.clearance-alert-icon {
+    color: #f59e0b;
+    flex-shrink: 0;
 }
 
 .clearance-alert-box span {
@@ -118,7 +143,7 @@
     line-height: 1.5;
 }
 
-.clearance-btn {
+.clearance-btn-primary {
     width: 100%;
     height: 56px;
     display: flex;
@@ -128,6 +153,22 @@
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px -5px rgba(190, 18, 60, 0.4);
+}
+
+.clearance-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 25px -5px rgba(190, 18, 60, 0.5);
+}
+
+.clearance-btn-primary:active {
+    transform: translateY(0);
 }
 
 .clearance-footer {

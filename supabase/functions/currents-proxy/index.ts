@@ -1,6 +1,6 @@
-// supabase/functions/currents-proxy/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
+import { enforceDurableRateLimit, requireProxyScope } from "../_shared/auth.ts"
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'))
@@ -9,6 +9,12 @@ serve(async (req) => {
   }
 
   try {
+    const authz = await requireProxyScope(req, corsHeaders);
+    if ('response' in authz) return authz.response;
+
+    const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'currents-proxy', 10);
+    if ('response' in limit) return limit.response;
+
     const { query, language = 'en', country = 'KE' } = await req.json()
     const apiKey = Deno.env.get('CURRENTS_API_KEY')
     if (!apiKey) throw new Error('CURRENTS_API_KEY not configured')

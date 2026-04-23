@@ -129,7 +129,7 @@ const mapReading = (row: any): TankReading => ({
 const mapAlert = (row: any): Alert => ({
     id: row.id?.toString() || Math.random().toString(),
     tankId: row.tank_id,
-    type: row.alert_type === 'low_fuel' ? 'low-level' : (row.alert_type === 'high_temperature' ? 'high-temperature' : row.alert_type),
+    type: row.alert_type === 'low_fuel' ? 'low_level' : (row.alert_type === 'high_temperature' ? 'high_temperature' : row.alert_type),
     severity: row.severity || 'low',
     message: row.message || '',
     title: row.title || 'Alert',
@@ -149,6 +149,10 @@ export function useTanks(stationId: string) {
 
     const query = useQuery({
         queryKey: ['tanks', stationId],
+        initialData: () => {
+            if (!stationId) return undefined;
+            return cacheHelper.get(`tanks_${stationId}`) || undefined;
+        },
         queryFn: async () => {
             let sbQuery = supabase.from('tanks').select('*');
             if (stationId && stationId !== 'SYSTEM_GOVERNANCE') {
@@ -156,10 +160,12 @@ export function useTanks(stationId: string) {
             }
             const { data, error } = await sbQuery.order('tank_name');
             if (error) throw error;
-            return (data || []).map(mapTank);
+            const mapped = (data || []).map(mapTank);
+            cacheHelper.set(`tanks_${stationId}`, mapped);
+            return mapped;
         },
         enabled: true,
-        staleTime: 5 * 60 * 1000, // Tanks don't change names/configs often
+        staleTime: 5 * 60 * 1000,
     });
 
     useEffect(() => {
@@ -349,6 +355,10 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
 
     const query = useQuery({
         queryKey: ['alerts', stationId, resolved],
+        initialData: () => {
+            if (!stationId) return undefined;
+            return cacheHelper.get(`alerts_${stationId}_${resolved}`) || undefined;
+        },
         queryFn: async () => {
             let sbQuery = supabase.from('alerts').select('*').eq('is_resolved', resolved);
             if (stationId && stationId !== 'SYSTEM_GOVERNANCE') {
@@ -356,7 +366,9 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
             }
             const { data, error } = await sbQuery.order('created_at', { ascending: false }).limit(50);
             if (error) throw error;
-            return (data || []).map(mapAlert);
+            const mapped = (data || []).map(mapAlert);
+            cacheHelper.set(`alerts_${stationId}_${resolved}`, mapped);
+            return mapped;
         },
         enabled: true,
         staleTime: 10 * 1000,
@@ -585,6 +597,35 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
 }
 
 /**
+ * Propagate threshold logic to all tanks in a station
+ * [SaaS Fleet Management]: Ensures all sensors follow the same safety benchmarks.
+ */
+export async function propagateStationThresholds(stationId: string) {
+    const { error } = await supabase
+        .from('tanks')
+        .update({
+            high_level_threshold: 95,
+            low_level_threshold: 20,
+            critical_level_threshold: 5,
+            updated_at: new Date().toISOString()
+        })
+        .eq('station_id', stationId);
+
+    if (error) throw error;
+    
+    // Forensic Audit
+    await AuditService.log(
+        'SYSTEM',
+        'SETTINGS_CHANGED',
+        stationId,
+        `Fleet-wide threshold propagation executed. Policy: High(95%), Low(20%), Critical(5%).`,
+        'INFO'
+    ).catch(err => console.error('[Audit Log Failed]', err));
+    
+    return true;
+}
+
+/**
  * Hook for User Profile
  */
 export function useProfile(authUserId: string | undefined) {
@@ -668,7 +709,6 @@ export async function createShift(stationId: string, shiftData: Omit<ShiftDocume
     // Map ShiftDocument to snake_case table columns
     const dbShift = {
         station_id: stationId, 
-        client_id: stationId, // Maintain redundancy for legacy joins
         site_id: (shiftData.siteId && uuidRegex.test(shiftData.siteId)) ? shiftData.siteId : null,
         tank_id: (shiftData.tankId && uuidRegex.test(shiftData.tankId)) ? shiftData.tankId : null,
         opened_at: shiftData.openedAt,
@@ -685,7 +725,7 @@ export async function createShift(stationId: string, shiftData: Omit<ShiftDocume
         variance_data: shiftData.variance,
         status: shiftData.status,
         review_state: shiftData.reviewState,
-        closed_by_uid: shiftData.closedBy.authUserId || 'SYSTEM_AUTO', 
+        auth_user_id: shiftData.closedBy.authUserId || 'SYSTEM_AUTO', 
         supervisor_notes: shiftData.notes,
         operation_type: shiftData.operation_type || 'CLOSE',
         action_label: shiftData.action_label || (shiftData.operation_type === 'OPEN' ? 'Shift Initialized' : 'Reconciliation Finalized')
@@ -781,6 +821,31 @@ export async function resolveAlert(alertId: string, resolvedBy: string) {
 
     if (error) throw error;
     return data;
+}
+
+/**
+ * Delete Tank
+ * [DESTRUCTIVE OPERATION]: Only accessible to authLevel <= 5.
+ */
+export async function deleteTank(tankId: string) {
+    const { error } = await supabase
+        .from('tanks')
+        .delete()
+        .eq('id', tankId);
+
+    if (error) throw error;
+
+    // Forensic Log for deletion
+    await AuditService.log(
+        'SECURITY',
+        'DELETE_TANK',
+        '', 
+        `Tank identity ${tankId} permanently purged from system.`,
+        'CRITICAL',
+        { tankId }
+    ).catch(() => {});
+
+    return true;
 }
 /**
  * Trigger a new Alert

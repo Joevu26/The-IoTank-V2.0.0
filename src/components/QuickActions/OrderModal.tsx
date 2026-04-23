@@ -42,7 +42,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSucce
 
     if (!isOpen) return null;
 
-    const selectedTank = tanks.find(t => t.id === formData.tankId);
+    const selectedTank = tanks.find((t: import('@/types').Tank) => t.id === formData.tankId);
 
     const executeSubmission = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -129,7 +129,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSucce
                                     <label>Target Tank / Product Context</label>
                                     <select required title="Target Tank" aria-label="Target Tank" value={formData.tankId} onChange={e => {
                                         const newTankId = e.target.value;
-                                        const tank = tanks.find(t => t.id === newTankId);
+                                        const tank = tanks.find((t: import('@/types').Tank) => t.id === newTankId);
                                         setFormData({
                                             ...formData,
                                             tankId: newTankId,
@@ -137,7 +137,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSucce
                                         });
                                     }}>
                                         <option value="">Select Target Storage...</option>
-                                        {tanks.map(t => (
+                                        {tanks.map((t: import('@/types').Tank) => (
                                             <option key={t.id} value={t.id}>{t.name} ({t.fuelType})</option>
                                         ))}
                                     </select>

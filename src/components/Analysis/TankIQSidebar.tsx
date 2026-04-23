@@ -133,13 +133,15 @@ export const TankIQSidebar: React.FC<TankIQSidebarProps> = ({ isOpen, onClose })
             </div>
 
             <div className="tankiq-footer">
-                <div className="quick-suggestions">
-                    {quickSuggestions.map((s, i) => (
-                        <div key={i} className="suggestion-chip" onClick={() => handleSendMessage(s)}>
-                            {s}
-                        </div>
-                    ))}
-                </div>
+                {messages.length === 0 && (
+                    <div className="quick-suggestions">
+                        {quickSuggestions.map((s, i) => (
+                            <div key={i} className="suggestion-chip" onClick={() => handleSendMessage(s)}>
+                                {s}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <div className="chat-input-container">
                     <input 

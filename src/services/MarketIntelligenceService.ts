@@ -184,7 +184,7 @@ export class MarketIntelligenceService {
         return [{
             id: `epra-${now.getFullYear()}-${now.getMonth()}`,
             authority: 'EPRA',
-            noticeType: 'price-cycle',
+            noticeType: 'price_cycle',
             title: `Monthly Petroleum Price Review: ${currentMonth} - ${nextMonth} ${now.getFullYear()}`,
             effectiveDate: now.getTime(),
             summary: `EPRA announces the latest pump prices based on stabilized landing costs.`,
@@ -195,15 +195,14 @@ export class MarketIntelligenceService {
     async syncAll(stationId: string): Promise<boolean> {
         let someFailure = false;
         let news: MarketSignal[] = [];
-        const triggerAlert = async (type: 'market-news' | 'regulatory-update', message: string, severity: 'info' | 'warning' = 'info') => {
+        const triggerAlert = async (type: 'market_news' | 'regulatory_update', message: string, severity: 'info' | 'warning' = 'info') => {
             try {
                 await supabase.from('alerts').insert({
                     station_id: stationId,
-                    alert_type: 'system_error',
+                    alert_type: type, // Standardized to the actual alert type
                     severity,
-                    title: type === 'market-news' ? '💡 Price Review Trigger' : '📜 Regulatory Advisory',
+                    title: type === 'market_news' ? '💡 Price Review Trigger' : '📜 Regulatory Advisory',
                     message,
-                    auth_user_id: 'system',
                     alert_data: { detectionMethod: 'ai-assisted' },
                     is_read: false,
                     is_acknowledged: false,
@@ -232,7 +231,7 @@ export class MarketIntelligenceService {
                     created_at: new Date().toISOString()
                 });
                 if (error) throw error;
-                if ((signal.relevanceScore ?? 0) >= 0.9) await triggerAlert('market-news', `High-Impact News: ${signal.title}`);
+                if ((signal.relevanceScore ?? 0) >= 0.9) await triggerAlert('market_news', `High-Impact News: ${signal.title}`);
             }
         } catch (e) { console.error('News sync failed:', e); someFailure = true; }
 
@@ -251,7 +250,7 @@ export class MarketIntelligenceService {
                     created_at: new Date().toISOString()
                 });
                 if (error) throw error;
-                await triggerAlert('regulatory-update', `Regulatory Update: ${notice.title}`, 'warning');
+                await triggerAlert('regulatory_update', `Regulatory Update: ${notice.title}`, 'warning');
             }
         } catch (e) { console.error('EPRA sync failed:', e); someFailure = true; }
 
@@ -263,7 +262,7 @@ export class MarketIntelligenceService {
                     const { error } = await supabase.from('raw_market_data').upsert({
                         id: `eia-crude-${item.period}`,
                         station_id: stationId,
-                        fuel_type: 'crude-oil',
+                        fuel_type: 'crude_oil',
                         region: 'Global/EIA',
                         price_per_liter: parseFloat(item.value),
                         currency: 'USD',

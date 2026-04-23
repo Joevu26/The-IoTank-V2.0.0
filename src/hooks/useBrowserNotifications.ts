@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAlerts } from './useSupabase';
 import { NotificationService } from '@/services/NotificationService';
+import { Alert } from '@/types';
 
 /**
  * Hook to automatically trigger browser notifications for new alerts
@@ -15,13 +16,13 @@ export function useBrowserNotifications(stationId: string) {
 
         // On first run, we just populate the existing alert IDs so we don't spam the user
         if (isFirstRun.current) {
-            alerts.forEach(alert => prevAlertIds.current.add(alert.id));
+            alerts.forEach((alert: Alert) => prevAlertIds.current.add(alert.id));
             isFirstRun.current = false;
             return;
         }
 
         // Check for new alerts
-        alerts.forEach(alert => {
+        alerts.forEach((alert: Alert) => {
             if (!prevAlertIds.current.has(alert.id)) {
                 // This is a new alert!
                 NotificationService.show(`IoTank Alert: ${alert.severity.toUpperCase()}`, {

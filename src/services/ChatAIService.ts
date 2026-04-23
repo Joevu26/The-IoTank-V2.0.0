@@ -94,14 +94,10 @@ export class ChatAIService {
     }
 
     private static async callGemini(message: string, history: any[]): Promise<string | null> {
-        const contents = [
-            { role: 'user', parts: [{ text: `SYSTEM INSTRUCTION: ${SYSTEM_PROMPT}` }] },
-            { role: 'model', parts: [{ text: "Understood. I am now configured as the IoTank Intelligent Operational Assistant. How can I assist with your fuel intelligence hub today?" }] },
-            ...history.map(h => ({
-                role: h.role === 'user' ? 'user' : 'model',
-                parts: [{ text: h.content }]
-            })),
-            { role: 'user', parts: [{ text: message }] }
+        const messages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...history,
+            { role: 'user', content: message }
         ];
 
         try {
@@ -111,7 +107,7 @@ export class ChatAIService {
                 headers,
                 body: JSON.stringify({
                     action: 'chat',
-                    body: { contents },
+                    body: { messages },
                     endpoint: 'models/gemini-1.5-flash:generateContent'
                 })
             });

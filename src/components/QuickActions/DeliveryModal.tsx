@@ -215,7 +215,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
         }
     };
 
-    const selectedTank = tanks.find(t => t.id === formData.tankId);
+    const selectedTank = tanks.find((t: import('@/types').Tank) => t.id === formData.tankId);
 
     // Variance Computation
     const existing = Number(formData.existingVolume) || 0;
@@ -262,7 +262,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                         <label>Target Tank</label>
                                         <select required title="Target Tank" aria-label="Target Tank" value={formData.tankId} onChange={e => {
                                             const newTankId = e.target.value;
-                                            const tank = tanks.find(t => t.id === newTankId);
+                                            const tank = tanks.find((t: import('@/types').Tank) => t.id === newTankId);
                                             setFormData({
                                                 ...formData,
                                                 tankId: newTankId,
@@ -271,7 +271,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                             });
                                         }}>
                                             <option value="">Select Target Storage...</option>
-                                            {tanks.map(t => (
+                                            {tanks.map((t: import('@/types').Tank) => (
                                                 <option key={t.id} value={t.id}>{t.name} ({t.fuelType})</option>
                                             ))}
                                         </select>

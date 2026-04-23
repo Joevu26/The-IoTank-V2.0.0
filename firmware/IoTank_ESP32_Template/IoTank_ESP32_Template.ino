@@ -1,27 +1,35 @@
 /*
- * The IoTank V2.0.0 - ESP32 Firmware Template
+ * The IoTank V2.0.0 - ESP32 Firmware Template (Supabase Edition)
  * 
  * Hardware: ESP32 + A02YYUW Ultrasonic Sensor + DS18B20 Temp Sensor
  * Libraries: 
- *   - Firebase-ESP-Client (by Mobizt)
+ *   - HTTPClient (Built-in)
+ *   - ArduinoJson (by Benoit Blanchon)
  *   - OneWire & DallasTemperature
  */
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <Firebase_ESP_Client.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// --- CONFIGURATION ---
+// --- WIFI CONFIGURATION ---
 #define WIFI_SSID "YOUR_WIFI_SSID"
 #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
 
-#define API_KEY "AIzaSyBD2rpCklOeU5Q_zZw1Fwe-s5ugKKWw5k8"
-#define DATABASE_URL "the-iotank-project.firebaseio.com"
+// --- SUPABASE CONFIGURATION ---
+// Use your Supabase Project URL (e.g., https://your-project.supabase.co)
+#define SUPABASE_URL "https://suifvborodwergtrbjez.supabase.co"
+// Use your Supabase Anon Key
+#define SUPABASE_ANON_KEY "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1aWZ2Ym9yb2R3ZXJndHJiamV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NjA3NDAsImV4cCI6MjA4OTMzNjc0MH0.MNRIzdkr3w7AbhYcp7zdDT4waltCMO33e_vTxZtu8W0"
+// Generate a long-lived Hardware JWT using the 'issue-device-token' Edge Function
+#define DEVICE_JWT "YOUR_DEVICE_JWT_HERE"
 
-#define ORG_ID "YOUR_ORG_ID"
-#define TANK_ID "YOUR_TANK_ID"
+// --- IDENTITY CONFIGURATION ---
+#define STATION_ID "YOUR_STATION_UUID"
+#define TANK_ID "YOUR_TANK_UUID"
 
 // Pin Definitions
 #define SENSOR_TX 17 // Ultrasonic TX -> ESP32 RX2
@@ -29,9 +37,6 @@
 #define ONE_WIRE_BUS 4 // DS18B20 Data Pin
 
 // --- GLOBALS ---
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
@@ -44,17 +49,14 @@ void setup() {
   sensors.begin();
 
   // WiFi Connection
+  Serial.print("Connecting to WiFi");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500); Serial.print(".");
   }
   Serial.println("\nConnected to WiFi");
-
-  // Firebase Setup
-  config.api_key = API_KEY;
-  config.database_url = DATABASE_URL;
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 }
 
 float readUltrasonic() {
@@ -74,28 +76,63 @@ float readUltrasonic() {
   return -1;
 }
 
+void sendTelemetry(float distCm, float tempC) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi Disconnected. Skipping send.");
+    return;
+  }
+
+  HTTPClient http;
+  String url = String(SUPABASE_URL) + "/rest/v1/sensor_readings";
+  
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("apikey", SUPABASE_ANON_KEY);
+  http.addHeader("Authorization", "Bearer " + String(DEVICE_JWT));
+  http.addHeader("Prefer", "return=minimal");
+
+  // Create JSON payload
+  StaticJsonDocument<256> doc;
+  doc["tank_id"] = TANK_ID;
+  doc["station_id"] = STATION_ID;
+  doc["raw_distance"] = distCm * 10; // Convert cm to mm for database
+  doc["temperature"] = tempC;
+  doc["rssi"] = WiFi.RSSI();
+
+  String payload;
+  serializeJson(doc, payload);
+
+  Serial.print("Sending payload: ");
+  Serial.println(payload);
+
+  int httpResponseCode = http.POST(payload);
+
+  if (httpResponseCode > 0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    if (httpResponseCode == 201) {
+      Serial.println("Data synced to Supabase successfully.");
+    }
+  } else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
+
+  http.end();
+}
+
 void loop() {
   sensors.requestTemperatures();
   float tempC = sensors.getTempCByIndex(0);
   float distCm = readUltrasonic();
 
   if (distCm > 0) {
-    FirebaseJson json;
-    json.set("rawDistance", distCm);
-    json.set("temperature", tempC);
-    json.set("timestamp", (double)millis()); // In production, use Firebase cloud timestamp
-    json.set("deviceId", WiFi.macAddress());
-    json.set("processingLocation", "edge");
-
-    // Path must match: organizations/{orgId}/tanks/{tankId}/raw_readings
-    String path = "organizations/" + String(ORG_ID) + "/tanks/" + String(TANK_ID) + "/raw_readings";
-    
-    if (Firebase.RTDB.pushJSON(&fbdo, path, &json)) {
-      Serial.println("Data sent successfully!");
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
+    sendTelemetry(distCm, tempC);
+  } else {
+    Serial.println("Failed to read ultrasonic sensor.");
   }
 
-  delay(60000); // Wait 1 minute
+  // Heartbeat / Delay
+  // In production, consider ESP.deepSleep() for battery savings.
+  delay(60000); 
 }

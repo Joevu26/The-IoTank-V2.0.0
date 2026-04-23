@@ -612,7 +612,9 @@ export function useMarketNews(): UseMarketNewsReturn {
 
         // 3. Last Resort: Self-Hosted RSS Parser
         const isUrlValid = source.url && source.url.startsWith('http');
-        if (collected.length === 0 && isUrlValid && !source.url.startsWith('proxy:')) {
+        const isProxy = source.url && source.url.startsWith('proxy:');
+        
+        if (collected.length === 0 && isUrlValid && !isProxy) {
             try {
                 const { data, error } = await supabase.functions.invoke(RSS_PARSER, {
                     method: 'POST',
@@ -627,7 +629,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                     collected.push(...articles);
                 }
             } catch (e) { 
-                console.error('[useMarketNews] Parser total failure:', e);
+                console.error(`[useMarketNews] Parser failure for ${source.shortLabel}:`, e);
             }
         }
 

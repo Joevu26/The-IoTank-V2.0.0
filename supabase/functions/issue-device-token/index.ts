@@ -105,28 +105,45 @@ Deno.serve(async (req) => {
       ["sign"]
     );
 
-    // Payload designed for RLS consumption
+    const issuedAt = Math.floor(Date.now() / 1000);
+    // CRIT-004: 1 year (down from 10 years) — rotate annually or on device compromise
+    const expiresAt = issuedAt + (60 * 60 * 24 * 365);
+
     const payload = {
-      role: 'device', // Identity for RLS policies
+      role: 'device',
       station_id: stationId,
-      iat: Math.floor(Date.now() / 1000),
-      // Long-lived (10 years) because hardware updates are costly/rare
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 365 * 10), 
-      iss: 'lotank-bridge-v2',
+      tank_id: tankId,
+      iat: issuedAt,
+      exp: expiresAt,
+      iss: 'iotank-bridge-v2',   // Fixed typo: was 'lotank-bridge-v2'
       aud: 'authenticated'
     };
 
     const token = await createJwt({ alg: "HS256", typ: "JWT" }, payload, key);
+
+    // CRIT-004: Record token in registry for future revocation capability
+    const tokenHash = Array.from(
+      new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))
+    ).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    await supabaseAdmin.from('device_tokens').insert({
+      tank_id:    tankId,
+      station_id: stationId,
+      issued_by:  user.id,
+      expires_at: new Date(expiresAt * 1000).toISOString(),
+      token_hash: tokenHash,
+    }).throwOnError();
 
     console.log(`[issue-device-token] TOKEN_ISSUED for Tank ${tankId} | Station ${stationId}`);
 
     return new Response(JSON.stringify({ 
       success: true,
       token,
-      expires_at: payload.exp,
+      expires_at: expiresAt,
       claims: {
           role: payload.role,
-          station_id: payload.station_id
+          station_id: payload.station_id,
+          tank_id: payload.tank_id
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

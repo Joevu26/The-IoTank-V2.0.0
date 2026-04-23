@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * Creates a standard Supabase client for native Auth.
- * Consolidating to Supabase Auth removes the need for Firebase JWT injection.
+ * HIGH-001: Using sessionStorage instead of localStorage to limit XSS blast radius.
+ * Sessions expire when the browser tab closes, reducing the token theft window.
  */
 export const createSharedSupabaseClient = (
     supabaseUrl: string,
@@ -11,9 +12,10 @@ export const createSharedSupabaseClient = (
     return createClient(supabaseUrl, supabaseAnonKey, {
         auth: {
             persistSession: true,
-            storage: window.localStorage,
+            storage: window.sessionStorage, // HIGH-001: Narrower scope than localStorage
             autoRefreshToken: true,
-            detectSessionInUrl: true
+            detectSessionInUrl: true,
+            storageKey: 'iotank_session'
         }
     });
 };

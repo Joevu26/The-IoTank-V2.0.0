@@ -122,7 +122,7 @@ export interface Alert {
     id: string;
     tankId?: string;
     siteId?: string;
-    type: 'leak' | 'theft' | 'theft_detected' | 'leak_detected' | 'overfill' | 'low-level' | 'high-temperature' | 'sensor-failure' | 'anomaly' | 'refill' | 'refill-detected' | 'unauthorized-refill' | 'connectivity-lost' | 'market-news' | 'regulatory-update' | 'delivery-variance' | 'telemetry-gap' | 'compliance-deadline' | 'composite' | 'info';
+    type: 'leak' | 'theft' | 'theft_detected' | 'leak_detected' | 'overfill' | 'low_level' | 'low_level_critical' | 'low_level_warning' | 'high_temperature' | 'sensor_failure' | 'anomaly' | 'refill' | 'refill_detected' | 'unauthorized_refill' | 'connectivity_lost' | 'market_news' | 'regulatory_update' | 'delivery_variance' | 'telemetry_gap' | 'compliance_deadline' | 'composite' | 'info';
     severity: 'info' | 'warning' | 'critical';
     severityLabel?: AlertSeverityLabel;  // INFO | WATCH | HIGH | CRITICAL
     score?: number;            // 0-100 calculated severity score
@@ -227,7 +227,7 @@ export interface SupplyRisk {
 export interface RegulatoryNotice {
     id: string;
     authority: 'EPRA' | 'KRA' | 'NEMA' | 'MOT';
-    noticeType: 'price-cycle' | 'tax-adjustment' | 'safety-mandate' | 'environmental';
+    noticeType: 'price_cycle' | 'tax_adjustment' | 'safety_mandate' | 'environmental';
     title: string;
     effectiveDate: number;
     summary: string;
@@ -312,6 +312,7 @@ export interface User {
     siteIds: string[]; // Sites user has access to
     mfaEnabled: boolean;
     isSystemAccount?: boolean;
+    isProvisional?: boolean;
     /** @deprecated Use re-authentication with login password instead */
     masterAccessPassword?: string;
     createdAt: number;

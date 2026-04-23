@@ -7,7 +7,7 @@ import {
     FiCheckCircle, FiPieChart, FiDollarSign, FiZap,
     FiUserPlus, FiEdit3, FiBell, FiRefreshCw, FiSend,
     FiLifeBuoy, FiAlertTriangle, FiCommand, FiCheck, FiLock,
-    FiCloud, FiDownloadCloud, FiBarChart2, FiCpu as FiEngine, FiTarget
+    FiCloud, FiDownload, FiBarChart2, FiCpu as FiEngine, FiTarget
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -170,7 +170,7 @@ const Dashboard = () => {
                         <div className="glass-panel compact-stat-card success">
                             <div className="stat-header">
                                 <span className="stat-label">Data Ingestion</span>
-                                <FiDownloadCloud size={14} className="text-emerald-500" />
+                                <FiDownload size={14} className="text-emerald-500" />
                             </div>
                             <div className="stat-val-group">
                                 <span className="stat-value">{stats?.health?.dataIngestionRate || '1.2k'}</span>

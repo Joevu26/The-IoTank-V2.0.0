@@ -7,7 +7,7 @@ import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { AuditService } from '@/services/AuditService';
-import { TankReading } from '@/types';
+import { TankReading, Tank } from '@/types';
 import '../Inventory/AddTankModal.css';
 
 interface ShiftCloseModalProps {
@@ -18,7 +18,7 @@ interface ShiftCloseModalProps {
 export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
     const { tanks } = useTanks(currentUser?.stationId || '');
-    const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map(t => t.id));
+    const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map((t: Tank) => t.id));
     const [activeShiftSnapshot, setActiveShiftSnapshot] = useState<any>(null);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [isClosing, setIsClosing] = useState(false);
@@ -74,7 +74,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     // Metrics
     const volumesDispensed: Record<string, number> = {};
     
-    tanks.forEach(tank => {
+    tanks.forEach((tank: Tank) => {
         const currentReading = readings[tank.id];
         const startVol = startVolumes[tank.id] || tank.currentVolume || 0; 
         const currentVol = currentReading?.volumeCorrected || currentReading?.volume || tank.currentVolume || 0;
@@ -83,7 +83,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     });
 
     // Global aggregated price map from tanks
-    const fuelPriceMap = tanks.reduce((acc, tank) => {
+    const fuelPriceMap = tanks.reduce((acc: Record<string, number>, tank: Tank) => {
         const price = (tank as any).metadata?.retailPrice || 0;
         if (!acc[tank.fuelType] || price > 0) {
             acc[tank.fuelType] = price;
@@ -92,7 +92,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     }, {} as Record<string, number>);
 
     // Total Revenue based on Authorized Prices
-    const totalVolumetricSold = tanks.reduce((acc, tank) => {
+    const totalVolumetricSold = tanks.reduce((acc: number, tank: Tank) => {
         const vol = volumesDispensed[tank.id] || 0;
         const price = (tank as any).metadata?.retailPrice || 0;
         return acc + (vol * price);
@@ -163,7 +163,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             }
 
             const pumpReadings: Record<string, any> = {};
-            tanks.forEach(t => {
+            tanks.forEach((t: Tank) => {
                 pumpReadings[t.name] = {
                     start: startVolumes[t.id] || 0,
                     end: readings[t.id]?.volumeCorrected || readings[t.id]?.volume || t.currentVolume || 0
@@ -233,7 +233,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 <div className="atm-section-body p-0">
                     {tanks.length === 0 ? (
                         <div className="p-10 text-center text-slate-400 font-medium italic">No active tanks detected.</div>
-                    ) : tanks.map(tank => (
+                    ) : tanks.map((tank: Tank) => (
                         <div key={tank.id} className="pt-6 pb-8 px-8 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
                             <div className="font-black text-slate-900 text-[14px] mb-5 flex items-center gap-2 uppercase tracking-tight">
                                 <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(0,212,255,0.5)]"></div>
@@ -299,7 +299,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     <span className="atm-section-title">Volumetric Telemetry Overview</span>
                 </div>
                 <div className="atm-section-body p-6 space-y-10">
-                    {tanks.map(tank => {
+                    {tanks.map((tank: Tank) => {
                         const dispensed = volumesDispensed[tank.id] || 0;
                         const startVol = startVolumes[tank.id] || tank.currentVolume || 0;
                         const tankReading = readings[tank.id];

@@ -7,7 +7,16 @@ import { User, UserRole } from '@/types';
 import { AuditService } from '@/services/AuditService';
 import { NewsService } from '@/services/NewsService';
 
+// HIGH-003: Only emit debug logs in development — never in production
+const debugLog = import.meta.env.DEV ? console.log : () => {};
+
 const CACHE_KEY = 'iotank_cached_user';
+// HIGH-001: Fields stored in the localStorage cache — sensitive auth fields (role, authLevel)
+// are intentionally excluded; they are always re-derived from the DB on enrichment.
+const SAFE_CACHE_FIELDS: (keyof User)[] = [
+    'authUserId', 'email', 'displayName', 'photoURL',
+    'stationId', 'companyName', 'logoUrl', 'address', 'phoneNumber', 'siteIds'
+];
 
 export interface EnrollMFAResult {
     factorId: string;
@@ -45,8 +54,21 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState<User | null>(() => {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                // Preliminary check: if we have a cached user, we can assume authenticated for the first frame
+                parsed.isProvisional = true;
+                parsed.role = 'viewer';
+                parsed.authLevel = 8;
+                return parsed;
+            } catch { return null; }
+        }
+        return null;
+    });
+    const [loading, setLoading] = useState(!localStorage.getItem(CACHE_KEY));
     const [mfaChallengeRequired, setMfaChallengeRequired] = useState(false);
     const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
     // Stores the pending Supabase challenge ID during an MFA flow
@@ -87,7 +109,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Cooldown check: Prevent re-enriching the same user within 10s if we already tried
         const now = Date.now();
         if (currentUserAuthIdRef.current === sbUser.id && (now - lastEnrichmentAttemptRef.current < 10000)) {
-            console.log(`[DEBUG_LOG] Enrichment cooldown active for ${sbUser.id}. Skipping.`);
+            debugLog(`[DEBUG_LOG] Enrichment cooldown active for ${sbUser.id}. Skipping.`);
             updateLoadingState(false);
             return false;
         }
@@ -101,7 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isEnrichingRef.current = sbUser.id;
         
         try {
-            console.log(`[DEBUG_LOG] PROFILE: Launching optimized identity bundle handshake...`);
+            debugLog(`[DEBUG_LOG] PROFILE: Launching optimized identity bundle handshake...`);
             let handshakeTimedOut = false;
             
             // TIMEOUT PROTECTION: Force-fail if a query hangs more than 15s (Safe for slow DB cold starts)
@@ -118,7 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 // [RECOVERY PANIC BYPASS]: If we detect a recovery link, we MUST NOT enrich or check boundaries.
                 // Doing so might trigger a sign-out for System-Admins landing on the Client portal.
                 if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
-                    console.log("[DEBUG_LOG] ENRICHMENT: Recovery detected. Postponing enrichment to allow password reset.");
+                    debugLog("[DEBUG_LOG] ENRICHMENT: Recovery detected. Postponing enrichment to allow password reset.");
                     return false;
                 }
 
@@ -232,16 +254,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 };
 
                 // 4. CACHE: Persist for SWR (Stale-While-Revalidate) bootstrap
+                // HIGH-001: Only cache non-sensitive identity fields — role/authLevel always come from DB
                 try {
-                    localStorage.setItem(CACHE_KEY, JSON.stringify(finalUser));
+                    const safeCache: Partial<User> = {};
+                    SAFE_CACHE_FIELDS.forEach(k => { (safeCache as any)[k] = (finalUser as any)[k]; });
+                    localStorage.setItem(CACHE_KEY, JSON.stringify(safeCache));
                 } catch (cacheErr) {
-                    console.warn('[DEBUG_LOG] Failed to cache user profile:', cacheErr);
+                    debugLog('[DEBUG_LOG] Failed to cache user profile:', cacheErr);
                 }
             
                 if (handshakeTimedOut) {
                     console.warn("[DEBUG_LOG] RECOVERY: Identity applied after timeout window.");
                 } else {
-                    console.log("[DEBUG_LOG] SUCCESS: Identity bundle applied.");
+                    debugLog("[DEBUG_LOG] SUCCESS: Identity bundle applied.");
                 }
                 isProvisionedRef.current = !!finalUser.stationId;
                 setCurrentUser(finalUser);
@@ -269,7 +294,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // [RECOVERY DETECTOR]: Detect recovery fragments before routing or enrichment logic starts
     useEffect(() => {
         if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
-            console.log("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
+            debugLog("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
             const targetUrl = `${window.location.origin}/reset-password${window.location.hash}`;
             window.location.href = targetUrl;
         }
@@ -300,14 +325,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const initializeAuth = async () => {
             if (handshakeInProgressRef.current) return;
             
-            console.log("[DEBUG_LOG] BOOT: Launching secure handshake...");
+            debugLog("[DEBUG_LOG] BOOT: Launching secure handshake...");
             isBootingRef.current = true;
             handshakeInProgressRef.current = true;
 
             // [RECOVERY SCAN]: Detect if the user landed on ANY page with a recovery hash
             // This is a fail-safe for when Supabase ignores the redirectTo parameter.
             if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
-                console.log("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
+                debugLog("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
                 
                 // Clear any potentially conflicting state
                 isBootingRef.current = false;
@@ -352,7 +377,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         try {
                             const parsed = JSON.parse(cachedData);
                             if (parsed.authUserId === session.user.id) {
-                                console.log("[DEBUG_LOG] BOOT: Restoring identity from local cache.");
+                                debugLog("[DEBUG_LOG] BOOT: Restoring identity from local cache.");
+                                // PREVENT PREMATURE REDIRECTS: Force provisional state on boot so ProtectedRoute shows a loader 
+                                // instead of kicking the user out before the background DB handshake completes.
+                                parsed.isProvisional = true;
+                                parsed.role = 'viewer';
+                                parsed.authLevel = 8;
                                 setCurrentUser(parsed);
                                 setLoading(false);
                                 isProvisionedRef.current = !!parsed.stationId;
@@ -371,7 +401,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                         }
                     }
                 } else {
-                    console.log("[DEBUG_LOG] BOOT: No active session. Public flight mode.");
+                    debugLog("[DEBUG_LOG] BOOT: No active session. Public flight mode.");
                     updateLoadingState(false);
                 }
             } catch (error) {
@@ -387,10 +417,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         initializeAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log(`[DEBUG_LOG] AUTH_EVENT: ${event} (Booting: ${isBootingRef.current})`);
+            debugLog(`[DEBUG_LOG] AUTH_EVENT: ${event} (Booting: ${isBootingRef.current})`);
 
             if (event === 'PASSWORD_RECOVERY') {
-                console.log("[DEBUG_LOG] AUTH_EVENT: Password recovery detected. Forcing navigation to reset module.");
+                debugLog("[DEBUG_LOG] AUTH_EVENT: Password recovery detected. Forcing navigation to reset module.");
                 setLoading(false);
                 if (window.location.pathname !== '/reset-password') {
                     // Use href to ensure a clean state break
@@ -408,7 +438,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             // Always handle sign out immediately
             if (event === 'SIGNED_OUT') {
-                console.log("[DEBUG_LOG] AUTH_EVENT: Session terminated. Purging cache.");
+                debugLog("[DEBUG_LOG] AUTH_EVENT: Session terminated. Purging cache.");
                 localStorage.removeItem(CACHE_KEY);
                 currentUserAuthIdRef.current = null;
                 setCurrentUser(null);
@@ -421,7 +451,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // NEVER suppress SIGNED_IN — the user may have just logged in while boot was running.
             // The isEnrichingRef concurrency lock inside enrichUserFromSupabase handles deduplication.
             if ((isBootingRef.current || handshakeInProgressRef.current) && event !== 'SIGNED_IN') {
-                console.log(`[DEBUG_LOG] AUTH_EVENT: ${event} suppressed (Handshake in progress)`);
+                debugLog(`[DEBUG_LOG] AUTH_EVENT: ${event} suppressed (Handshake in progress)`);
                 return;
             }
 
@@ -439,7 +469,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // CRITICAL: isSameUser check should NOT block SIGNED_IN events if we are stuck
             // in an unprovisioned state, as we need to re-trigger enrichment.
             if (isSilentEvent || (isSameUser && event === 'SIGNED_IN' && isProvisionedRef.current)) {
-                console.log(`[DEBUG_LOG] AUTH_EVENT: Skipping redundant update for ${event}`);
+                debugLog(`[DEBUG_LOG] AUTH_EVENT: Skipping redundant update for ${event}`);
                 return;
             }
 
@@ -450,14 +480,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 // PROVISIONAL IDENTITY: Set unprovisioned user immediately so ProtectedRoute
                 // sees a truthy currentUser while enrichment happens.
                 if (!currentUserAuthIdRef.current || currentUserAuthIdRef.current !== session.user.id) {
-                    console.log("[DEBUG_LOG] AUTH_EVENT: Setting provisional identity.");
+                    debugLog("[DEBUG_LOG] AUTH_EVENT: Setting provisional identity.");
                     
                     const cachedUser = localStorage.getItem(CACHE_KEY);
                     if (cachedUser) {
                         try {
                             const parsed = JSON.parse(cachedUser);
                             if (parsed.authUserId === session.user.id) {
-                                console.log("[DEBUG_LOG] AUTH_EVENT: Loading identity from cache.");
+                                debugLog("[DEBUG_LOG] AUTH_EVENT: Loading identity from cache.");
+                                parsed.isProvisional = true;
+                                parsed.role = 'viewer';
+                                parsed.authLevel = 8;
                                 setCurrentUser(parsed);
                                 setLoading(false);
                                 unlockedByCache = true;
@@ -484,7 +517,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setLoading(false);
                 }
             } else {
-                console.log("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
+                debugLog("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
                 currentUserAuthIdRef.current = null;
                 setCurrentUser(null);
                 setLoading(false);
@@ -507,8 +540,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const signIn = async (email: string, password: string) => {
         setLoading(true);
+
+        // HIGH-005: Server-side brute-force check before attempting auth
+        try {
+            const { data: allowed, error: rateErr } = await supabase.rpc('check_auth_attempt', { p_email: email });
+            if (!rateErr && allowed === false) {
+                setLoading(false);
+                throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
+            }
+        } catch (rateCheckErr: any) {
+            // If the RPC itself fails, continue — don't block login due to rate limiter failure
+            if (rateCheckErr.message?.includes('locked')) throw rateCheckErr;
+            debugLog('[signIn] Rate check RPC unavailable, proceeding:', rateCheckErr.message);
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
+            // Record the failed attempt
+            supabase.rpc('log_auth_attempt', { p_email: email, p_success: false }).then(({error: rpcErr}) => {
+                if (rpcErr) debugLog('[signIn] log_auth_attempt failed', rpcErr);
+            });
             setLoading(false);
             throw error;
         }
@@ -728,7 +779,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const canSee = (requiredLevel: number): boolean => {
-        return (currentUser?.authLevel || 99) <= requiredLevel;
+        return (currentUser?.authLevel ?? 99) <= requiredLevel;
     };
 
     const value = {
@@ -756,3 +807,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+

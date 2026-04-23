@@ -18,7 +18,7 @@ export const PredictivePanel: React.FC<PredictivePanelProps> = ({ stationId, tan
     const { tanks } = useTanks(stationId);
 
     // Find the specific tank if tankId is provided
-    const tank = tankId ? tanks.find(t => t.id === tankId) : null;
+    const tank = tankId ? tanks.find((t: import('@/types').Tank) => t.id === tankId) : null;
 
     // Fetch readings for specific tank or empty if no tank
     const { readings, loading: readingsLoading } = useHistoricalReadings(stationId, tankId || '', {

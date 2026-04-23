@@ -1,11 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.40.0"
 import { corsHeaders } from "../_shared/cors.ts"
+import { enforceDurableRateLimit, requireProxyScope } from "../_shared/auth.ts"
 
 serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
     try {
+        const authz = await requireProxyScope(req, corsHeaders);
+        if ('response' in authz) return authz.response;
+
+        const limit = await enforceDurableRateLimit(authz.context, corsHeaders, 'daily-analytics-rollup', 5);
+        if ('response' in limit) return limit.response;
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL') || '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
