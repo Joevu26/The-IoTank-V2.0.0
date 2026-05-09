@@ -116,7 +116,14 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             onCropComplete(croppedBlob);
         } catch (e) {
             console.error(e);
-            alert('Failed to process image crop.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Crop Failed',
+                    message: 'Failed to process image crop.',
+                    type: 'error',
+                    attribution: 'IMAGE PROCESSOR'
+                }
+            }));
         } finally {
             setIsProcessing(false);
         }

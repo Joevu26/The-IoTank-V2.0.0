@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'security events', path: '/security-events', icon: <MdReportGmailerrorred />, level: 1 },
 
         { name: 'business & revenue', isSection: true, path: 'sec-biz', level: 4 },
-        { name: 'billing archive', path: '/billing', icon: <MdAttachMoney />, level: 4 },
+        { name: 'Payments & Debt', path: '/billing', icon: <MdAttachMoney />, level: 4 },
         { name: 'analytics & reports', path: '/analytics', icon: <MdBarChart />, level: 1 },
 
         { name: 'workspace & support', isSection: true, path: 'sec-work', level: 4 },

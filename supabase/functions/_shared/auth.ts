@@ -2,7 +2,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.40.0'
 import { emitSecurityTelemetry } from './telemetry.ts'
 
-declare const Deno: any;
+/**
+ * Deno namespace declaration for TypeScript environment awareness
+ */
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
 
 type CorsHeaders = Record<string, string>;
 type SupabaseAdminClient = ReturnType<typeof createClient>;

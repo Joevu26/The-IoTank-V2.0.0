@@ -56,8 +56,8 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
     e.preventDefault();
     setError('');
 
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.station_name || !formData.county || !formData.notes) {
-      setError('please fill in all fields to proceed with your request.');
+    if (!formData.full_name || !formData.email || !formData.phone || !formData.station_name || !formData.county) {
+      setError('please fill in all required fields to proceed with your request.');
       return;
     }
     if (!validateEmail(formData.email)) {
@@ -89,6 +89,16 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
           }
         } else {
             console.warn('reCAPTCHA library failed to initialize within 5 seconds.');
+            // Dispatch premium persistent toast
+            const toastEvent = new CustomEvent('system-toast', {
+              detail: {
+                title: 'APTCHA service',
+                message: 'Please check your internet connection and reload to get a reCAPTCHA challenge.',
+                type: 'error',
+                persistent: true
+              }
+            });
+            window.dispatchEvent(toastEvent);
         }
       } catch (recaptchaError) {
         console.warn('reCAPTCHA v3 error (non-blocking):', recaptchaError);
@@ -128,9 +138,25 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
       document.body.classList.remove('show-recaptcha');
       
       setSubmitted(true);
-    } catch (err: unknown) {
+    } catch (err: any) {
       console.error('registration request error:', err);
-      setError('failed to submit your request. please try again or contact support.');
+      const errMsg = err.message || '';
+      
+      if (errMsg.includes('Email already exists') || errMsg.includes('pending request')) {
+        setError(errMsg);
+        // Dispatch premium persistent toast
+        const toastEvent = new CustomEvent('system-toast', {
+          detail: {
+            title: 'Registration Error',
+            message: errMsg,
+            type: 'error',
+            persistent: true
+          }
+        });
+        window.dispatchEvent(toastEvent);
+      } else {
+        setError('failed to submit your request. please try again or contact support.');
+      }
       document.body.classList.remove('show-recaptcha');
     } finally {
       setLoading(false);

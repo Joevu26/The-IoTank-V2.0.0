@@ -5,6 +5,7 @@ import { supabase } from '@/config/supabase';
 import { TankReading, Tank, Alert, User, ShiftDocument, Site } from '@/types';
 import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
 import { AuditService } from '@/services/AuditService';
+import { logger } from '@/utils/logger';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -31,7 +32,7 @@ const cacheHelper = {
             };
             localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(payload));
         } catch (e) {
-            console.warn('[StorageAgent] Cache write failed:', e);
+            logger.warn('[StorageAgent] Cache write failed:', e);
         }
     },
     get: (key: string) => {
@@ -102,11 +103,11 @@ const parseTimestamp = (ts: any) => {
 const mapReading = (row: any): TankReading => ({
     id: row.id?.toString() || Math.random().toString(),
     tankId: row.tank_id,
-    timestamp: parseTimestamp(row.timestamp),
+    timestamp: parseTimestamp(row.captured_at || row.timestamp),
     temperature: safeNum(row.temperature),
     volume: safeNum(row.volume || row.ambient_volume),
     fuelLevel: safeNum(row.fill_percentage),
-    volumeCorrected: safeNum(row.standard_volume || row.volume || row.ambient_volume),
+    volumeCorrected: safeNum(row.volume_corrected || row.standard_volume || row.volume || row.ambient_volume),
     signalQuality: (() => {
         const rssiVal = Math.abs(row.rssi || row.signal_strength || (row.metadata?.rssi) || 0);
         if (rssiVal === 0) return 'Offline';
@@ -130,7 +131,7 @@ const mapAlert = (row: any): Alert => ({
     id: row.id?.toString() || Math.random().toString(),
     tankId: row.tank_id,
     type: row.alert_type === 'low_fuel' ? 'low_level' : (row.alert_type === 'high_temperature' ? 'high_temperature' : row.alert_type),
-    severity: row.severity || 'low',
+    severity: (row.severity === 'warning' || row.severity === 'critical') ? row.severity : 'info',
     message: row.message || '',
     title: row.title || 'Alert',
     timestamp: parseTimestamp(row.timestamp),
@@ -146,6 +147,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
  */
 export function useTanks(stationId: string) {
     const queryClient = useQueryClient();
+    const [isOffline, setIsOffline] = useState(false);
 
     const query = useQuery({
         queryKey: ['tanks', stationId],
@@ -154,15 +156,26 @@ export function useTanks(stationId: string) {
             return cacheHelper.get(`tanks_${stationId}`) || undefined;
         },
         queryFn: async () => {
-            let sbQuery = supabase.from('tanks').select('*');
-            if (stationId && stationId !== 'SYSTEM_GOVERNANCE') {
-                sbQuery = sbQuery.eq('station_id', stationId);
+            try {
+                let sbQuery = supabase.from('tanks').select('*');
+                if (stationId && stationId !== 'SYSTEM_GOVERNANCE') {
+                    sbQuery = sbQuery.eq('station_id', stationId);
+                }
+                const { data, error } = await sbQuery.order('tank_name');
+                if (error) throw error;
+                const mapped = (data || []).map(mapTank);
+                cacheHelper.set(`tanks_${stationId}`, mapped);
+                setIsOffline(false);
+                return mapped;
+            } catch (err) {
+                logger.warn('[GhostMode] Tanks fetch failed, falling back to cache:', err);
+                const cached = cacheHelper.get(`tanks_${stationId}`);
+                if (cached) {
+                    setIsOffline(true);
+                    return cached;
+                }
+                throw err;
             }
-            const { data, error } = await sbQuery.order('tank_name');
-            if (error) throw error;
-            const mapped = (data || []).map(mapTank);
-            cacheHelper.set(`tanks_${stationId}`, mapped);
-            return mapped;
         },
         enabled: true,
         staleTime: 5 * 60 * 1000,
@@ -172,8 +185,9 @@ export function useTanks(stationId: string) {
         if (!stationId) return;
 
         const channelFilter = stationId !== 'SYSTEM_GOVERNANCE' ? `station_id=eq.${stationId}` : undefined;
+        const channelId = `tanks-realtime:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`tanks-realtime:${stationId}`)
+            .channel(channelId)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tanks', filter: channelFilter }, () => {
                 queryClient.invalidateQueries({ queryKey: ['tanks', stationId] });
             })
@@ -184,7 +198,12 @@ export function useTanks(stationId: string) {
         };
     }, [stationId, queryClient]);
 
-    return { tanks: query.data || [], loading: query.isLoading, error: query.error as Error | null };
+    return { 
+        tanks: query.data || [], 
+        loading: query.isLoading, 
+        error: query.error as Error | null,
+        isOffline 
+    };
 }
 
 /**
@@ -200,11 +219,11 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
                 .from('sensor_readings')
                 .select('*')
                 .eq('tank_id', tankId)
-                .order('timestamp', { ascending: false })
+                .order('captured_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') throw error;
+            if (error) throw error;
             return data ? mapReading(data) : null;
         },
         enabled: !!tankId && enabled,
@@ -214,8 +233,9 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
     useEffect(() => {
         if (!tankId || !enabled) return;
 
+        const channelId = `reading-realtime:${tankId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`reading-realtime:${tankId}`)
+            .channel(channelId)
             .on('postgres_changes', { 
                 event: 'INSERT', 
                 schema: 'public', 
@@ -259,6 +279,7 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
 export function useAllLatestReadings(stationId: string | undefined, tankIds: string[], enabled: boolean = true) {
     const queryClient = useQueryClient();
     const cacheKey = `latest_readings_${stationId}`;
+    const [isOffline, setIsOffline] = useState(false);
 
     const query = useQuery({
         queryKey: ['all_latest_readings', tankIds],
@@ -269,51 +290,43 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
         queryFn: async () => {
             if (tankIds.length === 0) return {};
             
-            // Optimized query using the latest_sensor_readings view
-            const { data, error } = await supabase
-                .from('latest_sensor_readings')
-                .select('*')
-                .in('tank_id', tankIds);
-
-            if (error) {
-                console.error('Core Query Fail (Optimized View):', error);
-                const { data: fallback, error: fallError } = await supabase
-                    .from('sensor_readings')
+            try {
+                const { data, error } = await supabase
+                    .from('latest_sensor_readings')
                     .select('*')
-                    .in('tank_id', tankIds)
-                    .order('timestamp', { ascending: false })
-                    .limit(tankIds.length * 2); 
+                    .in('tank_id', tankIds);
+
+                if (error) throw error;
                 
-                if (fallError) throw fallError;
-                const results = (fallback || []).reduce((acc: any, r) => {
-                    if (!acc[r.tank_id]) acc[r.tank_id] = mapReading(r);
-                    return acc;
-                }, {});
-                if (stationId) cacheHelper.set(cacheKey, results);
-                return results;
+                const latest: Record<string, TankReading> = {};
+                (data || []).forEach(r => {
+                    latest[r.tank_id] = mapReading(r);
+                });
+                if (stationId && Object.keys(latest).length > 0) cacheHelper.set(cacheKey, latest);
+                setIsOffline(false);
+                return latest;
+            } catch (err) {
+                logger.warn('[GhostMode] Readings fetch failed, falling back to cache:', err);
+                const cached = cacheHelper.get(cacheKey);
+                if (cached) {
+                    setIsOffline(true);
+                    return cached;
+                }
+                throw err;
             }
-            
-            const latest: Record<string, TankReading> = {};
-            (data || []).forEach(r => {
-                latest[r.tank_id] = mapReading(r);
-            });
-            if (stationId && Object.keys(latest).length > 0) cacheHelper.set(cacheKey, latest);
-            return latest;
         },
         enabled: enabled && !!stationId && tankIds.length > 0,
         staleTime: 10000, 
     });
 
-    // [ALG OPTIMIZATION]: Stabilize tankIds to prevent redundant re-subscriptions
     const stabilizedTankIds = React.useMemo(() => JSON.stringify([...tankIds].sort()), [tankIds]);
 
-    // ✦ HIGH-FREQUENCY LIVE SUBSCRIPTION (1s Resolution)
-    // Ensures components re-render immediately when any tank in the station gets an update
     useEffect(() => {
         if (!stationId || !enabled || tankIds.length === 0) return;
 
+        const channelId = `station-telemetry:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`station-telemetry:${stationId}`)
+            .channel(channelId)
             .on(
                 'postgres_changes',
                 {
@@ -324,15 +337,12 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
                 },
                 (payload) => {
                     const newReading = mapReading(payload.new);
-                    // Standardize inclusion check
                     if (tankIds.includes(newReading.tankId)) {
                         queryClient.setQueryData(['all_latest_readings', tankIds], (old: any) => {
                             const updated = { ...old, [newReading.tankId]: newReading };
                             if (stationId) cacheHelper.set(cacheKey, updated);
                             return updated;
                         });
-                        
-                        // Also update the individual reading hook's cache for consistency
                         queryClient.setQueryData(['latest_reading', newReading.tankId], newReading);
                     }
                 }
@@ -344,7 +354,12 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
         };
     }, [stationId, enabled, stabilizedTankIds, queryClient, cacheKey]);
 
-    return { readings: query.data || {}, loading: query.isLoading, error: query.error as Error | null };
+    return { 
+        readings: query.data || {}, 
+        loading: query.isLoading, 
+        error: query.error as Error | null,
+        isOffline 
+    };
 }
 
 /**
@@ -376,8 +391,9 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
 
     useEffect(() => {
         const channelFilter = (stationId && stationId !== 'SYSTEM_GOVERNANCE') ? `station_id=eq.${stationId}` : undefined;
+        const channelId = `alerts-realtime:${stationId || 'all'}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`alerts-realtime:${stationId || 'all'}`)
+            .channel(channelId)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts', filter: channelFilter }, () => {
                 queryClient.invalidateQueries({ queryKey: ['alerts', stationId, resolved] });
             })
@@ -436,15 +452,22 @@ export function useHistoricalReadings(
         queryKey: ['history', tankId, maxPoints, timeRange?.start, timeRange?.end],
         queryFn: async () => {
             if (!tankId) return [];
-            const { data, error } = await supabase
+            let query = supabase
                 .from('sensor_readings')
                 .select('*')
                 .eq('tank_id', tankId)
-                .order('timestamp', { ascending: false })
-                .limit(maxPoints);
+                .order('captured_at', { ascending: true });
+
+            if (timeRange) {
+                query = query
+                    .gte('captured_at', new Date(timeRange.start).toISOString())
+                    .lte('captured_at', new Date(timeRange.end).toISOString());
+            }
+            
+            const { data, error } = await query.limit(maxPoints);
 
             if (error) throw error;
-            const mapped = (data || []).map(mapReading).reverse();
+            const mapped = (data || []).map(mapReading);
             
             // Apply LTTB Downsampling if we have many points for better chart performance
             if (mapped.length > maxPoints / 2) {
@@ -478,7 +501,7 @@ export function useTankAnalytics30d(stationId: string | undefined) {
             const { data, error } = await supabase.rpc('get_tank_analytics_30d', { p_station_id: stationId });
 
             if (error) {
-                console.warn('[useTankAnalytics30d] RPC failed, fallback to raw may be needed:', error);
+                logger.warn('[useTankAnalytics30d] RPC failed, fallback to raw may be needed:', error);
                 return [];
             }
             return data || [];
@@ -545,7 +568,7 @@ export async function updateTank(tankId: string, updates: Partial<Tank>) {
                     `Hardware profile updated for ${updates.name || 'tank'}. Fields modified: ${Object.keys(dbUpdates).join(', ')}`,
                     'INFO',
                     { tankId, changes: dbUpdates }
-                ).catch((err: any) => console.warn("[AUDIT_FAILURE]", err));
+                ).catch((err: any) => logger.warn("[AUDIT_FAILURE]", err));
 
                 resolve(data);
             } catch (err: any) {
@@ -591,7 +614,7 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
         if (error) throw error;
         return mapTank(data);
     } catch (err) {
-        console.error('Error creating tank:', err);
+        logger.error('Error creating tank:', err);
         throw err;
     }
 }
@@ -620,7 +643,7 @@ export async function propagateStationThresholds(stationId: string) {
         stationId,
         `Fleet-wide threshold propagation executed. Policy: High(95%), Low(20%), Critical(5%).`,
         'INFO'
-    ).catch(err => console.error('[Audit Log Failed]', err));
+    ).catch(err => logger.error('[Audit Log Failed]', err));
     
     return true;
 }
@@ -672,7 +695,7 @@ export function useProfile(authUserId: string | undefined) {
                 }
             } catch (err) {
                 if (!isMounted) return;
-                console.error('Error fetching profile:', err);
+                logger.error('Error fetching profile:', err);
                 setError(err as Error);
             } finally {
                 if (isMounted) setLoading(false);
@@ -681,11 +704,12 @@ export function useProfile(authUserId: string | undefined) {
 
         fetchProfile();
 
+        const channelId = `profile:${authUserId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`profile:${authUserId}`)
+            .channel(channelId)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'profiles', filter: `auth_user_id=eq.${authUserId}` },
+                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `auth_user_id=eq.${authUserId}` },
                 () => fetchProfile()
             )
             .subscribe();
@@ -750,7 +774,7 @@ export async function upsertProfile(profile: Partial<User> & { authUserId: strin
         .from('profiles')
         .select('station_id')
         .eq('auth_user_id', profile.authUserId)
-        .single();
+        .maybeSingle();
     
     const dbProfile: any = {
         auth_user_id: profile.authUserId,
@@ -767,7 +791,7 @@ export async function upsertProfile(profile: Partial<User> & { authUserId: strin
     if (!existing?.station_id && profile.stationId) {
         dbProfile.station_id = profile.stationId;
     } else if (existing?.station_id && profile.stationId && existing.station_id !== profile.stationId) {
-        console.warn(`[SECURITY] Prevented unauthorized station migration for user ${profile.authUserId}`);
+        logger.warn(`[SECURITY] Prevented unauthorized station migration for user ${profile.authUserId}`);
         // Forensic log of the attempt
         AuditService.log(
             'SECURITY',
@@ -902,5 +926,47 @@ export function useRefuelMonitor(stationId: string, tankId: string) {
     return { isRefuelling };
 }
 
-// useActiveShift moved to useShifts.ts - exported here for forensic compatibility during HMR transition
-export { useActiveShift } from './useShifts';
+/**
+ * Hook to fetch all stations (Super Admin only)
+ */
+export function useAllStations() {
+    const query = useQuery({
+        queryKey: ['all_stations'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('fuel_stations')
+                .select('*')
+                .order('station_name');
+            if (error) throw error;
+            return data || [];
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
+    return { stations: query.data || [], loading: query.isLoading, error: query.error as Error | null };
+}
+
+/**
+ * Hook for Global Infrastructure Stats (Super Admin)
+ */
+export function useGlobalStats() {
+    const query = useQuery({
+        queryKey: ['global_stats'],
+        queryFn: async () => {
+            // This would ideally be a single RPC, but we can aggregate here for now
+            const { data: stations } = await supabase.from('fuel_stations').select('id');
+            const { count: totalTanks } = await supabase.from('tanks').select('*', { count: 'exact', head: true });
+            const { count: totalAlerts } = await supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('is_resolved', false);
+            
+            return {
+                stationCount: stations?.length || 0,
+                tankCount: totalTanks || 0,
+                activeAlerts: totalAlerts || 0,
+                healthScore: 100 - (totalAlerts ? Math.min(30, totalAlerts * 2) : 0)
+            };
+        },
+        staleTime: 60 * 1000,
+    });
+
+    return { stats: query.data || { stationCount: 0, tankCount: 0, activeAlerts: 0, healthScore: 100 }, loading: query.isLoading };
+}

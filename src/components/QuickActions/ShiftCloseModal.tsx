@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FiX, FiFileText, FiShield, FiCreditCard, FiDroplet, FiTrendingUp, FiDollarSign, FiAlertTriangle, FiCheckCircle, FiInfo, FiActivity } from 'react-icons/fi';
+import { FiX, FiFileText, FiShield, FiCreditCard, FiDroplet, FiTrendingUp, FiDollarSign, FiAlertTriangle, FiInfo, FiActivity } from 'react-icons/fi';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useAllLatestReadings, createShift } from '@/hooks/useSupabase';
 import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { AuditService } from '@/services/AuditService';
-import { TankReading, Tank } from '@/types';
+import { Tank } from '@/types';
+import { logger } from '@/utils/logger';
 import '../Inventory/AddTankModal.css';
 
 interface ShiftCloseModalProps {
@@ -17,36 +19,52 @@ interface ShiftCloseModalProps {
 
 export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClose }) => {
     const { currentUser } = useAuth();
-    const { tanks } = useTanks(currentUser?.stationId || '');
-    const { readings } = useAllLatestReadings(currentUser?.stationId || '', tanks.map((t: Tank) => t.id));
-    const [activeShiftSnapshot, setActiveShiftSnapshot] = useState<any>(null);
+    const queryClient = useQueryClient();
+    const stationId = currentUser?.stationId || '';
+    const { tanks } = useTanks(stationId);
+    const { readings } = useAllLatestReadings(stationId, tanks.map((t: Tank) => t.id));
+    
+    const [activeShiftSnapshot, setActiveShiftSnapshot] = useState<Record<string, number> | null>(null);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [isClosing, setIsClosing] = useState(false);
     const [isHibernating, setIsHibernating] = useState(false);
+    const [dbStartTime, setDbStartTime] = useState<string | null>(null);
+    const [isManualOverride, setIsManualOverride] = useState(false);
+    const [manualClosingVolumes, setManualClosingVolumes] = useState<Record<string, string>>({});
 
-    // Read opening state
-    React.useEffect(() => {
-        if (!isOpen || !currentUser?.stationId) return;
+    // Read opening state from DB on mount/open
+    useEffect(() => {
+        if (!isOpen || !stationId) return;
 
         const fetchActiveShift = async () => {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('current_station_shifts')
                 .select('*')
-                .eq('station_id', currentUser.stationId)
-                .single();
+                .eq('station_id', stationId)
+                .maybeSingle();
             
-            if (data?.metadata?.tank_snapshots) {
-                // Map complex snapshot object back to simple volume map for the calculator
-                const volumeMap: Record<string, number> = {};
-                Object.entries(data.metadata.tank_snapshots).forEach(([id, info]: [string, any]) => {
-                    volumeMap[id] = info.opening_volume;
-                });
-                setActiveShiftSnapshot(volumeMap);
+            if (error) {
+                console.error('Error fetching shift snapshot:', error);
+                return;
+            }
+
+            if (data) {
+                if (data.metadata?.tank_snapshots) {
+                    const volumeMap: Record<string, number> = {};
+                    Object.entries(data.metadata.tank_snapshots).forEach(([id, info]: [string, any]) => {
+                        volumeMap[id] = info.opening_volume;
+                    });
+                    setActiveShiftSnapshot(volumeMap);
+                }
+                
+                if (data.status === 'OPEN') {
+                    setDbStartTime(data.updated_at);
+                }
             }
         };
 
         fetchActiveShift();
-    }, [isOpen, currentUser?.stationId]);
+    }, [isOpen, stationId]);
 
     // Legacy fallback (maintained for zero-downtime transition)
     const startVolumesStr = localStorage.getItem('iotank_shift_start_volumes');
@@ -71,18 +89,23 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
         setTimeout(() => setIsHibernating(false), 800);
     };
 
-    // Metrics
+    // Metrics calculation
     const volumesDispensed: Record<string, number> = {};
-    
     tanks.forEach((tank: Tank) => {
         const currentReading = readings[tank.id];
         const startVol = startVolumes[tank.id] || tank.currentVolume || 0; 
-        const currentVol = currentReading?.volumeCorrected || currentReading?.volume || tank.currentVolume || 0;
+        
+        // Use manual override volume if provided, else use live telemetry
+        const manualVolStr = manualClosingVolumes[tank.id];
+        const manualVol = manualVolStr ? Number(manualVolStr) : null;
+        const currentVol = isManualOverride && manualVol !== null 
+            ? manualVol 
+            : (currentReading?.volumeCorrected || currentReading?.volume || tank.currentVolume || 0);
+            
         const dispensed = startVol - currentVol;
         volumesDispensed[tank.id] = dispensed > 0 ? dispensed : 0; 
     });
 
-    // Global aggregated price map from tanks
     const fuelPriceMap = tanks.reduce((acc: Record<string, number>, tank: Tank) => {
         const price = (tank as any).metadata?.retailPrice || 0;
         if (!acc[tank.fuelType] || price > 0) {
@@ -91,7 +114,6 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
         return acc;
     }, {} as Record<string, number>);
 
-    // Total Revenue based on Authorized Prices
     const totalVolumetricSold = tanks.reduce((acc: number, tank: Tank) => {
         const vol = volumesDispensed[tank.id] || 0;
         const price = (tank as any).metadata?.retailPrice || 0;
@@ -120,22 +142,13 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
         const nowString = new Date().toISOString();
         setIsClosing(true);
         try {
-            await supabase
-                .from('current_station_shifts')
-                .upsert({
-                    station_id: currentUser?.stationId,
-                    status: 'CLOSED',
-                    updated_at: nowString,
-                    updated_by: currentUser?.authUserId
-                });
-
             await AuditService.log(
                 'SHIFT',
                 isCollusionSuspected ? 'SECURITY_COLLUSION_ALERT' : 'SHIFT_CLOSED',
-                currentUser?.stationId || '',
+                stationId,
                 isCollusionSuspected 
-                    ? `FORENSIC ALERT: Critical discrepancy detected in shift reconciliation. Variance of Ksh ${deficit.toFixed(2)} exceeds authorized threshold. Collusion suspect verified.`
-                    : `Forensic Session Terminated: Reconciliation balanced for personnel [${currentUser?.displayName || currentUser?.email}]. Net variance: Ksh ${deficit.toFixed(2)}. Operations archived.`,
+                    ? `FORENSIC ALERT: Discrepancy detected. Variance: Ksh ${deficit.toFixed(2)}. Threshold exceeded.`
+                    : `Shift Closed: Variance balanced at Ksh ${deficit.toFixed(2)}. Operations archived.`,
                 isCollusionSuspected ? 'CRITICAL' : 'INFO',
                 { 
                     variance: deficit, 
@@ -155,49 +168,107 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
 
             if (isCollusionSuspected) {
                 await EmailDispatchService.sendSecurityAlert({
-                    to: 'admin@iotank.com',
+                    to: currentUser?.stationEmail || currentUser?.email || '',
                     type: 'COLLUSION',
                     siteName: currentUser?.companyName || 'Fuel Station',
-                    details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Discrepancy detected.' }
+                    details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Significant discrepancy detected.' }
                 });
             }
 
             const pumpReadings: Record<string, any> = {};
             tanks.forEach((t: Tank) => {
+                const manualVol = manualClosingVolumes[t.id] ? Number(manualClosingVolumes[t.id]) : null;
+                const endVol = (isManualOverride && manualVol !== null) 
+                    ? manualVol 
+                    : (readings[t.id]?.volumeCorrected || readings[t.id]?.volume || t.currentVolume || 0);
+
                 pumpReadings[t.name] = {
                     start: startVolumes[t.id] || 0,
-                    end: readings[t.id]?.volumeCorrected || readings[t.id]?.volume || t.currentVolume || 0
+                    end: endVol,
+                    is_manual_override: isManualOverride
                 };
             });
 
-            await createShift(currentUser?.stationId || '', {
+            await createShift(stationId, {
                 openedAt: startTimeStr || nowString,
                 closedAt: nowString,
                 durationMin: startTimeStr ? Math.floor((Date.now() - new Date(startTimeStr).getTime()) / 60000) : 0,
                 siteId: tanks[0]?.siteId || null,
-                nodeId: tanks[0]?.sensorId || '',
+                nodeId: tanks[0]?.sensorId || (isManualOverride ? 'MANUAL' : ''),
                 tankId: tanks[0]?.id || null,
                 pumpReadings,
                 volumeSoldLiters: totalDispensedLiters,
                 expected: { cash: 0, mpesa: 0, pos: 0, total: totalVolumetricSold },
                 received: { cash: totalCollected, mpesa: 0, pos: 0, total: totalCollected + spending, spending },
                 variance: { amount: deficit, pct: totalVolumetricSold > 0 ? (deficit/totalVolumetricSold)*100 : 0 },
-                status: deficit === 0 ? 'BALANCED' : (deficit > 50 ? 'SHORT' : 'OVER'),
+                status: deficit === 0 ? 'BALANCED' : (deficit > 0 ? 'SHORT' : 'OVER'),
                 reviewState: 'CLOSED',
                 openedBy: openedBy || { authUserId: '', display: 'Unknown' },
                 closedBy: { authUserId: currentUser?.authUserId || '', display: currentUser?.displayName || currentUser?.email || '' },
-                closingVolume: (Object.values(readings) as TankReading[]).reduce((sum: number, r: TankReading) => sum + (r.volumeCorrected || r.volume || 0), 0),
-                notes,
+                closingVolume: tanks.reduce((sum: number, t: Tank) => {
+                    const manualVol = manualClosingVolumes[t.id] ? Number(manualClosingVolumes[t.id]) : null;
+                    return sum + ((isManualOverride && manualVol !== null) ? manualVol : (readings[t.id]?.volumeCorrected || readings[t.id]?.volume || 0));
+                }, 0),
+                notes: isManualOverride ? `[MANUAL OVERRIDE]: ${notes}` : notes,
                 createdAt: nowString,
                 operation_type: 'CLOSE',
-                action_label: 'Reconciliation Finalized'
+                action_label: isManualOverride ? 'Reconciliation Finalized (Manual)' : 'Reconciliation Finalized (Telemetric)'
             } as any);
+
+            // [SYNC]: Update the stateless tracker to CLOSED state with full metadata
+            await supabase
+                .from('current_station_shifts')
+                .upsert({
+                    station_id: stationId,
+                    status: 'CLOSED',
+                    updated_at: nowString,
+                    updated_by: currentUser?.authUserId || '',
+                    metadata: { 
+                        last_opened_at: dbStartTime || startTimeStr || nowString,
+                        closed_at: nowString,
+                        variance: deficit,
+                        operator: currentUser?.displayName || currentUser?.email,
+                        is_manual_override: isManualOverride
+                    }
+                });
+
+            if (isManualOverride) {
+                await AuditService.log(
+                    'SECURITY',
+                    'MANUAL_OVERRIDE',
+                    stationId,
+                    `OPERATIONAL ALERT: Shift closed via manual volume bypass by ${currentUser?.email}. Forensic sync offline.`,
+                    'WARNING',
+                    { manualClosingVolumes, deficit }
+                );
+            }
+            
+            // [FORENSIC UPGRADE]: Automated Shift Summary Email to Station Admin
+            const durationMs = startTimeStr ? (Date.now() - new Date(startTimeStr).getTime()) : 0;
+            const hrs = Math.floor(durationMs / 3600000);
+            const mins = Math.floor((durationMs % 3600000) / 60000);
+            const durationStr = `${hrs}h ${mins}m`;
+
+            EmailDispatchService.sendSecurityAlert({
+                to: currentUser?.stationEmail || currentUser?.email || 'admin@iotank.com',
+                type: 'SHIFT_REPORT',
+                siteName: currentUser?.companyName || 'Fuel Station',
+                details: {
+                    timestamp: nowString,
+                    description: `Shift Summary for ${currentUser?.companyName}. Operator: ${currentUser?.displayName || currentUser?.email}.`,
+                    totalSales: totalCollected + spending,
+                    totalLiters: totalDispensedLiters,
+                    varianceValue: deficit,
+                    duration: durationStr,
+                    operator: currentUser?.displayName || currentUser?.email || 'Unknown'
+                }
+            });
 
             localStorage.removeItem('iotank_shift_start_time');
             localStorage.removeItem('iotank_shift_start_volumes');
             localStorage.removeItem('iotank_shift_opened_by');
             localStorage.setItem('iotank_shift_status', 'closed');
-            // Final success feedback
+
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Shift Archived',
@@ -207,9 +278,26 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 }
             }));
 
+            // [SYNC]: Instant UI Update (Bypass real-time lag)
+            // Optimistically update the active_shift query to show the CLOSED state IMMEDIATELY
+            queryClient.setQueryData(['active_shift', stationId], {
+                status: 'CLOSED',
+                updated_at: nowString,
+                updated_by: currentUser?.authUserId || '',
+                metadata: {
+                    last_opened_at: dbStartTime || startTimeStr || nowString,
+                    closed_at: nowString,
+                    variance: deficit,
+                    operator: currentUser?.displayName || currentUser?.email
+                }
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['active_shift', stationId] });
+            queryClient.invalidateQueries({ queryKey: ['shifts', stationId] });
+
             onClose();
         } catch (err) {
-            console.error('Shift close error:', err);
+            logger.error('Shift close error', err, 'SHIFT_CLOSE');
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Sync Failed',
@@ -283,7 +371,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                         </div>
                         <div className="field-info-box">
                             <FiInfo className="info-icon" />
-                            <p>Note: Total operations spending will be automatically deducted from the total revenue during forensic reconciliation.</p>
+                            <p>Note: Total operations spending will be automatically deducted from revenue during reconciliation.</p>
                         </div>
                     </div>
                 </div>
@@ -299,11 +387,51 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     <span className="atm-section-title">Volumetric Telemetry Overview</span>
                 </div>
                 <div className="atm-section-body p-6 space-y-10">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telemetric Reliability</span>
+                        <button 
+                            type="button"
+                            onClick={() => setIsManualOverride(!isManualOverride)}
+                            className={`text-[9px] font-black px-3 py-1.5 rounded-full transition-all ${isManualOverride ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                            {isManualOverride ? 'MANUAL OVERRIDE ACTIVE' : 'Sensor Sync Failure?'}
+                        </button>
+                    </div>
+
+                    {isManualOverride && (
+                        <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-5 mb-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <p className="text-[10px] text-amber-700 font-bold mb-4 flex items-center gap-2 uppercase tracking-tight">
+                                <FiShield size={12} />
+                                Forensic Bypass: Enter manual closing volumes (Liters)
+                            </p>
+                            <div className="space-y-3">
+                                {tanks.map((tank: Tank) => (
+                                    <div key={tank.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-amber-100 shadow-sm">
+                                        <span className="text-xs font-black text-slate-700">{tank.name}</span>
+                                        <div className="relative">
+                                            <input 
+                                                type="number" 
+                                                placeholder="0.0"
+                                                className="w-24 h-9 text-right pr-6 text-sm font-black text-slate-900 border-none focus:ring-0 bg-transparent"
+                                                value={manualClosingVolumes[tank.id] || ''}
+                                                onChange={(e) => setManualClosingVolumes(prev => ({ ...prev, [tank.id]: e.target.value }))}
+                                            />
+                                            <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">L</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {tanks.map((tank: Tank) => {
-                        const dispensed = volumesDispensed[tank.id] || 0;
+                        const manualVol = manualClosingVolumes[tank.id] ? Number(manualClosingVolumes[tank.id]) : null;
+                        const currentVol = (isManualOverride && manualVol !== null) 
+                            ? manualVol 
+                            : (readings[tank.id]?.volumeCorrected || readings[tank.id]?.volume || tank.currentVolume || 0);
+                        
                         const startVol = startVolumes[tank.id] || tank.currentVolume || 0;
-                        const tankReading = readings[tank.id];
-                        const currentVol = tankReading?.volumeCorrected || tankReading?.volume || tank.currentVolume || 0;
+                        const dispensed = startVol - currentVol;
 
                         return (
                             <div key={tank.id} className="storage-analysis-unit">
@@ -314,7 +442,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                                             {tank.name} <span className="text-cyan-400 opacity-50 ml-1 font-medium">/{tank.fuelType}</span>
                                         </h4>
                                     </div>
-                                    <div className="unit-status-pill">Telemetric Sync Active</div>
+                                    <div className="unit-status-pill">{isManualOverride ? 'Manual Entry' : 'Telemetric Sync Active'}</div>
                                 </div>
 
                                 <div className="tm-disclosure-grid !gap-4">
@@ -325,13 +453,13 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                                     </div>
                                     <div className="tm-disclosure-chip forensic">
                                         <span className="tm-chip-label">Closing Profile</span>
-                                        <span className="tm-chip-value text-blue-600">{currentVol.toFixed(0)}<span className="unit-suffix">L</span></span>
-                                        <div className="tm-chip-status ok">Real-time Sync</div>
+                                        <span className={`tm-chip-value ${isManualOverride ? 'text-amber-600' : 'text-blue-600'}`}>{currentVol.toFixed(0)}<span className="unit-suffix">L</span></span>
+                                        <div className={`tm-chip-status ${isManualOverride ? 'warning' : 'ok'}`}>{isManualOverride ? 'Manual Override' : 'Real-time Sync'}</div>
                                     </div>
                                     <div className="tm-disclosure-chip forensic accent">
                                         <span className="tm-chip-label">Total Drawdown</span>
                                         <span className="tm-chip-value">{dispensed.toFixed(1)}<span className="unit-suffix">L</span></span>
-                                        <div className="tm-chip-status">Net Volumetric</div>
+                                        <div className="tm-chip-status">Net Volumetric {isManualOverride ? '(Manual)' : ''}</div>
                                     </div>
                                 </div>
                             </div>
@@ -402,7 +530,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     <FiShield size={32} />
                 </div>
                 <h3 className="text-xl font-black text-slate-900 tracking-tight">Final Reconciliation Audit</h3>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Forensic summary for intelligence archive</p>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Forensic summary for archive</p>
             </div>
 
             <div className="forensic-hud-grid grid grid-cols-2 gap-4">
@@ -429,20 +557,15 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 </div>
                 <div className="atm-section-body p-6">
                     <div className="form-group mb-0">
-                        <label>Additional Observations / Incident Notes</label>
+                        <label>Additional Observations</label>
                         <textarea 
-                            className="w-full !min-h-[120px] !p-5 !text-[13px] !font-medium !rounded-2xl !border-2 !border-slate-200 !bg-slate-50/30 focus:!bg-white placeholder:text-slate-400"
-                            placeholder="Detail any technical issues, manual meter overrides, or discrepancy explanations..."
+                            className="w-full !min-h-[120px] !p-5 !text-[13px] !font-medium !rounded-2xl !border-2 !border-slate-200 !bg-slate-50/30 focus:!bg-white"
+                            placeholder="Detail any technical issues or meter overrides..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                         />
                     </div>
                 </div>
-            </div>
-
-            <div className="tm-verification-card mt-6">
-                <FiCheckCircle size={18} />
-                <p>Syncing this shift will permanently commit these readings to the historical audit archive.</p>
             </div>
         </div>
     );
@@ -453,10 +576,10 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 <div className="modal-header">
                     <div className="header-text-container">
                         <h2>Close Shift Archive</h2>
-                        <p>Complete forensic reconciliation to finalize current operations</p>
+                        <p>Complete forensic reconciliation</p>
                         <div className="modal-header-badges">
                             <span className="modal-badge blue">RECONCILIATION</span>
-                            <span className="modal-badge cyan">STATION: {currentUser?.stationId?.slice(0, 8)}</span>
+                            <span className="modal-badge cyan">STATION: {stationId.slice(0, 8)}</span>
                         </div>
                     </div>
                     <button className={`close-btn ${isHibernating ? 'hibernate' : ''}`} type="button" onClick={onClose} title="Abort Audit">
@@ -467,10 +590,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 <div className="add-tank-form scrollbar-elegant !px-8 !py-8">
                     <div className="flex justify-center gap-2.5 mb-10 sticky top-0 bg-white/60 backdrop-blur-xl py-4 z-20 border-b border-slate-100/50">
                         {[1, 2, 3].map(s => (
-                            <div 
-                                key={s} 
-                                className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-24 bg-cyan-500' : 'w-6 bg-slate-200 shadow-inner'}`} 
-                            />
+                            <div key={s} className={`h-1.5 rounded-full transition-all duration-700 ${s === step ? 'w-24 bg-cyan-500' : 'w-6 bg-slate-200'}`} />
                         ))}
                     </div>
 
@@ -481,14 +601,14 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     </div>
                 </div>
 
-                <div className="form-actions !px-10 py-8 bg-slate-50/80 border-t border-slate-100 backdrop-blur-md flex justify-end gap-4 rounded-b-3xl">
+                <div className="form-actions !px-10 py-8 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-4 rounded-b-3xl">
                     <button type="button" className="btn-danger !min-w-[120px]" onClick={step === 1 ? onClose : () => setStep(step === 2 ? 1 : 2)}>
                         {step === 1 ? 'Abort Audit' : 'Go Back'}
                     </button>
                     <button type="button" className="btn-submit !min-w-[180px]" 
                             onClick={step < 3 ? () => setStep(step === 1 ? 2 : 3) : handleFinalize} 
                             disabled={isClosing}>
-                        {step < 3 ? (step === 1 ? 'Continue' : 'Verify Metrics') : (isClosing ? 'Finalizing Archive...' : 'Commit & Close Shift')}
+                        {step < 3 ? (step === 1 ? 'Continue' : 'Verify Metrics') : (isClosing ? 'Finalizing...' : 'Commit & Close Shift')}
                     </button>
                 </div>
             </div>

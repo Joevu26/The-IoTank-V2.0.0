@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/config/supabase';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
+import { useActiveShift } from './useShifts';
 
 export type ShiftStatus = 'OPEN' | 'CLOSED';
 
@@ -8,82 +8,37 @@ export const useShiftStatus = () => {
     const { currentUser } = useAuth();
     const stationId = currentUser?.stationId;
 
-    const [status, setStatus] = useState<ShiftStatus>('CLOSED');
-    const [openedAt, setOpenedAt] = useState<number | null>(null);
-    const [closedAt, setClosedAt] = useState<number | null>(null);
+    const { activeShift, loading: isLoading } = useActiveShift(stationId);
     const [uptime, setUptime] = useState<string>('--:--:--');
-    const [isLoading, setIsLoading] = useState(true);
 
-    const fetchCurrentShift = useCallback(async () => {
-        if (!stationId) return;
+    const status = useMemo(() => 
+        (activeShift?.status as ShiftStatus) || 'CLOSED'
+    , [activeShift]);
 
-        const { data, error } = await supabase
-            .from('current_station_shifts')
-            .select('*')
-            .eq('station_id', stationId)
-            .maybeSingle();
-
-        if (error) {
-            console.error('Error fetching shift status:', error);
-            return;
-        }
-
-        if (data) {
-            setStatus(data.status as ShiftStatus);
-            const time = data.updated_at ? new Date(data.updated_at).getTime() : null;
-            if (data.status === 'OPEN') {
-                setOpenedAt(time);
-                setClosedAt(null);
-            } else {
-                setClosedAt(time);
-                setOpenedAt(null);
-            }
-        } else {
-            // Default to CLOSED if no record exists for the station
-            setStatus('CLOSED');
-            setOpenedAt(null);
-            setClosedAt(null);
-        }
-        setIsLoading(false);
-    }, [stationId]);
-
-    useEffect(() => {
-        if (!stationId) return;
+    const openedAt = useMemo(() => {
+        if (!activeShift) return null;
+        const time = activeShift.updated_at ? new Date(activeShift.updated_at).getTime() : null;
         
-        fetchCurrentShift();
+        if (status === 'OPEN') {
+            return time;
+        } else {
+            // Preserve the last opening time from metadata for historical display
+            const metadata = activeShift.metadata || {};
+            let lastOpened = metadata.last_opened_at ? new Date(metadata.last_opened_at).getTime() : null;
+            
+            // [FALLBACK]: Check localStorage if metadata is missing (current session context)
+            if (!lastOpened) {
+                const localStart = localStorage.getItem('iotank_shift_start_time');
+                if (localStart) lastOpened = new Date(localStart).getTime();
+            }
+            return lastOpened;
+        }
+    }, [activeShift, status]);
 
-        // Subscribe to changes
-        const channel = supabase
-            .channel(`shift_sync_${stationId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'current_station_shifts',
-                    filter: `station_id=eq.${stationId}`
-                },
-                (payload) => {
-                    const newData = payload.new as any;
-                    if (newData) {
-                        setStatus(newData.status as ShiftStatus);
-                        const time = newData.updated_at ? new Date(newData.updated_at).getTime() : null;
-                        if (newData.status === 'OPEN') {
-                            setOpenedAt(time);
-                            setClosedAt(null);
-                        } else {
-                            setClosedAt(time);
-                            setOpenedAt(null);
-                        }
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, fetchCurrentShift]);
+    const closedAt = useMemo(() => {
+        if (!activeShift || status === 'OPEN') return null;
+        return activeShift.updated_at ? new Date(activeShift.updated_at).getTime() : null;
+    }, [activeShift, status]);
 
     const updateUptime = useCallback(() => {
         const activeTime = status === 'OPEN' ? openedAt : closedAt;
@@ -119,3 +74,4 @@ export const useShiftStatus = () => {
         isViewOnly: status === 'CLOSED'
     };
 };
+

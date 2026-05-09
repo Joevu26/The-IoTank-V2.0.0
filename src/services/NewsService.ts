@@ -7,17 +7,37 @@ import { MarketSignal } from '@/types';
  */
 export class NewsService {
     private static channel: any = null;
+    private static isInitializing = false;
+    private static listenerCount = 0;
 
     /**
      * Start listening for live news updates.
      */
-    static startListening() {
-        if (this.channel) {
-            console.log('[DEBUG_LOG] NewsService: Listener already active. Skipping.');
+    static async startListening() {
+        this.listenerCount++;
+        
+        // If already connected or initializing, just increment count and skip
+        if (this.isInitializing || (this.channel && (this.channel.state === 'joined' || this.channel.state === 'joining'))) {
             return;
         }
 
-        console.log('Initializing Real-time News Listener...');
+        this.isInitializing = true;
+        
+        // Cleanup existing channel if it's in a bad state (but count is 1)
+        if (this.channel && this.listenerCount === 1) {
+            this.stopListening(true);
+        }
+
+        const { logger } = await import('@/utils/logger');
+        
+        // Re-check after async import
+        if (this.channel) {
+            this.isInitializing = false;
+            return;
+        }
+
+        // Only log at debug level to reduce noise
+        logger.debug('Initializing Real-time News Listener...', { listeners: this.listenerCount }, 'NEWS_SERVICE');
 
         this.channel = supabase
             .channel('public:market_news')
@@ -32,7 +52,15 @@ export class NewsService {
                     this.dispatchNews(payload.new);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    this.isInitializing = false;
+                    logger.info('Market News Live Sync Active', { listeners: this.listenerCount }, 'NEWS_SERVICE');
+                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                    this.isInitializing = false;
+                    this.channel = null;
+                }
+            });
     }
 
     /**
@@ -64,11 +92,19 @@ export class NewsService {
 
     /**
      * Stop listening.
+     * @param force Force stop regardless of listener count (internal use)
      */
-    static stopListening() {
-        if (this.channel) {
-            supabase.removeChannel(this.channel);
-            this.channel = null;
+    static stopListening(force: boolean = false) {
+        if (!force) {
+            this.listenerCount = Math.max(0, this.listenerCount - 1);
+        }
+
+        if (force || this.listenerCount === 0) {
+            if (this.channel) {
+                supabase.removeChannel(this.channel);
+                this.channel = null;
+            }
+            this.isInitializing = false;
         }
     }
 

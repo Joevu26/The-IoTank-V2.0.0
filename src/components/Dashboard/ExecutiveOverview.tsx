@@ -3,7 +3,7 @@ import {
     FiCloud, FiCheckCircle,
     FiBarChart2, FiWifi
 } from 'react-icons/fi';
-import { Tank, TankReading } from '@/types';
+import { Tank, TankReading, Alert } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 
 import './ExecutiveOverview.css';
@@ -12,9 +12,10 @@ interface ExecutiveOverviewProps {
     tanks: Tank[];
     readings: Record<string, TankReading>;
     stationId: string;
+    alerts?: Alert[];
 }
 
-export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, readings, stationId }) => {
+export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, readings, stationId, alerts = [] }) => {
     // Dynamically Calculate Metrics from Props
     const activeTanks = tanks.filter(t => t.isActive);
 
@@ -28,7 +29,7 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
         if (!tank?.id) return;
         const reading = readings[tank.id];
         
-        // Signal Quality (Fallback to tank integrity or 100 if completely mock)
+        // Signal Quality (Fallback to tank integrity metrics if live reading is missing)
         // Convert text labels to numeric scores for calculation (Excellent=100, Good=75, Fair=50, Weak=25, Unusable=10)
         const getSignalScore = (quality: string | number | undefined): number => {
             if (typeof quality === 'number') return quality;
@@ -74,6 +75,35 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
     const sensorHealthValue = activeTanks.length > 0 ? `${Math.round((activeNodes / activeTanks.length) * 100)}%` : 'N/A';
     const sensorStatus = activeTanks.length === 0 ? 'No Data' : (anyStale ? 'Attention Needed' : 'Excellent');
 
+    // 4. Delivery Recon
+    let deliveryNeeds = 'Optimal';
+    let pendingRestocks = 0;
+    activeTanks.forEach(tank => {
+        const reading = readings[tank.id];
+        const vol = reading?.volumeCorrected || reading?.volume || tank.currentVolume || 0;
+        const fillPercentage = (vol / tank.capacity) * 100;
+        if (fillPercentage <= (tank.lowLevelThreshold || 15)) {
+            pendingRestocks++;
+        }
+    });
+    if (activeTanks.length === 0) deliveryNeeds = 'No Data';
+    else if (pendingRestocks > 0) deliveryNeeds = 'Pending Restock';
+    const deliveryValue = activeTanks.length === 0 ? 'N/A' : (pendingRestocks > 0 ? `${pendingRestocks} Pending` : 'All Clear');
+
+    // 5. Compliance
+    const criticalAlerts = alerts.filter(a => a.severity === 'critical');
+    const complianceValue = activeTanks.length === 0 ? 'N/A' : (criticalAlerts.length > 0 ? 'At Risk' : '100%');
+    const complianceStatus = activeTanks.length === 0 ? 'No Data' : (criticalAlerts.length > 0 ? 'Violations' : 'Compliant');
+
+    // 6. Market Risk
+    let missingPrices = 0;
+    activeTanks.forEach(tank => {
+        const price = Number((tank as any).metadata?.retailPrice) || 0;
+        if (price <= 0) missingPrices++;
+    });
+    const riskValue = activeTanks.length === 0 ? 'N/A' : (missingPrices > 0 ? 'High' : 'Low');
+    const riskStatus = activeTanks.length === 0 ? 'No Data' : (missingPrices > 0 ? 'Missing Prices' : 'Verified');
+
     const isLoading = activeTanks.length === 0 && stationId !== '';
 
     const getMetricsState = (val: number | string, isLoader: boolean) => {
@@ -91,12 +121,12 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
         { label: 'Telemetry Integrity', value: isLoading ? '...' : telemetryValue, status: isLoading ? 'Linking...' : telemetryStatus, icon: <FiCloud />, state: getMetricsState(avgSignal, isLoading) },
         { label: 'Safety Relay Status', value: isLoading ? '...' : relayValue, status: isLoading ? 'Linking...' : relayStatus, icon: <FiZap />, state: anySafetyTriggered ? 'critical' : (isLoading ? 'loading' : 'secure') },
         ...(canSee(6) ? [
-            { label: 'Delivery Recon', value: 'N/A', status: 'Unavailable', icon: <FiCheckCircle />, state: 'unknown' },
-            { label: 'Compliance', value: 'N/A', status: 'Unavailable', icon: <FiActivity />, state: 'unknown' }
+            { label: 'Delivery Recon', value: isLoading ? '...' : deliveryValue, status: isLoading ? 'Linking...' : deliveryNeeds, icon: <FiCheckCircle />, state: pendingRestocks > 0 ? 'fair' : (isLoading ? 'loading' : 'optimal') },
+            { label: 'Compliance', value: isLoading ? '...' : complianceValue, status: isLoading ? 'Linking...' : complianceStatus, icon: <FiActivity />, state: criticalAlerts.length > 0 ? 'critical' : (isLoading ? 'loading' : 'optimal') }
         ] : []),
         { label: 'Sensor Health', value: isLoading ? '...' : sensorHealthValue, status: isLoading ? 'Linking...' : sensorStatus, icon: <FiCpu />, state: getMetricsState((activeNodes / activeTanks.length) * 100, isLoading) },
         ...(canSee(6) ? [
-            { label: 'Market Risk', value: 'N/A', status: 'Unavailable', icon: <FiBarChart2 />, state: 'unknown' }
+            { label: 'Market Risk', value: isLoading ? '...' : riskValue, status: isLoading ? 'Linking...' : riskStatus, icon: <FiBarChart2 />, state: missingPrices > 0 ? 'critical' : (isLoading ? 'loading' : 'optimal') }
         ] : []),
     ];
 
@@ -140,7 +170,9 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                     ) : (
                         tanks.map(tank => {
                             if (!tank || !tank.id) return null;
-                            const readingScale = readings[tank.id]?.signalQuality || 'Offline';
+                            const reading = readings[tank.id];
+                            const isOffline = !reading || !reading.timestamp || (Date.now() - reading.timestamp) > 60 * 60 * 1000; // 1 hour threshold
+                            const readingScale = isOffline ? 'Offline' : (reading.signalQuality || 'Offline');
                             const rssiStatus = String(readingScale);
                             
                             const rssiState = (rssiStatus === 'Excellent' || rssiStatus === 'Good') ? 'optimal' : 
@@ -150,7 +182,7 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({ tanks, rea
                                 <div key={tank.id} className={`rssi-node-card state-${rssiState}`}>
                                     <div className="node-info">
                                         <span className="node-name">{tank.name || 'Unknown'}</span>
-                                        <span className="node-id">ESP: {tank.sensorId || 'N/A'}</span>
+
                                     </div>
                                     <div className="node-signal">
                                             {[1, 2, 3, 4].map(bar => {

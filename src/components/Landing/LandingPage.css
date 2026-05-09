@@ -116,6 +116,19 @@ ul {
     }
 }
 
+/* Accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
 
 .section-compact {
     padding: 40px 0;
@@ -311,12 +324,10 @@ p,
 @keyframes gemini-flow {
     0% {
         --gemini-angle: 0deg;
-        opacity: 1;
     }
 
     100% {
         --gemini-angle: 360deg;
-        opacity: 1;
     }
 }
 
@@ -330,33 +341,30 @@ p,
 .btn-gemini-glow::before {
     content: '' !important;
     position: absolute;
-    inset: -2px;
-    /* Slight overflow for better perimeter visibility */
-    padding: 2.5px;
-    /* Line thickness */
+    inset: -1.5px; /* Thinner line for elegance */
+    padding: 2px;
     border-radius: inherit;
     background: conic-gradient(from var(--gemini-angle),
             transparent 0deg,
-            transparent 300deg,
-            #4285F4 315deg,
-            #EA4335 330deg,
-            #FBBC04 345deg,
+            transparent 260deg,
+            #4285F4 285deg,
+            #EA4335 310deg,
+            #FBBC04 335deg,
             #34A853 355deg,
             transparent 360deg) border-box !important;
     -webkit-mask:
         linear-gradient(#fff 0 0) content-box,
         linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
-    mask-composite: exclude;
     mask:
         linear-gradient(#fff 0 0) content-box,
         linear-gradient(#fff 0 0);
     mask-composite: exclude;
     pointer-events: none;
     z-index: 10;
-    /* Bring to front for visibility */
-    animation: gemini-flow 3s linear infinite;
-    opacity: 1;
+    animation: gemini-flow 4s linear infinite; /* Slower for smoothness */
+    will-change: --gemini-angle;
+    transform: translateZ(0); /* GPU acceleration */
 }
 
 .btn-gemini-glow:hover::after {

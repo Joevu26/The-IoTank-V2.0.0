@@ -58,7 +58,14 @@ export const HelpPage: React.FC = () => {
             setTimeout(() => setShowSuccess(false), 5000);
         } catch (error) {
             console.error('Error creating ticket:', error);
-            alert('Submission failed. Please try again.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Submission Failed',
+                    message: 'Could not create support ticket. Please try again.',
+                    type: 'error',
+                    attribution: 'SUPPORT CENTER'
+                }
+            }));
         } finally {
             setIsSubmitting(false);
         }

@@ -181,6 +181,7 @@ export const MainLayout: React.FC = () => {
             <TankIQSidebar 
                 isOpen={isTankIQOpen} 
                 onClose={() => setIsTankIQOpen(false)} 
+                onToggle={() => setIsTankIQOpen(!isTankIQOpen)}
             />
 
             <div className="content-wrapper">

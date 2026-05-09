@@ -11,10 +11,11 @@
  *  - Failure states: 'ok' | 'cached-stale' | 'no-signal' | 'source-unavailable'
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/config/supabase';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { MarketSignal, Tank } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/utils/logger';
+import { supabase } from '@/config/supabase';
 import { IntelligenceAIService, ArticleAIDirective } from '@/services/IntelligenceAIService';
 
 const CACHE_TTL_MS = 15 * 60 * 1000;       // 15 minutes — standard news sources
@@ -159,7 +160,7 @@ export type FetchStatus = 'ok' | 'cached-stale' | 'no-signal' | 'source-unavaila
 export interface NewsArticle extends MarketSignal {
     region: 'Kenya' | 'Global';
     topicTags: string[];
-    implicationCategory: 'Price' | 'Supply' | 'Compliance' | 'Logistics' | 'General';
+    implicationCategory: 'Price' | 'Supply' | 'Compliance' | 'Logistics' | 'Political' | 'General';
     briefingSummary: string;   // Rule-based 200-char snippet + implication
     feedSource: string;        // shortLabel of origin
     imageUrl?: string;
@@ -196,9 +197,10 @@ function computeTopicTags(title: string, description: string): string[] {
     return tags.length > 0 ? tags : ['General'];
 }
 
-function computeImplication(title: string, summary: string): 'Price' | 'Supply' | 'Compliance' | 'Logistics' | 'General' {
+function computeImplication(title: string, summary: string): 'Price' | 'Supply' | 'Compliance' | 'Logistics' | 'Political' | 'General' {
     const text = (title + ' ' + summary).toLowerCase();
-    if (text.includes('epra') || text.includes('regulation') || text.includes('tax') || text.includes('vat') || text.includes('mandate')) return 'Compliance';
+    if (text.includes('epra') || text.includes('regulation') || text.includes('tax') || text.includes('vat') || text.includes('mandate') || text.includes('policy')) return 'Compliance';
+    if (text.includes('government') || text.includes('president') || text.includes('court') || text.includes('sanctions') || text.includes('war') || text.includes('unrest') || text.includes('political')) return 'Political';
     if (text.includes('pipeline') || text.includes('port') || text.includes('logistics') || text.includes('terminal') || text.includes('shipping')) return 'Logistics';
     if (text.includes('supply') || text.includes('shortage') || text.includes('stock')) return 'Supply';
     if (text.includes('price') || text.includes('crude') || text.includes('brent') || text.includes('cost') || text.includes('forex') || text.includes('shilling')) return 'Price';
@@ -503,18 +505,16 @@ export function useMarketNews(): UseMarketNewsReturn {
         }, 1000);
     }, []);
 
-    const fetchFromSource = useCallback(async (source: NewsFeedSource, tanks?: Tank[]): Promise<NewsArticle[]> => {
+    const fetchFromSource = useCallback(async (source: NewsFeedSource, tanks?: Tank[], force = false): Promise<NewsArticle[]> => {
         // [SYNC_OPTIMIZATION]: Check per-source TTL before triggering a network sync
         const lastSync = getSyncTime(source.shortLabel);
         const ttl = source.cacheTTL ?? CACHE_TTL_MS;
-        if (Date.now() - lastSync < ttl) {
+        if (!force && (Date.now() - lastSync < ttl)) {
             // Data is still fresh in master history, skip network load
             return [];
         }
 
         const collected: NewsArticle[] = [];
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
         // [FORENSIC_PRIORITY]: EPRA is our primary regulatory source.
         // If we fail to get results from the scraper, we immediately try the GNews proxy.
         // 0. Try HIGH-INTEGRITY: Official Scraper (only for Regulatory/Logistics)
@@ -522,11 +522,7 @@ export function useMarketNews(): UseMarketNewsReturn {
             try {
                 const { data, error } = await supabase.functions.invoke(OFFICIAL_SCRAPER, {
                     method: 'POST',
-                    body: { source: source.shortLabel },
-                    headers: {
-                        'Authorization': `Bearer ${anonKey}`, // Force anon key for scraper reliability
-                        'apikey': anonKey
-                    }
+                    body: { source: source.shortLabel }
                 });
 
                 if (!error && data?.results?.length > 0) {
@@ -553,11 +549,7 @@ export function useMarketNews(): UseMarketNewsReturn {
 
                 const { data, error } = await supabase.functions.invoke(GNEWS_PROXY, {
                     method: 'POST',
-                    body: { query, max: 8 }, // Higher limit for regulatory sources
-                    headers: {
-                        'Authorization': `Bearer ${anonKey}`,
-                        'apikey': anonKey
-                    }
+                    body: { query, max: 8 }
                 });
                 
                 if (error && (error as any).status === 429) {
@@ -574,11 +566,7 @@ export function useMarketNews(): UseMarketNewsReturn {
             try {
                 const { data, error } = await supabase.functions.invoke(NEWSDATA_PROXY, {
                     method: 'POST',
-                    body: { query: source.shortLabel + ' energy Kenya' },
-                    headers: {
-                        'Authorization': `Bearer ${anonKey}`,
-                        'apikey': anonKey
-                    }
+                    body: { query: source.shortLabel + ' energy Kenya' }
                 });
                 
                 if (error && (error as any).status === 429) {
@@ -593,11 +581,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                     try {
                         const { data: currentsData, error: currentsError } = await supabase.functions.invoke(CURRENTS_PROXY, {
                             method: 'POST',
-                            body: { query: source.shortLabel },
-                            headers: {
-                                'Authorization': `Bearer ${anonKey}`,
-                                'apikey': anonKey
-                            }
+                            body: { query: source.shortLabel }
                         });
                         if (currentsError && (currentsError as any).status === 429) {
                             markApiLimited('CURRENTS');
@@ -618,13 +602,11 @@ export function useMarketNews(): UseMarketNewsReturn {
             try {
                 const { data, error } = await supabase.functions.invoke(RSS_PARSER, {
                     method: 'POST',
-                    body: { rssUrl: source.url },
-                    headers: {
-                        'Authorization': `Bearer ${anonKey}`,
-                        'apikey': anonKey
-                    }
+                    body: { rssUrl: source.url }
                 });
-                if (!error && data?.items) {
+                if (error) {
+                    logger.warn(`RSS Parser 400/Failure for ${source.shortLabel}: ${source.url}`, error, 'MARKET_NEWS');
+                } else if (data?.items) {
                     const articles = data.items.map((i: any) => buildSignalFromArticle(i, source));
                     collected.push(...articles);
                 }
@@ -636,18 +618,22 @@ export function useMarketNews(): UseMarketNewsReturn {
         if (collected.length > 0) {
             // [TankIQ ENRICHMENT]: Only for newly fetched high-relevance signals
             const aiService = new IntelligenceAIService();
-            const enriched = await Promise.all(collected.map(async (article) => {
+            const enriched = [];
+            for (const article of collected) {
                 if ((article.relevanceScore ?? 0) > 0.70) {
                     try {
-                        const directive = await aiService.generateArticleDirective(article, tanks || []);
-                        return { ...article, aiDirective: directive };
+                        const directive = await aiService.generateArticleDirective(article, Array.isArray(tanks) ? tanks : []);
+                        enriched.push({ ...article, aiDirective: directive });
+                        // [Rate Limit Shield]: Sequential processing with micro-delay for stability
+                        await new Promise(resolve => setTimeout(resolve, 250));
                     } catch (e) {
                         console.warn(`[useMarketNews] TankIQ failed for ${article.title}`, e);
-                        return article;
+                        enriched.push(article);
                     }
+                } else {
+                    enriched.push(article);
                 }
-                return article;
-            }));
+            }
 
             writeMasterHistory(enriched);
             updateSyncTime(source.shortLabel);
@@ -680,7 +666,7 @@ export function useMarketNews(): UseMarketNewsReturn {
 
             for (const src of NEWS_SOURCES) {
                 try {
-                    const articles = await fetchFromSource(src, tanks);
+                    const articles = await fetchFromSource(src, tanks, force);
                     if (articles.length > 0) {
                         anySuccess = true;
                     }

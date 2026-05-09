@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { ShiftDocument } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { logger } from '@/utils/logger';
 
 interface UseShiftsOptions {
     startDate?: Date;
@@ -54,27 +55,37 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
             const { data, error } = await sbQuery;
             if (error) throw error;
 
-            return (data || []).map(row => ({
-                ...row,
-                id: row.id,
-                tankId: row.tank_id,
-                siteId: row.site_id,
-                received_collections: row.received_collections || {},
-                variance_data: row.variance_data || {},
+            return (data || []).map(row => {
+                const pumpReadings = row.pump_readings || {};
+                const readingsArray = Object.values(pumpReadings) as any[];
                 
-                openingReading: row.pump_readings ? (Object.values(row.pump_readings)[0] as any)?.start : 0,
-                closingReading: row.pump_readings ? (Object.values(row.pump_readings)[0] as any)?.end : 0,
-                salesVolume: row.volume_sold_liters || 0,
-                variance: row.variance_data?.amount || 0,
-                cashCollected: row.received_collections?.total || 0,
+                // Aggregate data for multi-tank stations
+                const totalOpening = readingsArray.reduce((sum, r) => sum + (r.start || 0), 0);
+                const totalClosing = readingsArray.reduce((sum, r) => sum + (r.end || 0), 0);
+                const totalSales = row.volume_sold_liters || 0;
                 
-                openedAt: row.opened_at,
-                closedAt: row.closed_at,
-                operatorName: row.metadata?.opened_by?.display || row.metadata?.operator?.name || row.operator_name || 'Unknown',
-                notes: row.supervisor_notes || row.notes,
-                status: row.status,
-                reviewState: row.review_state
-            } as unknown as ShiftDocument));
+                return {
+                    ...row,
+                    id: row.id,
+                    tankId: row.tank_id,
+                    siteId: row.site_id,
+                    received_collections: row.received_collections || {},
+                    variance_data: row.variance_data || {},
+                    
+                    openingReading: totalOpening,
+                    closingReading: totalClosing,
+                    salesVolume: totalSales,
+                    variance: row.variance_data?.amount || 0,
+                    cashCollected: row.received_collections?.total || 0,
+                    
+                    openedAt: row.opened_at,
+                    closedAt: row.closed_at,
+                    operatorName: row.metadata?.opened_by?.display || row.metadata?.operator?.name || row.operator_name || 'Unknown',
+                    notes: row.supervisor_notes || row.notes,
+                    status: row.status,
+                    reviewState: row.review_state
+                } as unknown as ShiftDocument;
+            });
         },
         enabled: !!stationId,
         staleTime: 5 * 1000,
@@ -83,13 +94,14 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
     useEffect(() => {
         if (!stationId) return;
 
+        const channelId = `shifts-realtime:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`shifts-realtime:${stationId}`)
+            .channel(channelId)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'shift_closures', filter: `station_id=eq.${stationId}` },
                 (payload) => {
-                    console.log('[useShifts] Real-time event detected on shift_closures:', payload.eventType);
+                    logger.debug('[useShifts] Real-time event detected on shift_closures:', payload.eventType, 'SHIFTS_RT');
                     // Invalidate everything shift-related to be safe
                     queryClient.invalidateQueries({ queryKey: ['shifts'] });
                     queryClient.invalidateQueries({ queryKey: ['active_shift'] });
@@ -123,9 +135,9 @@ export function useActiveShift(stationId: string | undefined) {
                 .from('current_station_shifts')
                 .select('*')
                 .eq('station_id', stationId)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') throw error;
+            if (error) throw error;
             return data || null;
         },
         enabled: !!stationId,
@@ -135,15 +147,16 @@ export function useActiveShift(stationId: string | undefined) {
     useEffect(() => {
         if (!stationId) return;
 
+        const channelId = `active-shift:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`active-shift:${stationId}`)
+            .channel(channelId)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
                 table: 'current_station_shifts',
                 filter: `station_id=eq.${stationId}` 
             }, (payload) => {
-                console.log('[useActiveShift] Real-time event detected on current_station_shifts:', payload.eventType);
+                logger.debug('[useActiveShift] Real-time event detected on current_station_shifts:', payload.eventType, 'SHIFTS_RT');
                 queryClient.invalidateQueries({ queryKey: ['active_shift'] });
                 queryClient.invalidateQueries({ queryKey: ['shifts'] });
             })

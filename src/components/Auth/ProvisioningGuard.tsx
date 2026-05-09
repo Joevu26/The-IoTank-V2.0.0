@@ -62,10 +62,24 @@ export const ProvisioningGuard: React.FC<ProvisioningGuardProps> = ({ children }
             const { data, error } = await supabase.rpc('check_my_identity');
             if (error) throw error;
             console.log('[DEBUG_LOG] IDENTITY_DIAGNOSTIC:', data);
-            alert(`Diagnostic report generated in Console. \nStatus: ${data.auth_user ? 'Authenticated' : 'Unauthenticated'} \nProfile: ${data.profile ? 'Found' : 'MISSING'}`);
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Diagnostic Report',
+                    message: `Status: ${data.auth_user ? 'Authenticated' : 'Unauthenticated'}\nProfile: ${data.profile ? 'Found' : 'MISSING'}\n\nCheck browser console for full payload.`,
+                    type: data.profile ? 'success' : 'warning',
+                    attribution: 'IDENTITY SYSTEM'
+                }
+            }));
         } catch (err) {
             console.error('[DEBUG_LOG] Diagnostic failed:', err);
-            alert('Diagnostic function not found in DB. Please run the migration first.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Diagnostic Failed',
+                    message: 'Diagnostic function not found in DB. Please run the migration first.',
+                    type: 'error',
+                    attribution: 'IDENTITY SYSTEM'
+                }
+            }));
         }
     };
 

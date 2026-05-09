@@ -46,11 +46,11 @@ export interface Tank {
     name: string;
     location: string;
     capacity: number; // Total capacity in liters
-    fuelType: 'Diesel' | 'Petrol' | 'Kerosene' | 'LPG' | 'Jet Fuel' | 'biodiesel' | 'diesel' | 'gasoline' | 'kerosene' | 'jet-fuel';
+    fuelType: 'diesel' | 'petrol' | 'kerosene' | 'lpg' | 'jet_fuel' | 'biodiesel';
     shape: 'cylinder' | 'rectangular' | 'capsule' | 'spherical' | 'compartmentalized';
-    height: number;      // cm
-    diameter?: number;   // cm (for cylinder/capsule)
-    length?: number;     // cm (for horizontal/capsule)
+    height: number;      // meters (as stored in DB: tank_height column)
+    diameter?: number;   // meters (for cylinder/capsule, derived from tank_radius * 2)
+    length?: number;     // meters (for horizontal/capsule)
 
     // Alert thresholds
     lowLevelThreshold: number; // Percentage (e.g., 20%)
@@ -62,10 +62,10 @@ export interface Tank {
     leakDetectionSensitivity: number; // Percentage drop per hour (legacy)
     thermalCoefficient: number; // α for thermal expansion (per °C)
     density: number; // kg/L at 15.5°C
-    sensorOffset: number; // Calibration offset in cm
-    sensorHeight: number; // Sensor installation height from tank bottom (cm)
-    sensorEmptyDistance?: number; // Distance sensor reads when tank is EMPTY (cm)
-    sensorFullDistance?: number;  // Distance sensor reads when tank is FULL (cm)
+    sensorOffset: number; // Calibration offset in mm (as stored in DB: sensor_offset column)
+    sensorHeight: number; // Sensor installation height from tank bottom (mm)
+    sensorEmptyDistance?: number; // Distance sensor reads when tank is EMPTY (mm)
+    sensorFullDistance?: number;  // Distance sensor reads when tank is FULL (mm)
 
     // State (Last known values)
     currentVolume?: number;
@@ -196,7 +196,7 @@ export interface MarketData {
     volatilityIndex?: number;
 }
 
-export type SignalSourceType = 'API' | 'Public Notice' | 'Corporate Announcement' | 'News Outlet' | 'News' | 'Commodity' | 'Operational Alert' | 'Price Impact' | 'Supply Chain' | 'Regulatory';
+export type SignalSourceType = 'API' | 'Public Notice' | 'Corporate Announcement' | 'News Outlet' | 'Commodity' | 'Operational Alert' | 'Price Impact' | 'Supply Chain' | 'Regulatory';
 
 export interface MarketSignal {
     id: string;
@@ -212,6 +212,24 @@ export interface MarketSignal {
     attribution?: string; // e.g., "Kenya Ports Authority", "Daily Nation"
     priority?: number; // 1-3
     metadata?: Record<string, any>;
+}
+
+export interface MarketActionItem {
+    id: string;
+    stationId: string;
+    fuelType: string;
+    oldPrice: number | null;
+    newPrice: number;
+    effectiveDate: string;
+    actionType: 'price_adjustment' | 'procurement_hedge' | 'compliance_review';
+    status: 'pending' | 'completed' | 'ignored';
+    metadata: {
+        source_url?: string;
+        signal_id?: string;
+        variance?: number;
+    };
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface SupplyRisk {
@@ -312,6 +330,7 @@ export interface User {
     siteIds: string[]; // Sites user has access to
     mfaEnabled: boolean;
     isSystemAccount?: boolean;
+    stationEmail?: string;
     isProvisional?: boolean;
     /** @deprecated Use re-authentication with login password instead */
     masterAccessPassword?: string;
@@ -508,6 +527,7 @@ export interface DeliveryDocument {
     createdBy: { kind: 'user' | 'system'; authUserId: string; display: string };
     createdAt: string; // ISO String
     notes?: string;
+    bolPhotoUrl?: string;
 }
 
 // --- Lightweight Workflow Types (Legacy) ---

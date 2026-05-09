@@ -78,7 +78,7 @@ export const TANKIQ_TOOLS_METADATA = [
         type: 'function',
         function: {
             name: 'get_station_summary',
-            description: 'Get a real-time summary of all tanks (volumes, capacities, fuel types) and currently active/unresolved alerts for the station.',
+            description: 'Get live telemetry readings, real-time sensor data, and a summary of all tanks (volumes, capacities, fuel types) and currently active/unresolved alerts for the station.',
             parameters: { type: 'object', properties: {} }
         }
     },

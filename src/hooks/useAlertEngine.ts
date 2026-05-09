@@ -14,10 +14,13 @@ import { Alert, TankReading, RiskIndex, Tank } from '@/types';
 import { supabase } from '@/config/supabase';
 import { useTanks } from './useSupabase';
 import { useShiftStatus } from './useShiftStatus';
+import { useAuth } from './useAuth';
 import { NotificationService } from '../services/NotificationService';
 import { EmailDispatchService } from '../services/EmailDispatchService';
 import { detectTankAlerts, filterDuplicates, correlateAlerts } from '../services/AlertDetectionEngine';
 import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
+import { THRESHOLDS } from '@/constants/forensicThresholds';
+import { logger } from '@/utils/logger';
 
 export interface AlertEngineThresholds {
     telemetryGapMinutes: number;
@@ -27,17 +30,17 @@ export interface AlertEngineThresholds {
 }
 
 const DEFAULT_THRESHOLDS: AlertEngineThresholds = {
-    telemetryGapMinutes: 30,
+    telemetryGapMinutes: THRESHOLDS.TELEMETRY.OFFLINE_WARNING_MINS,
     deliveryVarianceThreshold: 5,
     nightDrawdownSensitivity: 'standard',
-    refillDetectionThreshold: 10,
+    refillDetectionThreshold: 20, // 20L fallback
 };
 
 const SCAN_INTERVAL_MS = 60000; // 60 Seconds (Rapid detection for first alert)
 const NOTIFICATION_DEBOUNCE_MS = 1800000; // 30 Minutes (Avoid consecutive alert noise)
 
 function computeRiskIndex(activeAlerts: Alert[]): RiskIndex {
-    const fuelAlerts = activeAlerts.filter(a => ['low_level', 'leak_detected', 'overfill', 'theft_detected', 'unauthorized_refill'].includes(a.type));
+    const fuelAlerts = activeAlerts.filter(a => ['low_level', 'leak_detected', 'overfill', 'theft_detected', 'unauthorized_refill', 'refill'].includes(a.type));
     const systemAlerts = activeAlerts.filter(a => ['sensor_failure', 'telemetry_gap', 'connectivity_lost', 'high_temperature'].includes(a.type));
     const complianceAlerts = activeAlerts.filter(a => ['compliance_deadline', 'delivery_variance', 'market_news', 'regulatory_update'].includes(a.type));
 
@@ -75,6 +78,7 @@ export function useAlertEngine(
     stationId: string,
     thresholds: AlertEngineThresholds = DEFAULT_THRESHOLDS
 ) {
+    const { currentUser } = useAuth();
     const { tanks } = useTanks(stationId);
     const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
     const [riskIndex, setRiskIndex] = useState<RiskIndex>({
@@ -83,6 +87,7 @@ export function useAlertEngine(
         compliance: { score: 0, label: 'STABLE' },
     });
     const [isScanning, setIsScanning] = useState(false);
+    const isScanningRef = useRef(false);
     const [hasLoadedAlerts, setHasLoadedAlerts] = useState(false);
     const [lastScanTime, setLastScanTime] = useState<number>(() => {
         const saved = localStorage.getItem(`iotank_last_scan_${stationId}`);
@@ -98,13 +103,16 @@ export function useAlertEngine(
         lastInflowVolume: number;
     }>>({});
     const { status: shiftStatus } = useShiftStatus();
-    // Memory for toasted alerts with TTL: { 'tankId:type': timestamp }
-    // [PERSISTENCE UPGRADE]: Load from localStorage to survive refreshes
+    // [PERSISTENCE UPGRADE]: Load from localStorage and purge stale entries (>24h)
     const [toastedAlerts, setToastedAlertsState] = useState<Map<string, number>>(() => {
         const saved = localStorage.getItem(`iotank_toast_memory_${stationId}`);
         if (saved) {
             try {
-                return new Map(JSON.parse(saved));
+                const now = Date.now();
+                const entries = JSON.parse(saved) as [string, number][];
+                // Purge entries older than 24 hours
+                const validEntries = entries.filter(([_, timestamp]) => (now - timestamp) < 86400000);
+                return new Map(validEntries);
             } catch (e) {
                 return new Map();
             }
@@ -114,6 +122,7 @@ export function useAlertEngine(
 
     const toastedAlertsRef = useRef<Map<string, number>>(toastedAlerts);
     const initialScanPerformedRef = useRef(false);
+    const pendingInsertsRef = useRef<Set<string>>(new Set()); // Track alerts currently being written
 
     // Sync ref and localStorage when state changes
     useEffect(() => {
@@ -178,12 +187,13 @@ export function useAlertEngine(
 
     // ── Detection scan ───────────────────────────────────────────────────────
     const runScan = useCallback(async () => {
-        if (!tanks.length || isScanning || !hasLoadedAlerts) return;
+        if (!tanks.length || isScanningRef.current || !hasLoadedAlerts) return;
         
         // Prevent redundant scans if performed very recently (within 10s)
         const now = Date.now();
         if (now - lastScanTime < 10000) return;
 
+        isScanningRef.current = true;
         setIsScanning(true);
         setLastScanTime(now);
         localStorage.setItem(`iotank_last_scan_${stationId}`, now.toString());
@@ -231,7 +241,7 @@ export function useAlertEngine(
 
                         const isUnauthorized = shiftStatus !== 'open';
                         
-                        console.log(`[AlertEngine] REFILL_START on ${tank.name}. Start: ${prevVol}L, Detected Climb: ${volChange}L. Authorized: ${!isUnauthorized}`);
+                        logger.debug(`[AlertEngine] REFILL_START on ${tank.name}. Start: ${prevVol}L, Detected Climb: ${volChange}L. Authorized: ${!isUnauthorized}`, null, 'ALERT_ENGINE');
 
                         window.dispatchEvent(new CustomEvent('system-toast', {
                             detail: {
@@ -268,11 +278,11 @@ export function useAlertEngine(
                         if (volChange > 1.0) { 
                             session.stableCount = 0;
                             session.lastInflowVolume = currVol;
-                            console.log(`[AlertEngine] REFILL_IN_PROGRESS on ${tank.name}. Current: ${currVol}L`);
+                            logger.debug(`[AlertEngine] REFILL_IN_PROGRESS on ${tank.name}. Current: ${currVol}L`, null, 'ALERT_ENGINE');
                         } else {
                             // No significant growth detected in this scan
                             session.stableCount += 1;
-                            console.log(`[AlertEngine] REFILL_STABILIZING on ${tank.name}. Stable for ${session.stableCount} cycle(s).`);
+                            logger.debug(`[AlertEngine] REFILL_STABILIZING on ${tank.name}. Stable for ${session.stableCount} cycle(s).`, null, 'ALERT_ENGINE');
                         }
 
                         // 🛑 END REFILL (Stability reached for 1 full reading cycle ~60s)
@@ -281,7 +291,7 @@ export function useAlertEngine(
                             const deliveredVolume = endVolume - session.startVolume;
                             session.isActive = false;
 
-                            console.log(`[AlertEngine] REFILL_COMPLETE on ${tank.name}. Captured Delta: ${deliveredVolume}L`);
+                            logger.debug(`[AlertEngine] REFILL_COMPLETE on ${tank.name}. Captured Delta: ${deliveredVolume}L`, null, 'ALERT_ENGINE');
 
                             const isUnauthorized = shiftStatus !== 'open';
                             
@@ -295,8 +305,8 @@ export function useAlertEngine(
                                     ? `🔴 Unauthorized Out-of-Hours Refill: ${tank.name}`
                                     : `Refill Verification Required: ${tank.name}`,
                                 message: isUnauthorized
-                                    ? `SECURITY VIOLATION: Tank gained ${deliveredVolume.toFixed(1)}L while station was closed. Immeditately reconcile Waybill/Invoice.`
-                                    : `Automatic detection completed. Net Sensory Delivery: ${deliveredVolume.toFixed(1)}L. (Start: ${session.startVolume.toFixed(1)}L -> End: ${endVolume.toFixed(1)}L)`,
+                                    ? `SECURITY BREACH: Fuel inflow of ${deliveredVolume.toFixed(1)}L detected while shift is CLOSED. Out-of-hours delivery requires immediate verification.`
+                                    : `Automated detection completed. Net Sensory Delivery: ${deliveredVolume.toFixed(1)}L. (Start: ${session.startVolume.toFixed(1)}L -> End: ${endVolume.toFixed(1)}L)`,
                                 alert_data: { score: isUnauthorized ? 98 : 95 },
                                 is_resolved: false,
                                 metadata: {
@@ -308,7 +318,7 @@ export function useAlertEngine(
                                 }
                             };
 
-                            supabase.from('alerts').insert(refillAlert).then(() => {
+                            supabase.from('alerts').upsert(refillAlert, { onConflict: 'station_id,tank_id,alert_type,is_resolved' }).then(() => {
                                 // Finalize notification
                                 window.dispatchEvent(new CustomEvent('system-toast', {
                                     detail: {
@@ -332,6 +342,19 @@ export function useAlertEngine(
                                         tankId: tank.id,
                                         modalType: 'refill_verification',
                                         alertData: refillAlert 
+                                    }
+                                });
+
+                                // [FORENSIC UPGRADE]: Tactical Email Dispatch for Refill
+                                EmailDispatchService.sendSecurityAlert({
+                                    to: currentUser?.stationEmail || currentUser?.email || 'security@iotank.com',
+                                    type: isUnauthorized ? 'UNAUTHORIZED_REFILL' : 'REFILL',
+                                    siteName: currentUser?.companyName || 'IoTank Site',
+                                    details: {
+                                        timestamp: new Date().toISOString(),
+                                        description: refillAlert.message,
+                                        lossVolume: deliveredVolume,
+                                        dropRate: 0 // Refill is gain, not loss
                                     }
                                 });
                             });
@@ -365,7 +388,17 @@ export function useAlertEngine(
             });
 
             if (uniqueDrafts.length > 0) {
-                const dbAlerts = uniqueDrafts.map(draft => ({
+                // [FIX]: Check pendingInsertsRef to avoid 409 Conflicts during rapid scans
+                const draftsToInsert = uniqueDrafts.filter(draft => {
+                    const key = `${draft.tankId}:${draft.type}`;
+                    if (pendingInsertsRef.current.has(key)) return false;
+                    pendingInsertsRef.current.add(key);
+                    return true;
+                });
+
+                if (draftsToInsert.length === 0) return;
+
+                const dbAlerts = draftsToInsert.map(draft => ({
                     station_id: stationId,
                     tank_id: draft.tankId,
                     alert_type: draft.type,
@@ -377,7 +410,18 @@ export function useAlertEngine(
                     metadata: draft.metadata || {}
                 }));
 
-                await supabase.from('alerts').insert(dbAlerts);
+                try {
+                    await supabase.from('alerts').upsert(dbAlerts, { onConflict: 'station_id,tank_id,alert_type,is_resolved' });
+                } catch (err) {
+                    console.error('[useAlertEngine] Alert insertion failed:', err);
+                } finally {
+                    // Cleanup pending refs after a safety delay to allow realtime sync to catch up
+                    setTimeout(() => {
+                        draftsToInsert.forEach(draft => {
+                            pendingInsertsRef.current.delete(`${draft.tankId}:${draft.type}`);
+                        });
+                    }, 2000);
+                }
                 
                 // [NEW]: Universal Toast Notification for every new system alert
                 // Uses the filtered "draftsToToast" to satisfy the "Optimal Frequency" requirement
@@ -410,28 +454,36 @@ export function useAlertEngine(
                         });
                     }
 
-                    if (suspectedType && (suspectedType.includes('THEFT') || suspectedType.includes('LEAK'))) {
+                    const isTheft = suspectedType?.includes('THEFT');
+                    const isLeak = suspectedType?.includes('LEAK');
+                    const isConnectivityLost = suspectedType?.includes('CONNECTIVITY_LOST') || suspectedType?.includes('TELEMETRY_GAP');
+                    const isRefill = suspectedType?.includes('REFILL');
+                    const isLevelBreach = suspectedType?.includes('LOW_LEVEL') || suspectedType?.includes('OVERFILL');
+
+                    if (suspectedType && (isTheft || isLeak || isConnectivityLost || isRefill || isLevelBreach)) {
                         const siteName = draft.rootCauseLink?.label || 'IOTANK SITE';
                         
                         // 1. Browser Push
-                        NotificationService.notifySecurity(
-                            suspectedType.includes('THEFT') ? 'THEFT' : 'LEAK',
-                            siteName,
-                            draft.description
-                        );
+                        if (isTheft || isLeak) {
+                            NotificationService.notifySecurity(
+                                isTheft ? 'THEFT' : 'LEAK',
+                                siteName,
+                                draft.description
+                            );
+                        }
 
                         // 2. [FORENSIC UPGRADE]: Push specific Intrusion Modal to Telemetry Queue
                         pushEvent({
                             type: draft.severity === 'critical' ? 'critical' : 'watch',
                             message: draft.message,
-                            actionLabel: suspectedType.includes('THEFT') ? 'INTERCEPT NOW' : 'Review Leak',
+                            actionLabel: isTheft ? 'INTERCEPT NOW' : (isRefill ? 'Review Refill' : 'Investigate'),
                             metadata: {
                                 tankId: draft.tankId,
-                                modalType: 'security_intrusion',
+                                modalType: (isTheft || isLeak) ? 'security_intrusion' : undefined,
                                 forensicData: {
-                                    type: suspectedType.includes('THEFT') ? 'THEFT' : 'LEAK',
+                                    type: isTheft ? 'THEFT' : (isRefill ? 'REFILL' : (isConnectivityLost ? 'DISCONNECT' : suspectedType)),
                                     dropRate: meta.dropRate,
-                                    volumeLost: meta.volumeLost,
+                                    volumeLost: meta.volumeLost || meta.volumeDelta,
                                     tankName: siteName,
                                     timestamp: new Date().toISOString()
                                 }
@@ -439,23 +491,26 @@ export function useAlertEngine(
                         });
 
                         // 3. Off-Platform SMTP Tactical Email
-                        EmailDispatchService.sendSecurityAlert({
-                            to: 'admin@iotank.com', // In production, this would be the client's admin email
-                            type: suspectedType.includes('THEFT') ? 'THEFT' : 'LEAK',
-                            siteName: siteName,
-                            details: {
-                                timestamp: new Date().toISOString(),
-                                dropRate: meta.dropRate,
-                                lossVolume: meta.volumeLost,
-                                description: draft.description
-                            }
-                        });
+                        if (isTheft || isLeak || isConnectivityLost || isRefill || isLevelBreach) {
+                            EmailDispatchService.sendSecurityAlert({
+                                to: currentUser?.stationEmail || currentUser?.email || 'security@iotank.com',
+                                type: (isTheft ? 'THEFT' : isRefill ? 'REFILL' : isConnectivityLost ? 'DISCONNECT' : suspectedType) as any,
+                                siteName: siteName,
+                                details: {
+                                    timestamp: new Date().toISOString(),
+                                    dropRate: meta.dropRate,
+                                    lossVolume: meta.volumeLost || meta.volumeDelta,
+                                    description: draft.description
+                                }
+                            });
+                        }
                     }
                 });
             }
         } catch (err) {
             console.warn('[AlertEngine] Scan error:', err);
         } finally {
+            isScanningRef.current = false;
             setIsScanning(false);
         }
     }, [tanks, activeAlerts, stationId, thresholds, isScanning, shiftStatus, pushEvent]);
@@ -486,7 +541,7 @@ export function useAlertEngine(
             const allTanksHaveData = tanks.every((t: Tank) => latestReadingsRef.current[t.id]);
             if (allTanksHaveData && !initialScanPerformedRef.current) {
                 initialScanPerformedRef.current = true;
-                console.log('[AlertEngine] BOOT: Hardware data acquired. Firing initial bootstrap scan.');
+                logger.debug('[AlertEngine] BOOT: Hardware data acquired. Firing initial bootstrap scan.', null, 'ALERT_ENGINE');
                 runScan();
             }
         }

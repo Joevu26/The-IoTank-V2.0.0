@@ -41,7 +41,7 @@ export function useTransactions(stationId: string, tankId?: string) {
                 
                 query = query
                     .order('timestamp', { ascending: false })
-                    .limit(50);
+                    .limit(500); // Increased from 50 — analytics needs full period data for variance calculation
 
                 if (tankId) {
                     query = query.eq('tank_id', tankId);
@@ -68,12 +68,28 @@ export function useTransactions(stationId: string, tankId?: string) {
 
         fetchTransactions();
 
+        // Realtime subscription: filter is only applied on INSERT/UPDATE (not DELETE — filter is pre-image based)
         const channelFilter = stationId !== 'SYSTEM_GOVERNANCE' ? `station_id=eq.${stationId}` : undefined;
         const channel = supabase
             .channel(`fuel_transactions:${stationId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_transactions', filter: channelFilter }, () => {
-                fetchTransactions();
-            })
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'fuel_transactions', 
+                filter: channelFilter 
+            }, fetchTransactions)
+            .on('postgres_changes', { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'fuel_transactions',
+                filter: channelFilter
+            }, fetchTransactions)
+            .on('postgres_changes', { 
+                event: 'DELETE', 
+                schema: 'public', 
+                table: 'fuel_transactions'
+                // No filter on DELETE: Postgres sends OLD row, filter can't match station_id reliably
+            }, fetchTransactions)
             .subscribe();
 
         return () => {

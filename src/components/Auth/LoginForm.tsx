@@ -8,7 +8,7 @@ import TermsModal from '../Landing/TermsModal';
 import '../Landing/TermsModal.css';
 import { OnboardingModal } from './OnboardingModal';
 import { RegistrationRequestForm } from './RegistrationRequestForm';
-import { AuditService } from '@/services/AuditService';
+
 import { supabase } from '@/config/supabase';
 import { getAuthFriendlyErrorMessage } from '@/utils/authErrors';
 import brandMark from '@/assets/iotank-logo-v3.png';
@@ -48,22 +48,12 @@ export const LoginForm: React.FC = () => {
 
     const processSignIn = async () => {
         try {
-            const userCredential = await signIn(email, password);
-            if (userCredential?.user) {
-                // Log success
-                await supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: true });
-
-                // 🟢 Forensic Log
-                await AuditService.log(
-                    'SECURITY',
-                    'LOGIN',
-                    userCredential.user.user_metadata?.station_id || '',
-                    `Identity verification successful for ${email}`,
-                    'INFO',
-                    { method: 'PASSWORD', email }
-                );
-            }
-            navigate('/dashboard');
+            await signIn(email, password);
+            await supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: true });
+            // Note: The AuthContext listener will set global 'loading' to true,
+            // preventing the useEffect from navigating. Once the listener sets
+            // mfaChallengeRequired to true and loading to false, the UI will 
+            // naturally swap to the MFA form.
         } catch (err: any) {
             console.error('Auth Error:', err);
             // Log failure
@@ -123,7 +113,7 @@ export const LoginForm: React.FC = () => {
         setMfaLoading(true);
         try {
             await verifyMFA(codeToVerify);
-            navigate('/dashboard');
+            // Navigation is safely handled by the reactive useEffect hook once currentUser is enriched.
         } catch (err: any) {
             console.error('MFA Verification Error:', err);
             setError(err.message || 'Invalid verification code. Please try again.');

@@ -21,7 +21,7 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
         try {
             let query = supabase
                 .from('deliveries')
-                .select('*')
+                .select('*, tanks(fuel_type, tank_name)')  // Join tank to get product type
                 .eq('station_id', stationId)
                 .order('created_at', { ascending: false });
 
@@ -42,29 +42,67 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
 
             if (fetchError) throw fetchError;
 
-            // Map database fields to DeliveryDocument interface if needed
-            // Based on types/index.ts, we might need to parse JSON fields
-            const mappedDeliveries = (data || []).map(row => ({
-                id: row.id,
-                ts: row.delivery_date || row.created_at,
-                ts_day: row.delivery_date ? row.delivery_date.slice(0, 10) : null,
-                siteId: row.site_id,
-                nodeId: row.node_id,
-                tankId: row.tank_id,
-                product: row.product,
-                supplier: row.supplier_name || row.supplier,
-                invoiceNo: row.bol_number || row.invoice_no,
-                invoiceLiters: row.bol_claimed_volume || row.invoice_liters,
-                measured: typeof row.measured === 'string' ? JSON.parse(row.measured) : row.measured,
-                before: typeof row.before === 'string' ? JSON.parse(row.before) : row.before,
-                after: typeof row.after === 'string' ? JSON.parse(row.after) : row.after,
-                variance: typeof row.variance === 'string' ? JSON.parse(row.variance) : row.variance,
-                status: row.status,
-                verified: row.verified,
-                createdBy: typeof row.created_by === 'string' ? JSON.parse(row.created_by) : row.created_by,
-                createdAt: row.created_at,
-                notes: row.notes
-            } as DeliveryDocument));
+            const mappedDeliveries = (data || []).map(row => {
+                // variance_volume is a DB GENERATED COLUMN: bol_claimed_volume - actual_received_volume
+                const varianceLiters = row.variance_volume !== null && row.variance_volume !== undefined
+                    ? Number(row.variance_volume)
+                    : (Number(row.bol_claimed_volume || 0) - Number(row.actual_received_volume || 0));
+                const invoiceLiters = Number(row.bol_claimed_volume || 0);
+                const variancePct = invoiceLiters > 0 ? (varianceLiters / invoiceLiters) * 100 : 0;
+
+                const actualReceivedVol = Number(row.actual_received_volume || row.tank_after_volume || 0);
+                const beforeVol = Number(row.tank_before_volume || 0);
+                const afterVol  = Number(row.tank_after_volume || 0);
+                const capacity  = Number(row.tanks?.capacity || row.capacity || 1);
+
+                // Normalize DB status to DeliveryDocument union
+                const rawStatus = (row.verification_status || row.status || '').toUpperCase();
+                const status: 'VERIFIED' | 'NEEDS_REVIEW' | 'DISPUTED' =
+                    rawStatus === 'VERIFIED' ? 'VERIFIED' :
+                    rawStatus === 'DISPUTED' ? 'DISPUTED' : 'NEEDS_REVIEW';
+
+                return {
+                    id: row.id,
+                    ts: row.delivery_date || row.created_at,
+                    ts_day: row.delivery_date ? row.delivery_date.slice(0, 10) : (row.created_at || '').slice(0, 10),
+                    siteId: row.site_id || '',
+                    nodeId: row.node_id || '',
+                    tankId: row.tank_id || '',
+                    // Product comes from joined tank's fuel_type
+                    product: row.tanks?.fuel_type || row.product || 'Unknown',
+                    supplier: row.supplier_name || row.supplier || '',
+                    invoiceNo: row.bol_number || row.invoice_no || '',
+                    invoiceLiters,
+                    // Full measured shape as required by DeliveryDocument
+                    measured: {
+                        observedLiters: actualReceivedVol,
+                        standardizedLiters: actualReceivedVol, // Thermal correction not yet applied at this layer
+                        tempC: Number(row.temperature_c || 20),
+                        refTempC: 15
+                    },
+                    // Full before/after shape as required by DeliveryDocument
+                    before: {
+                        pct: capacity > 0 ? parseFloat(((beforeVol / capacity) * 100).toFixed(1)) : 0,
+                        litersStd: beforeVol
+                    },
+                    after: {
+                        pct: capacity > 0 ? parseFloat(((afterVol / capacity) * 100).toFixed(1)) : 0,
+                        litersStd: afterVol
+                    },
+                    variance: {
+                        liters: varianceLiters,
+                        pct: parseFloat(variancePct.toFixed(2))
+                    },
+                    status,
+                    verified: row.is_accepted === true,
+                    createdBy: typeof row.created_by === 'string'
+                        ? JSON.parse(row.created_by)
+                        : (row.created_by || { kind: 'system', authUserId: '', display: 'System' }),
+                    createdAt: row.created_at,
+                    notes: row.dispute_notes || row.notes,
+                    bolPhotoUrl: row.bol_photo_url
+                } as unknown as DeliveryDocument;
+            });
 
             setDeliveries(mappedDeliveries);
             setError(null);
@@ -79,17 +117,19 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
     useEffect(() => {
         fetchDeliveries();
 
-        // Real-time subscription
+        // Real-time subscription: listen for INSERT and UPDATE (status changes)
+        const channelId = `deliveries-all-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
-            .channel(`deliveries-all-${stationId}`)
+            .channel(channelId)
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'deliveries' },
-                (payload) => {
-                    if ((payload.new as any)?.station_id === stationId) {
-                        fetchDeliveries();
-                    }
-                }
+                { event: 'INSERT', schema: 'public', table: 'deliveries', filter: `station_id=eq.${stationId}` },
+                fetchDeliveries
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'deliveries', filter: `station_id=eq.${stationId}` },
+                fetchDeliveries
             )
             .subscribe();
 

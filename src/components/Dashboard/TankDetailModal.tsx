@@ -44,7 +44,14 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
             exportToCSV(readings, `${tank.name}_Telemetry_${new Date().toISOString().split('T')[0]}`);
         } else {
             await new Promise(resolve => setTimeout(resolve, 800));
-            alert('Report shared with authorized site personnel.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Report Shared',
+                    message: 'Report shared with authorized site personnel.',
+                    type: 'success',
+                    attribution: 'REPORT EXPORT'
+                }
+            }));
         }
 
         setExporting(null);
@@ -65,10 +72,24 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
             };
 
             await updateTank(tank.id, updates);
-            alert('Hardware configuration synchronized.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Hardware Synced',
+                    message: 'Hardware configuration synchronized.',
+                    type: 'success',
+                    attribution: 'HARDWARE CONFIG'
+                }
+            }));
         } catch (error) {
             console.error('Error updating config:', error);
-            alert('Failed to update configuration.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Sync Failed',
+                    message: 'Failed to update configuration.',
+                    type: 'error',
+                    attribution: 'HARDWARE CONFIG'
+                }
+            }));
         } finally {
             setSaving(false);
         }
@@ -148,7 +169,7 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
                                     <TankVisual2D
                                         fuelLevel={latestReading?.fuelLevel || 0}
                                         fuelType={tank.fuelType}
-                                        shape={tank.shape as any}
+                                        shape={tank.shape}
                                         height={tank.height}
                                         diameter={tank.diameter}
                                         length={tank.length}

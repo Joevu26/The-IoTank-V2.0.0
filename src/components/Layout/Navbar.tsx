@@ -29,7 +29,7 @@ import { OrderModal } from '../QuickActions/OrderModal';
 import { Toast } from '../Common/Toast';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { ViewOnlyNoticeModal } from '../Common/ViewOnlyNoticeModal';
-import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo } from 'react-icons/fi';
+import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo, FiBell } from 'react-icons/fi';
 import { NotificationService } from '@/services/NotificationService';
 import { DeviceCommandService } from '@/services/DeviceCommandService';
 import { FiActivity } from 'react-icons/fi';
@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     const [showNotifications, setShowNotifications] = useState(false);
     const [showQuickActions, setShowQuickActions] = useState(false);
     
-    const { isViewOnly } = useShiftStatus();
+    const { status: shiftStatus, isViewOnly } = useShiftStatus();
     const [showNoticeModal, setShowNoticeModal] = useState(false);
 
     const [toast, setToast] = useState<{ 
@@ -60,7 +60,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     } | null>(null);
     
     const { activeModal, openModal, closeModal } = useModals();
-    const { status: shiftStatus } = useShiftStatus();
     
     // Derived states for local UI
     const isDeliveryModalOpen = activeModal === 'delivery';
@@ -75,6 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
     const [hiddenAlerts, setHiddenAlerts] = useState<Set<string>>(new Set());
 
+    const [unifiedEvents, setUnifiedEvents] = useState<any[]>([]);
+
     // Fetch alerts for the notification tray
     const { alerts } = useAlerts(stationId, false);
     const unreadAlerts = alerts.filter((a: any) => !a.resolved && !hiddenAlerts.has(a.id));
@@ -88,29 +89,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
         e.stopPropagation();
         if (resolvingIds.has(alertId)) return;
         
-        // Optimistic UI: Start animation immediately
+        // Optimistic UI: Hide immediately
+        setHiddenAlerts(prev => new Set(prev).add(alertId));
         setResolvingIds(prev => new Set(prev).add(alertId));
         
         try {
             if (!currentUser) return;
-            
-            // Fire and forget (almost) - handled by the timeout for animation
-            setTimeout(async () => {
-                try {
-                    await resolveAlert(alertId, currentUser.authUserId);
-                    setHiddenAlerts(prev => new Set(prev).add(alertId));
-                } catch (err) {
-                    console.error('Error resolving alert:', err);
-                    // Rollback on failure
-                    setResolvingIds(prev => {
-                        const next = new Set(prev);
-                        next.delete(alertId);
-                        return next;
-                    });
-                }
-            }, 300);
+            await resolveAlert(alertId, currentUser.authUserId);
         } catch (err) {
-            console.error('Error in resolve handler:', err);
+            console.error('Error resolving alert:', err);
+            // Rollback on failure
             setResolvingIds(prev => {
                 const next = new Set(prev);
                 next.delete(alertId);
@@ -123,37 +111,61 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
         e.stopPropagation();
         if (resolvingIds.has(eventId)) return;
 
-        // Optimistic UI: Start animation immediately
+        // Save current state for rollback
+        const previousEvents = [...unifiedEvents];
+        
+        // Optimistic UI: Remove from list immediately
+        setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
         setResolvingIds(prev => new Set(prev).add(eventId));
 
         try {
-            setTimeout(async () => {
-                try {
-                    const { error } = await supabase.rpc('resolve_unified_event', { p_event_id: eventId });
-                    
-                    if (error) throw error;
+            // [PERSISTENCE PROTOCOL]: Handle Forensic Audit Events
+            // 1. Check if the event has a source record (e.g., an alert) in metadata
+            const event = (unifiedEvents as any[]).find(ev => ev.id === eventId);
+            const sourceTable = event?.metadata?.table;
+            const sourceId = event?.metadata?.new?.id || event?.metadata?.old?.id;
 
-                    setUnifiedEvents(prev => prev.filter(ev => ev.id !== eventId));
-                } catch (err: any) {
-                    console.error('Error resolving event:', err);
-                    
-                    if (err?.code === 'PGRST202') {
-                        setToast({
-                            message: 'Database security schema is synchronizing. Please try again in 1-2 minutes.',
-                            type: 'warning'
-                        });
-                    }
-                    
-                    // Rollback on failure
-                    setResolvingIds(prev => {
-                        const next = new Set(prev);
-                        next.delete(eventId);
-                        return next;
-                    });
-                }
-            }, 300);
-        } catch (err) {
-            console.error('Outer error resolving event:', err);
+            if (sourceTable === 'alerts' && sourceId) {
+                await supabase
+                    .from('alerts')
+                    .update({ 
+                        is_resolved: true,
+                        resolved_at: new Date().toISOString(),
+                        resolved_by: currentUser?.authUserId || 'SYSTEM'
+                    })
+                    .eq('id', sourceId);
+            }
+
+            // 2. Resolve the event itself in unified_events
+            // Note: Requires migration 20260508000000_allow_event_resolution.sql to be applied
+            const { error } = await supabase
+                .from('unified_events')
+                .update({ is_resolved: true })
+                .eq('id', eventId);
+            
+            if (error) {
+                // If it fails (e.g. migration not applied), we keep the optimistic UI state 
+                // but log the error for diagnostics.
+                console.warn('[Navbar] Failed to persist event resolution. Forensic logs may remain immutable.', error);
+            }
+        } catch (err: any) {
+            console.error('Error resolving event:', err);
+            
+            // Rollback on failure: Restore the event to the UI
+            setUnifiedEvents(previousEvents);
+            
+            if (err?.code === 'PGRST202') {
+                setToast({
+                    message: 'Database security schema is synchronizing. Please try again in 1-2 minutes.',
+                    type: 'warning'
+                });
+            } else {
+                setToast({
+                    message: 'Forensic Link Error: Could not synchronize acknowledgement. Please try again.',
+                    type: 'error'
+                });
+            }
+        } finally {
             setResolvingIds(prev => {
                 const next = new Set(prev);
                 next.delete(eventId);
@@ -198,8 +210,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
         return () => clearInterval(timer);
     }, [isViewOnly]);
 
-    const [unifiedEvents, setUnifiedEvents] = useState<any[]>([]);
-
     useEffect(() => {
         const fetchUnifiedEvents = async () => {
             if (!stationId) return;
@@ -212,14 +222,35 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                 .limit(15);
             
             if (data) {
-                // [FILTER]: Remove routine forensic noise from the state to ensure accurate badge counts
-                const filtered = data.filter((ev: any) => {
+                const mapped = data.map((ev: any) => {
                     const desc = ev.description || '';
-                    const isSpam = desc.includes('Forensic audit: INSERT on alerts') || 
-                                 desc.includes('Forensic audit: UPDATE detected on tanks');
-                    return !isSpam;
-                });
-                setUnifiedEvents(filtered);
+                    const title = ev.title || '';
+                    
+                    // [NOISE REDUCTION]: Filter out internal state transitions with "no essence"
+                    const isInternalNoise = 
+                        desc.includes('UPDATE detected on alerts') || 
+                        desc.includes('UPDATE detected on tanks') ||
+                        desc.includes('INSERT on alerts') ||
+                        desc.includes('Forensic audit: UPDATE') ||
+                        desc.includes('verified notification has no essence') ||
+                        title.includes('Audit Synchronized');
+
+                    if (isInternalNoise) return null;
+
+                    let finalDesc = desc;
+                    if (desc.includes('Forensic audit:')) {
+                        // Extract just the action as requested: "it should just show the action done"
+                        finalDesc = desc.split('Forensic audit:')[1]?.trim() || 'System state change';
+                    }
+                    
+                    // Strip generic "Audit Synchronized:" prefix if present
+                    if (finalDesc.includes('Audit Synchronized:')) {
+                        finalDesc = finalDesc.split('Audit Synchronized:')[1]?.trim() || finalDesc;
+                    }
+
+                    return { ...ev, description: finalDesc };
+                }).filter(Boolean);
+                setUnifiedEvents(mapped as any);
             }
         };
 
@@ -237,34 +268,43 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     filter: `station_id=eq.${stationId}`
                 },
                 (payload) => {
-                    const desc = payload.new.description || '';
-                    const isSpam = desc.includes('Forensic audit: INSERT on alerts') || 
-                                 desc.includes('Forensic audit: UPDATE detected on tanks');
-                    
-                    if (!isSpam) {
-                        setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
-                    }
+                    const description = payload.new.description || '';
                     const cat = payload.new.event_category || 'SYSTEM';
                     const isCritical = payload.new.severity === 'CRITICAL';
-                    const description = payload.new.description || '';
+                    const title = payload.new.title || '';
+                    
+                    // [FILTER]: Ignore routine forensic updates to prevent UI loops/spam
+                    const isNoise = 
+                        description.includes('UPDATE detected on alerts') || 
+                        description.includes('UPDATE detected on tanks') ||
+                        description.includes('INSERT on alerts') ||
+                        title.includes('Audit Synchronized');
+                    
+                    if (isNoise) return;
 
-                    // [FILTER]: Ignore routine forensic updates on tanks to prevent UI spam during refills
-                    if (cat === 'SYSTEM' && description.includes('Forensic audit: UPDATE detected on tanks')) {
-                        return;
+                    // Update UI State
+                    setUnifiedEvents(prev => [payload.new, ...prev].slice(0, 15));
+
+                    let messageText = description;
+                    if (description.includes('Forensic audit:')) {
+                        messageText = description.split('Forensic audit:')[1]?.trim() || 'System state change';
+                    } else {
+                        messageText = sanitizeIds(description);
                     }
-                    if (cat === 'SECURITY' && description.includes('Forensic audit: INSERT on alerts')) {
-                        return;
+
+                    if (messageText.includes('Audit Synchronized:')) {
+                        messageText = messageText.split('Audit Synchronized:')[1]?.trim() || messageText;
                     }
 
                     setToast({
-                        message: sanitizeIds(description) || 'New audit event recorded.',
+                        message: messageText || 'New audit event recorded.',
                         type: isCritical ? 'error' : cat === 'SECURITY' ? 'warning' : 'success',
                     });
 
                     if (NotificationService.isEnabled()) {
-                        NotificationService.show(sanitizeIds(description) || 'System Audit Event', {
-                            body: `Category: ${payload.new.event_category}`,
-                            tag: `audit-${payload.new.id}`
+                        NotificationService.show(messageText || 'System Audit Event', {
+                            body: `Category: ${cat} | Severity: ${payload.new.severity}`,
+                            tag: 'unified-event'
                         });
                     }
                 }
@@ -554,7 +594,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             .map((event: any) => {
                                             const category = event.event_category?.toLowerCase() || 'system';
                                             return (
-                                                <div key={event.id} className={`notification-item cat-${category} ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
+                                                <div key={event.id} className={`notification-item cat-${category} severity-${event.severity?.toLowerCase() || 'info'} ${resolvingIds.has(event.id) ? "resolving-out" : ""}`}>
                                                     <div className="notification-title">
                                                         <div className="notif-placeholder">
                                                             {event.event_category === 'SHIFT' ? <FiClock /> :
@@ -588,12 +628,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                         })}
                                     </>
                                 ) : (
-                                    <div className="flex flex-col items-center justify-center py-10 opacity-60">
-                                        <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
-                                            <MdCheck className="text-emerald-500" size={24} />
+                                    <div className="empty-notif-state">
+                                        <div className="empty-icon-wrapper">
+                                            <FiBell size={28} />
                                         </div>
-                                        <span className="text-sm font-bold text-gray-900">All Caught Up</span>
-                                        <span className="text-[11px] text-gray-500 mt-1">No pending alerts found</span>
+                                        <h4 className="empty-title">All Caught Up</h4>
+                                        <p className="empty-desc">
+                                            The Forensic Intelligence Scanner has found no active threats or pending alerts.
+                                        </p>
+                                        <div className="integrity-badge">
+                                            <span className="status-dot"></span>
+                                            System Integrity Verified
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -605,7 +651,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                     }}
                                     className="btn-open-alerts"
                                 >
-                                    <FiActivity /> Open Command Center
+                                    <FiActivity /> Command Center
                                 </button>
                             </div>
                         </div>

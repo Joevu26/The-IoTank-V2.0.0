@@ -6,7 +6,7 @@ import { useShiftStatus } from './useShiftStatus';
 import { supabase } from '@/config/supabase';
 import { calculateETE, calculateRate, TELEMETRY_CONSTANTS } from '@/utils/telemetryMath';
 
-export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
+export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading[]) {
     const { pushEvent } = useTelemetryQueue();
     const { openedAt, status: shiftStatus } = useShiftStatus();
     const [avgDailyRate, setAvgDailyRate] = useState<number>(0);
@@ -14,7 +14,7 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
     // Fetch Last 7 Days Average Dispense Rate
     useEffect(() => {
         const fetchHistoricalAverage = async () => {
-            if (!tank.id) return;
+            if (!tank || !tank.id) return;
             
             try {
                 // Get last 7 shift closures for this tank
@@ -45,7 +45,7 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
         };
 
         fetchHistoricalAverage();
-    }, [tank.id]);
+    }, [tank?.id]);
 
     const analytics = useMemo(() => {
         try {
@@ -135,7 +135,16 @@ export function useConsumptionAnalytics(tank: Tank, readings: TankReading[]) {
                 type: 'system_error',
                 message: `Analytics failed for ${tank.name}: ${analytics.error}`,
                 actionLabel: 'Details',
-                onAction: () => alert(`Error processing ${readings.length} readings for ${tank.name}.`)
+                onAction: () => {
+                    window.dispatchEvent(new CustomEvent('system-toast', {
+                        detail: {
+                            title: 'Analytics Error',
+                            message: `Error processing ${readings.length} readings for ${tank.name}.`,
+                            type: 'error',
+                            attribution: 'TELEMETRY'
+                        }
+                    }));
+                }
             });
         }
     }, [analytics.error, tank?.name, readings.length, pushEvent]);

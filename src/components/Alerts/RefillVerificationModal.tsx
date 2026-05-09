@@ -99,7 +99,14 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
             onClose();
         } catch (error: any) {
             console.error('Reconciliation error:', error);
-            alert(`Synchronization error: ${error.message}`);
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Sync Error',
+                    message: `Synchronization error: ${error.message}`,
+                    type: 'error',
+                    attribution: 'RECONCILIATION ENGINE'
+                }
+            }));
         } finally {
             setProcessing(false);
         }

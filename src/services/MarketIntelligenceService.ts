@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { MarketSignal, RegulatoryNotice, SignalSourceType } from '@/types';
+import { logger } from '@/utils/logger';
 import { supabase } from '@/config/supabase';
 
 export interface MarketIntelligenceConfig {
@@ -27,7 +28,7 @@ export class MarketIntelligenceService {
                 headers['Authorization'] = `Bearer ${session.access_token}`;
             }
         } catch (e) {
-            console.warn('[MarketIntelligenceService] Auth check failed, proceeding anonymously.');
+            logger.warn('[MarketIntelligenceService] Auth check failed, proceeding anonymously.');
         }
 
         return headers;
@@ -128,7 +129,7 @@ export class MarketIntelligenceService {
                 };
             });
         } catch (error) {
-            console.error('Error fetching NewsAPI:', error);
+            logger.error('Error fetching NewsAPI:', error);
             return this.getFallbackNews();
         }
     }
@@ -146,7 +147,7 @@ export class MarketIntelligenceService {
             const data = await response.json();
             return data.response?.data || [];
         } catch (error) {
-            console.error('Error fetching EIA:', error);
+            logger.error('Error fetching EIA:', error);
             return null;
         }
     }
@@ -172,7 +173,7 @@ export class MarketIntelligenceService {
                 }
             }
         } catch (error) {
-            console.error(`Error fetching benchmarks from proxy:`, error);
+            logger.error(`Error fetching benchmarks from proxy:`, error);
         }
         return results;
     }
@@ -197,7 +198,7 @@ export class MarketIntelligenceService {
         let news: MarketSignal[] = [];
         const triggerAlert = async (type: 'market_news' | 'regulatory_update', message: string, severity: 'info' | 'warning' = 'info') => {
             try {
-                await supabase.from('alerts').insert({
+                await supabase.from('alerts').upsert({
                     station_id: stationId,
                     alert_type: type, // Standardized to the actual alert type
                     severity,
@@ -208,8 +209,8 @@ export class MarketIntelligenceService {
                     is_acknowledged: false,
                     is_resolved: false,
                     created_at: new Date().toISOString()
-                });
-            } catch (err) { console.error('Failed to trigger news alert:', err); }
+                }, { onConflict: 'station_id,alert_type,title' }); // Avoid duplicate news alerts
+            } catch (err) { logger.error('Failed to trigger news alert:', err); }
         };
 
         try {
@@ -233,7 +234,7 @@ export class MarketIntelligenceService {
                 if (error) throw error;
                 if ((signal.relevanceScore ?? 0) >= 0.9) await triggerAlert('market_news', `High-Impact News: ${signal.title}`);
             }
-        } catch (e) { console.error('News sync failed:', e); someFailure = true; }
+        } catch (e) { logger.error('News sync failed:', e); someFailure = true; }
 
         try {
             const epra = await this.fetchEPRANotices();
@@ -252,7 +253,7 @@ export class MarketIntelligenceService {
                 if (error) throw error;
                 await triggerAlert('regulatory_update', `Regulatory Update: ${notice.title}`, 'warning');
             }
-        } catch (e) { console.error('EPRA sync failed:', e); someFailure = true; }
+        } catch (e) { logger.error('EPRA sync failed:', e); someFailure = true; }
 
         try {
             const eiaData = await this.fetchEIAPrices();
@@ -273,7 +274,7 @@ export class MarketIntelligenceService {
                     if (error) throw error;
                 }
             }
-        } catch (e) { console.error('EIA sync failed:', e); someFailure = true; }
+        } catch (e) { logger.error('EIA sync failed:', e); someFailure = true; }
 
         try {
             const benchmarks = await this.fetchCrudeBenchmarks();
@@ -292,7 +293,7 @@ export class MarketIntelligenceService {
                 });
                 if (error) throw error;
             }
-        } catch (e) { console.error('Benchmark sync failed:', e); someFailure = true; }
+        } catch (e) { logger.error('Benchmark sync failed:', e); someFailure = true; }
 
         return !someFailure;
     }

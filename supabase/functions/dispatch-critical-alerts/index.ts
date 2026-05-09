@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.40.0'
 import { SmtpClient } from 'https://deno.land/x/smtp@v0.7.0/mod.ts'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { renderSecurityEmail } from '../_shared/SecurityEmailTemplate.ts'
+import { renderTransactionalEmail } from '../_shared/TransactionalEmailTemplate.ts'
 
 declare const Deno: any;
 
@@ -28,31 +29,63 @@ type ClaimedEvent = {
 
 async function isAuthorized(req: Request, supabaseAdmin: any) {
   const authHeader = req.headers.get('Authorization') || '';
-  if (!authHeader.startsWith('Bearer ')) return false;
+  if (!authHeader.startsWith('Bearer ')) {
+    console.warn('[isAuthorized] Missing or invalid Authorization header');
+    return false;
+  }
   const token = authHeader.replace('Bearer ', '').trim();
-  if (!token) return false;
+  if (!token) {
+    console.warn('[isAuthorized] Empty token');
+    return false;
+  }
 
   const cronSecret = Deno.env.get('SECURITY_ALERTS_CRON_SECRET');
   if (cronSecret && token === cronSecret) return true;
 
-  if (token.split('.').length !== 3) return false;
+  if (token.split('.').length !== 3) {
+    console.warn('[isAuthorized] Token is not a JWT');
+    return false;
+  }
+  
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return false;
+  if (error || !user) {
+    console.warn('[isAuthorized] Failed to get user from token:', error?.message);
+    return false;
+  }
 
+  // 1. Check if System Admin
   const { data: systemUser } = await supabaseAdmin
     .from('system_users')
     .select('role, is_active')
     .or(`auth_user_id.eq.${user.id},email.eq.${user.email || ''}`)
     .maybeSingle();
 
-  return !!(systemUser?.is_active && ['super_admin', 'admin_helper'].includes(systemUser.role));
+  if (systemUser?.is_active && ['super_admin', 'admin_helper'].includes(systemUser.role)) {
+      console.log('[isAuthorized] Authorized as System Admin:', systemUser.role);
+      return true;
+  }
+
+  // 2. Check if Station Admin
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role, station_id')
+    .or(`auth_user_id.eq.${user.id},email.eq.${user.email || ''}`)
+    .maybeSingle();
+
+  if (profile && ['owner', 'admin'].includes(profile.role)) {
+      console.log('[isAuthorized] Authorized as Station Admin:', profile.role);
+      return true;
+  }
+
+  console.warn('[isAuthorized] Denied: User has no authorized role in system_users or profiles', user.email);
+  return false;
 }
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const SUPABASE_URL = 'https://suifvborodwergtrbjez.supabase.co';
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   // SMTP Secrets from your Supabase Dashboard
@@ -88,28 +121,65 @@ Deno.serve(async (req: Request) => {
     const smtpClient = new SmtpClient();
 
     const connectSMTP = async () => {
-      await smtpClient.connect({
-        hostname: SMTP_HOSTNAME,
-        port: SMTP_PORT,
-        username: SMTP_USERNAME,
-        password: SMTP_PASSWORD,
-      });
+      console.log(`[SMTP] Initiating connection to ${SMTP_HOSTNAME}:${SMTP_PORT}...`);
+      
+      const isSecure = SMTP_PORT === 465; 
+      const isStartTLS = SMTP_PORT === 587; 
+      
+      try {
+        await smtpClient.connect({
+          hostname: SMTP_HOSTNAME,
+          port: SMTP_PORT,
+          username: SMTP_USERNAME,
+          password: SMTP_PASSWORD,
+          tls: isSecure || isStartTLS,
+        });
+        
+        // [FORENSIC FIX]: Wait for server greeting to stabilize before first command
+        // Gmail often errors with 'invalid cmd' if we are too fast.
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log(`[SMTP] Handshake stabilized. Connected to ${SMTP_HOSTNAME}`);
+      } catch (connErr) {
+        console.error(`[SMTP] Protocol Error at ${SMTP_HOSTNAME}:${SMTP_PORT}:`, connErr.message);
+        throw connErr;
+      }
     };
 
     // ── CASE 1: DIRECT SMTP DISPATCH (Secure Server-Side Render) ───
-    if (body.action === 'direct_security_alert' && body.to && body.params) {
+    if ((body.cmd === 'direct_security_alert' || body.action === 'direct_security_alert') && body.to && body.params) {
       await connectSMTP();
       const generatedHtml = renderSecurityEmail(body.params);
+      const subjectPrefix = body.params.type === 'SHIFT_REPORT' ? '📊 IOTANK OPERATIONS' : '🚨 IOTANK SECURITY';
       await smtpClient.send({
         from: SEND_FROM_EMAIL,
         to: body.to,
-        subject: `🚨 IOTANK SECURITY: ${body.params.type} at ${body.params.siteName}`,
+        subject: `${subjectPrefix}: ${body.params.type.replace('_', ' ')} at ${body.params.siteName}`,
         content: generatedHtml, // fallback text-like content
         html: generatedHtml,
       });
       await smtpClient.close();
 
       return new Response(JSON.stringify({ success: true, method: 'direct_smtp_secure' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── CASE 1.5: DIRECT TRANSACTIONAL DISPATCH (Welcome/Invite) ──
+    if ((body.cmd === 'direct_transactional_email' || body.action === 'direct_transactional_email') && body.to && body.params) {
+      await connectSMTP();
+      const generatedHtml = renderTransactionalEmail(body.params);
+      await smtpClient.send({
+        from: SEND_FROM_EMAIL,
+        to: body.to,
+        subject: body.params.type === 'INVITATION' ? `🛡️ Team Invitation: IoTank Fuel Intelligence` : `🚀 Welcome to IoTank: ${body.params.stationName}`,
+        content: generatedHtml,
+        html: generatedHtml,
+      });
+      await smtpClient.close();
+
+      return new Response(JSON.stringify({ success: true, method: 'direct_transactional_secure' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

@@ -124,11 +124,21 @@ export const ActionQueue: React.FC = () => {
             {/* ── Scrollable Items ── */}
             <div className="action-queue-items-container custom-scrollbar">
                 {displayEvents.length === 0 ? (
-                    <div className="action-queue-empty-state">
-                        <div className="action-queue-empty-icon-box">
-                            <FiCheckCircle size={22} className="action-queue-empty-icon" />
+                    <div className="action-queue-empty-state-modern animate-fade-in">
+                        <div className="empty-state-visual-container">
+                            <div className="empty-state-glow" />
+                            <div className="empty-state-icon-shell">
+                                <FiCheckCircle size={32} className="text-emerald-500" />
+                            </div>
                         </div>
-                        <span className="action-queue-empty-text">All Clear</span>
+                        <h4 className="empty-state-heading">Integrity Optimal</h4>
+                        <p className="empty-state-subheading">
+                            The Operational Directive Engine is clear. No high-priority alerts require attention.
+                        </p>
+                        <div className="empty-state-footer-bits">
+                            <span className="bit-dot animate-ping" />
+                            <span className="bit-text">Real-time scan in progress</span>
+                        </div>
                     </div>
                 ) : (
                     displayEvents.map((item) => {
@@ -137,6 +147,7 @@ export const ActionQueue: React.FC = () => {
                                 key={item.id}
                                 onClick={() => handleItemClick(item)}
                                 className="action-queue-item"
+                                data-type={item.type}
                             >
                                 {/* Type pill + icon */}
                                 <div className="action-queue-type-pill">

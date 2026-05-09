@@ -38,7 +38,7 @@ export function useGeminiInsights(stationId: string, tankId?: string) {
             });
 
             // Use tank-aware intelligence generation
-            const tankAwareInsights = await generateTankAwareInsights(tanks, signals, risks, service);
+            const tankAwareInsights = await generateTankAwareInsights(tanks, signals, risks, notices, service);
             setInsights(tankAwareInsights);
         } catch (err) {
             console.error('Error fetching AI insights (Failover exhausted):', err);

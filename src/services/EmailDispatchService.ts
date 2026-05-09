@@ -2,7 +2,7 @@ import { supabase } from '@/config/supabase';
 
 export interface EmailPayload {
     to: string;
-    type: 'THEFT' | 'LEAK' | 'COLLUSION' | 'SYSTEM_CRITICAL';
+    type: 'THEFT' | 'LEAK' | 'COLLUSION' | 'SYSTEM_CRITICAL' | 'REFILL' | 'UNAUTHORIZED_REFILL' | 'DISCONNECT' | 'LOW_FUEL' | 'OVERFILL' | 'WELCOME' | 'INVITATION' | 'SHIFT_REPORT';
     siteName: string;
     details: {
         timestamp: string;
@@ -11,6 +11,10 @@ export interface EmailPayload {
         varianceValue?: number;
         operator?: string;
         description: string;
+        // Shift Specific
+        totalSales?: number;
+        totalLiters?: number;
+        duration?: string;
     };
 }
 
@@ -43,11 +47,12 @@ export class EmailDispatchService {
     static async sendSecurityAlert(payload: EmailPayload) {
         try {
             const headers = await this.getSafeAuthHeaders();
-            const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/dispatch-critical-alerts', {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const response = await fetch(`${supabaseUrl}/functions/v1/dispatch-critical-alerts`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    action: 'direct_security_alert',
+                    cmd: 'direct_security_alert',
                     to: payload.to,
                     params: {
                         type: payload.type,
@@ -57,7 +62,10 @@ export class EmailDispatchService {
                         dropRate: payload.details.dropRate,
                         lossVolume: payload.details.lossVolume,
                         varianceValue: payload.details.varianceValue,
-                        operator: payload.details.operator
+                        operator: payload.details.operator,
+                        totalSales: payload.details.totalSales,
+                        totalLiters: payload.details.totalLiters,
+                        duration: payload.details.duration
                     }
                 })
             });

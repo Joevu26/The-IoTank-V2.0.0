@@ -16,7 +16,8 @@
  *      - Open Shift: Drop rate > Max Pump Capacity (Parallel Pull Theft)
  */
 
-import { Tank, TankReading, Alert } from '@/types';
+import type { Tank, TankReading, Alert } from '@/types';
+import { THRESHOLDS } from '@/constants/forensicThresholds';
 import { scoreByType } from './AlertScoringEngine';
 import { calculateTimeBasedSlope } from './algorithms';
 
@@ -60,7 +61,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     const drafts: DraftAlert[] = [];
     const now = Date.now();
 
-    const telemetryGapMs = (ctx.telemetryGapMinutes ?? 30) * 60 * 1000;
+    const telemetryGapMs = (ctx.telemetryGapMinutes ?? THRESHOLDS.TELEMETRY.OFFLINE_WARNING_MINS) * 60 * 1000;
     
     // Safety check
     if (!tank || !latestReading) return [];
@@ -79,14 +80,14 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     })();
 
     // ── 1. CRITICAL LEVEL BREACH (5%) ──────────────────────────────────────────
-    if (fuelLevel !== undefined && fuelLevel <= 5) {
+    if (fuelLevel !== undefined && fuelLevel <= THRESHOLDS.LEVEL.CRITICAL_LOW) {
         const { score, label } = scoreByType('low_level_critical', 0.95);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
             type: 'low_level',
             title: `CRITICAL LOW: ${tank.name} (Dead Stock Breach)`,
-            description: `Level at ${fuelLevel.toFixed(1)}%. Pump protection activated at 5%. Shutdown imminent.`,
+            description: `Level at ${fuelLevel.toFixed(1)}%. Pump protection activated at ${THRESHOLDS.LEVEL.CRITICAL_LOW}%. Shutdown imminent.`,
             message: `${tank.name} level critical: ${fuelLevel.toFixed(1)}%`,
             severity: 'critical',
             severityLabel: label,
@@ -99,11 +100,11 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
     }
-    // ── 2. LOW LEVEL WARNING (15%) ─────────────────────────────────────────────
+    // ── 2. LOW LEVEL WARNING (20%) ─────────────────────────────────────────────
     else if (
         fuelLevel !== undefined &&
-        fuelLevel > 5 &&
-        fuelLevel <= 15 // Standardized with Backend
+        fuelLevel > THRESHOLDS.LEVEL.CRITICAL_LOW &&
+        fuelLevel <= THRESHOLDS.LEVEL.WARNING_LOW
     ) {
         const { score, label } = scoreByType('low_level_warning', 0.80);
         drafts.push({
@@ -111,7 +112,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             siteId: tank.siteId,
             type: 'low_level',
             title: `LOW LEVEL: ${tank.name} Reorder Point`,
-            description: `Level at ${fuelLevel.toFixed(1)}%. Recommend reordering fuel to maintain operations.`,
+            description: `Level at ${fuelLevel.toFixed(1)}%. Recommend reordering fuel to maintain operations. Threshold: ${THRESHOLDS.LEVEL.WARNING_LOW}%.`,
             message: `${tank.name} fuel level low: ${fuelLevel.toFixed(1)}%`,
             severity: 'warning',
             severityLabel: label,
@@ -126,14 +127,14 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     }
 
     // ── 2.6 HIGH LEVEL & OVERFILL (95% / 98%) ──────────────────────────────────
-    if (fuelLevel !== undefined && fuelLevel >= 98) {
+    if (fuelLevel !== undefined && fuelLevel >= THRESHOLDS.LEVEL.CRITICAL_HIGH) {
         const { score, label } = scoreByType('composite_supply_risk', 0.98);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
             type: 'overfill',
             title: `CRITICAL OVERFILL: ${tank.name}`,
-            description: `Level at ${fuelLevel.toFixed(1)}%. Immediate spill risk. Halt all delivery operations.`,
+            description: `Level at ${fuelLevel.toFixed(1)}%. Immediate spill risk. Halt all delivery operations. Threshold: ${THRESHOLDS.LEVEL.CRITICAL_HIGH}%.`,
             message: `CRITICAL OVERFILL: ${tank.name} at ${fuelLevel.toFixed(1)}%`,
             severity: 'critical',
             severityLabel: label,
@@ -145,29 +146,57 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             aiConfidence: 0.98,
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
-    }
-
-    // ── 3. CONNECTIVITY LOST ─────────────────────────────────────────────────────
-    if (latestReading && (now - latestReading.timestamp) > telemetryGapMs) {
-        const gapMinutes = Math.round((now - latestReading.timestamp) / 60000);
-        const { score, label } = scoreByType('telemetry_gap', 0.85);
+    } else if (fuelLevel !== undefined && fuelLevel >= THRESHOLDS.LEVEL.WARNING_HIGH) {
+        const { score, label } = scoreByType('composite_supply_risk', 0.85);
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'connectivity_lost',
-            title: `Offline: ${tank.name}`,
-            description: `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
-            message: `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
-            severity: gapMinutes > 60 ? 'critical' : 'warning', // Standardized with Backend (1h = critical)
-            severityLabel: gapMinutes > 60 ? 'CRITICAL' : label,
-            score: gapMinutes > 60 ? 98 : score,
+            type: 'warning_high',
+            title: `HIGH LEVEL: ${tank.name}`,
+            description: `Level at ${fuelLevel.toFixed(1)}%. Monitoring required. Threshold: ${THRESHOLDS.LEVEL.WARNING_HIGH}%.`,
+            message: `HIGH LEVEL: ${tank.name} at ${fuelLevel.toFixed(1)}%`,
+            severity: 'warning',
+            severityLabel: label,
+            score,
             source: 'system',
             state: 'ACTIVE',
             resolved: false,
             detectionMethod: 'deterministic',
             aiConfidence: 0.85,
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-            metadata: { telemetryGapMinutes: gapMinutes },
+        });
+    }
+
+    // ── 3. CONNECTIVITY LOST ─────────────────────────────────────────────────────
+    const readingTimestamp = typeof latestReading.timestamp === 'string' 
+        ? new Date(latestReading.timestamp).getTime() 
+        : latestReading.timestamp;
+
+    if (latestReading && (now - readingTimestamp) > telemetryGapMs) {
+        const gapMinutes = Math.round((now - readingTimestamp) / 60000);
+        const { score, label } = scoreByType('telemetry_gap', 0.85);
+        const isCritical = gapMinutes >= THRESHOLDS.TELEMETRY.OFFLINE_CRITICAL_MINS;
+        
+        drafts.push({
+            tankId: tank.id,
+            siteId: tank.siteId,
+            type: 'connectivity_lost',
+            title: isCritical ? `CRITICAL OFFLINE: ${tank.name}` : `Offline: ${tank.name}`,
+            description: `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
+            message: `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
+            severity: isCritical ? 'critical' : 'warning',
+            severityLabel: isCritical ? 'CRITICAL' : label,
+            score: isCritical ? 98 : score,
+            source: 'system',
+            state: 'ACTIVE',
+            resolved: false,
+            detectionMethod: 'deterministic',
+            aiConfidence: 0.85,
+            rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
+            metadata: { 
+                type: 'CONNECTIVITY_LOST',
+                telemetryGapMinutes: gapMinutes 
+            },
         });
     }
 
@@ -205,24 +234,31 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const prevVol = previousReading.volumeCorrected || previousReading.volume || 0;
         const currVol = latestReading.volumeCorrected || latestReading.volume || 0;
         
+        const prevTime = typeof previousReading.timestamp === 'string' 
+            ? new Date(previousReading.timestamp).getTime() 
+            : previousReading.timestamp;
+            
+        const currTime = typeof latestReading.timestamp === 'string' 
+            ? new Date(latestReading.timestamp).getTime() 
+            : latestReading.timestamp;
+
         const points = [
-            { x: previousReading.timestamp, y: prevVol },
-            { x: latestReading.timestamp, y: currVol }
+            { x: prevTime, y: prevVol },
+            { x: currTime, y: currVol }
         ];
         
         const volumeDrop = prevVol - currVol; // Positive if consuming
         const dropRate = -calculateTimeBasedSlope(points); // Slope is negative for drop, we want positive L/hr
 
         // Heuristics
-        const rapidDropThreshold = tank.rapidDefillThreshold || 50; // L/hr (Forensic Theft)
-        const leakThreshold = tank.leakageThreshold || 2;           // L/hr (Maintenance Leak)
+        const rapidDropThreshold = tank.rapidDefillThreshold || THRESHOLDS.FORENSICS.RAPID_DEFILL_LHR; 
+        const leakThreshold = tank.leakageThreshold || THRESHOLDS.FORENSICS.LEAK_DETECTION_LHR;
         
-        const maxPumpFlow = (ctx.maxPumpFlowRateLpm || 80) * 60; // Default 4800 L/hr
+        const maxPumpFlow = (ctx.maxPumpFlowRateLpm || THRESHOLDS.FORENSICS.MAX_PUMP_FLOW_LPM) * 60; // L/hr
 
         if (!isShiftOpen) {
             // CASE A: Shift is CLOSED. Any drop is suspicious.
-            const MIN_THEFT_VOLUME = 2.0; 
-            if (volumeDrop > MIN_THEFT_VOLUME && dropRate > rapidDropThreshold) {
+            if (volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > rapidDropThreshold) {
                 const { score, label } = scoreByType('composite_supply_risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
@@ -265,8 +301,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             }
         } else {
             // CASE B: Shift is OPEN. Drop is expected, but siphoning (Parallel Pull) is theft.
-            const MIN_THEFT_VOLUME = 2.0; 
-            if (volumeDrop > MIN_THEFT_VOLUME && dropRate > maxPumpFlow) {
+            if (volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > maxPumpFlow) {
                 const { score, label } = scoreByType('composite_supply_risk', 0.95);
                 drafts.push({
                     tankId: tank.id,
@@ -313,7 +348,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                     ? `Critical integrity error: Tank level (${currVol.toFixed(1)}L) exceeds physical capacity (${tank.capacity}L). This indicates severe calibration drift or sensor malfunction.`
                     : (isUnauthorized
                         ? `SECURITY BREACH: Fuel inflow of ${volumeIncrease.toFixed(1)}L detected while shift is CLOSED. Out-of-hours delivery requires immediate verification.`
-                        : `Significant volume increase of ${volumeIncrease.toFixed(1)}L detected at ${new Date().toLocaleTimeString()}. Automated delivery record required for forensic reconciliation.`),
+                        : `Significant volume increase of ${volumeIncrease.toFixed(1)}L detected. Automated delivery record required for forensic reconciliation.`),
                 message: isOverCapacity 
                     ? `CRITICAL: ${tank.name} measured volume exceeds physical capacity. Integrity breach.`
                     : (isUnauthorized

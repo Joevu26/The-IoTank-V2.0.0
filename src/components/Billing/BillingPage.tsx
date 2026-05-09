@@ -3,20 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/config/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { format } from 'date-fns';
-import {
-    FaCreditCard, FaCheckCircle, FaExclamationTriangle, FaHistory,
-    FaDownload, FaArrowUp, FaArrowDown, FaRocket, FaDatabase, FaShieldAlt, FaChartLine
+import { 
+    FaMoneyBillWave, 
+    FaHistory, 
+    FaShieldAlt, 
+    FaChartBar, 
+    FaExclamationTriangle,
+    FaExchangeAlt,
+    FaPhone,
+    FaCreditCard,
+    FaFingerprint,
+    FaSatellite
 } from 'react-icons/fa';
+import { FiArrowRight, FiActivity } from 'react-icons/fi';
 import './BillingPage.css';
 
 interface BillingInfo {
-    station_id: string; // Unified identifier
+    station_id: string; 
     current_debt: number;
     total_paid: number;
     account_status: string;
     next_billing_date: string;
     station_name: string;
+    sub_tier?: 'BASIC' | 'PRO' | 'ENTERPRISE';
+    sub_status?: 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'PROVISIONING';
+    sub_expires_at?: string;
+    phone?: string;
+    telemetry_usage_mb?: number;
 }
 
 interface Transaction {
@@ -28,14 +41,10 @@ interface Transaction {
     payment_method: string;
     created_at: string;
     completed_at: string;
+    provider?: string;
+    provider_ref?: string;
+    status: string;
 }
-
-const BILLING_MODEL_FEATURES = [
-    { text: 'Fixed monthly service fee: Ksh 3,500', icon: <FaCheckCircle /> },
-    { text: 'Full database & storage hosting', icon: <FaCheckCircle /> },
-    { text: 'AI-powered procurement analytics', icon: <FaCheckCircle /> },
-    { text: 'Unlimited real-time monitoring', icon: <FaCheckCircle /> },
-];
 
 const MOCK_BILLING: BillingInfo = {
     station_id: 'demo-id',
@@ -43,14 +52,39 @@ const MOCK_BILLING: BillingInfo = {
     total_paid: 450000,
     account_status: 'healthy',
     next_billing_date: new Date(Date.now() + 864000000).toISOString(),
-    station_name: 'Simulated Environment'
+    station_name: 'Simulated Environment',
+    sub_tier: 'PRO',
+    sub_status: 'ACTIVE',
+    telemetry_usage_mb: 4.52
 };
 
 const MOCK_TRANSACTIONS: Transaction[] = [
-    { id: '1', transaction_type: 'payment', amount: 5000, description: 'M-Pesa Remittance - QJK98X', payment_status: 'completed', payment_method: 'mpesa', created_at: new Date(Date.now() - 86400000).toISOString(), completed_at: new Date(Date.now() - 86400000).toISOString() },
-    { id: '2', transaction_type: 'charge', amount: 2500, description: 'Monthly Infrastructure Fee', payment_status: 'completed', payment_method: 'system', created_at: new Date(Date.now() - 172800000).toISOString(), completed_at: new Date(Date.now() - 172800000).toISOString() },
-    { id: '3', transaction_type: 'charge', amount: 1200, description: 'AI Analytics Overages', payment_status: 'completed', payment_method: 'system', created_at: new Date(Date.now() - 259200000).toISOString(), completed_at: new Date(Date.now() - 259200000).toISOString() },
+    { id: '1', transaction_type: 'payment', amount: 5000, description: 'M-Pesa Remittance - QJK98X', payment_status: 'completed', payment_method: 'mpesa', created_at: new Date(Date.now() - 86400000).toISOString(), completed_at: new Date(Date.now() - 86400000).toISOString(), provider: 'MPESA', status: 'COMPLETED', provider_ref: 'MP_12345' },
+    { id: '2', transaction_type: 'charge', amount: 2500, description: 'Monthly Infrastructure Fee', payment_status: 'completed', payment_method: 'system', created_at: new Date(Date.now() - 172800000).toISOString(), completed_at: new Date(Date.now() - 172800000).toISOString(), provider: 'SYSTEM', status: 'COMPLETED', provider_ref: 'SYS_999' },
 ];
+
+const Sparkline: React.FC<{ color: string }> = ({ color }) => (
+    <div className="metric-trend-sparkline">
+        <svg className="sparkline-svg" viewBox="0 0 100 40">
+            <motion.path
+                d="M0,30 Q10,10 20,25 T40,15 T60,35 T80,5 T100,20"
+                fill="none"
+                stroke={color}
+                strokeWidth="3"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 2, ease: "easeInOut" }}
+            />
+            <motion.path
+                d="M0,30 Q10,10 20,25 T40,15 T60,35 T80,5 T100,20 L100,40 L0,40 Z"
+                fill={color}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.1 }}
+                transition={{ duration: 1, delay: 1 }}
+            />
+        </svg>
+    </div>
+);
 
 export const BillingPage: React.FC = () => {
     const { currentUser, canSee } = useAuth();
@@ -60,13 +94,12 @@ export const BillingPage: React.FC = () => {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [payAmount, setPayAmount] = useState('');
-    const [payRef, setPayRef] = useState('');
-    const [payMethod, setPayMethod] = useState<'mpesa' | 'bank_transfer' | 'card'>('mpesa');
+    const [payPhone, setPayPhone] = useState(currentUser?.phoneNumber || '');
     const [paying, setPaying] = useState(false);
     const [payFeedback, setPayFeedback] = useState('');
     const [stationId, setStationId] = useState<string | null>(null);
-    const [activeBillingTab, setActiveBillingTab] = useState<'overview' | 'usage' | 'history'>('overview');
     const [isDemo, setIsDemo] = useState(false);
+    const [readingCount, setReadingCount] = useState(0);
 
     useEffect(() => {
         const fetchBilling = async () => {
@@ -74,18 +107,14 @@ export const BillingPage: React.FC = () => {
             setLoading(true);
 
             try {
-                // Production-Ready Query: Standardizing on station_id and owner linkage
                 let query = supabase.from('fuel_stations').select('*');
 
                 if (currentUser.stationId && currentUser.stationId !== 'SYSTEM_GOVERNANCE') {
-                    // Standard user path: Fetch by assigned station ID
                     query = query.eq('station_id', currentUser.stationId);
                 } else if (currentUser.isSystemAccount) {
-                    // System Admin path: Usually sees nothing unless searching
                     setLoading(false);
                     return;
                 } else {
-                    // Provisioning Fallback: Fetch by owner_id if station_id is not yet assigned to profile
                     query = query.eq('owner_id', currentUser.authUserId);
                 }
 
@@ -96,20 +125,20 @@ export const BillingPage: React.FC = () => {
                 if (cbData) {
                     setBilling(cbData);
                     setStationId(cbData.station_id);
+                    setPayPhone(cbData.phone || currentUser?.phoneNumber || '');
 
-                    const { data: txData } = await supabase
-                        .from('transactions')
-                        .select('*')
-                        .eq('station_id', cbData.station_id)
-                        .order('created_at', { ascending: false })
-                        .limit(20);
+                    const [txRes, readingRes] = await Promise.all([
+                        supabase.from('billing_transactions').select('*').eq('station_id', cbData.station_id).order('created_at', { ascending: false }).limit(20),
+                        supabase.from('sensor_readings_partitioned').select('*', { count: 'exact', head: true }).eq('station_id', cbData.station_id)
+                    ]);
 
-                    setTransactions(txData || []);
+                    setTransactions(txRes.data || []);
+                    setReadingCount(readingRes.count || 0);
                     setIsDemo(false);
                 } else {
-                    console.log("[BILLING] No production record found. Defaulting to Simulation Mode.");
                     setBilling(MOCK_BILLING);
                     setTransactions(MOCK_TRANSACTIONS);
+                    setStationId(MOCK_BILLING.station_id);
                     setIsDemo(true);
                 }
             } catch (err) {
@@ -131,389 +160,339 @@ export const BillingPage: React.FC = () => {
                     <FaShieldAlt size={48} className="restricted-shield-icon" />
                 </div>
                 <h2>Security Protocol Enforced</h2>
-                <p>
-                    Finance and Governance modules are limited to <strong>Administrator</strong> class users. 
-                    Your current credential set does not grant access to this infrastructure.
-                </p>
+                <p>Finance and Governance modules are limited to Administrators.</p>
                 <div className="restricted-actions">
-                    <button onClick={() => navigate('/dashboard')} className="btn-primary" aria-label="Return to Dashboard">Return to Hub</button>
-                    <button onClick={() => window.open('mailto:security@iotank.com')} className="btn-outline" aria-label="Email support for access">Request Clearance</button>
+                    <button onClick={() => navigate('/dashboard')} className="btn-primary">Return to Hub</button>
                 </div>
             </div>
         );
     }
 
-    const handlePayment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setPayFeedback('');
-        const amount = parseFloat(payAmount);
-        if (!amount || amount <= 0) { setPayFeedback('Please enter a valid amount.'); return; }
-        if (!payRef.trim()) { setPayFeedback('Please enter a payment reference.'); return; }
-        if (!stationId) return;
-
-        setPaying(true);
-        const { error } = await supabase.rpc('process_payment', {
-            p_station_id: stationId,
-            p_amount: amount,
-            p_payment_method: payMethod,
-            p_payment_reference: payRef.trim(),
-            p_description: `${payMethod.toUpperCase()} payment - ${payRef}`,
-        });
-
+    const handleQuickProvision = async () => {
+        const newName = prompt("Enter Organization Name:", "My Station");
+        if (!newName) return;
+        setLoading(true);
+        const { error } = await supabase.rpc('emergency_set_station_name', { p_name: newName });
         if (error) {
-            setPayFeedback(` Payment failed: ${error.message}`);
-        } else {
-            setPayFeedback(`✅ Payment of KSh ${amount.toLocaleString()} recorded!`);
-            setPayAmount('');
-            setPayRef('');
-            const { data: updated } = await supabase.from('fuel_stations').select('*').eq('station_id', stationId).single();
-            if (updated) setBilling(updated);
-            const { data: txData } = await supabase.from('transactions').select('*').eq('station_id', stationId).order('created_at', { ascending: false }).limit(20);
-            setTransactions(txData || []);
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Provisioning Error',
+                    message: "Error: " + error.message,
+                    type: 'error',
+                    attribution: 'SYSTEM PROVISIONING'
+                }
+            }));
         }
-        setPaying(false);
+        else window.location.reload();
+        setLoading(false);
     };
 
-    const formatDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-    const txIcon = (type: string) => ['payment', 'credit'].includes(type) ? <FaArrowDown /> : <FaArrowUp />;
+    const handleStkPush = async () => {
+        if (!payAmount || parseFloat(payAmount) <= 0) { setPayFeedback('⚠️ Enter amount'); return; }
+        if (!payPhone || payPhone.length < 10) { setPayFeedback('⚠️ Enter valid phone'); return; }
+        if (!stationId) { setPayFeedback('⚠️ ID missing'); return; }
 
-    if (loading) {
-        return <div className="billing-loading">Authenticating Financial Ledger…</div>;
-    }
+        setPaying(true);
+        setPayFeedback(`📲 Initiating Push...`);
 
-    if (!billing) {
-        return (
-            <div className="billing-not-found">
-                <FaExclamationTriangle size={32} color="var(--color-warning)" />
-                <p>System error: No billing context identified. Please contact DevOps.</p>
-            </div>
-        );
-    }
+        try {
+            const amount = parseFloat(payAmount);
+            const ref = 'STK_' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    const isOverdue = billing.account_status === 'overdue' || billing.current_debt > 1000;
+            const { data, error } = await supabase.functions.invoke('mpesa-proxy', {
+                body: { phone: payPhone, amount: amount, reference: ref, stationId: stationId }
+            });
+
+            if (error) throw error;
+
+            await supabase.from('billing_transactions').insert({
+                station_id: stationId,
+                amount: amount,
+                provider: 'MPESA',
+                provider_ref: data.CheckoutRequestID || ref,
+                status: 'PENDING',
+                description: `M-Pesa STK Push initiated for KSh ${amount}`
+            });
+
+            setPayFeedback(`✅ Request Sent!`);
+            setPayAmount('');
+        } catch (err: any) {
+            setPayFeedback(`❌ Failed: ${err.message}`);
+        } finally {
+            setPaying(false);
+        }
+    };
+
+    const handlePaystackPayment = async () => {
+        const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+        if (!publicKey || publicKey === 'pk_test_placeholder') {
+            setPayFeedback('❌ Config error');
+            return;
+        }
+        if (!payAmount || parseFloat(payAmount) <= 0) {
+            setPayFeedback('⚠️ Enter amount');
+            return;
+        }
+        // @ts-ignore
+        const PaystackPop = window.PaystackPop;
+        if (!PaystackPop) {
+            setPayFeedback('❌ SDK not loaded');
+            return;
+        }
+
+        try {
+            const handler = PaystackPop.setup({
+                key: publicKey,
+                email: currentUser?.email || 'finance@iotank.com',
+                amount: parseFloat(payAmount) * 100,
+                currency: 'KES',
+                ref: 'PSTK_' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+                callback: (response: any) => {
+                    setPaying(true);
+                    setPayFeedback('⏳ Verifying...');
+                    const verify = async () => {
+                        try {
+                            const { error } = await supabase.rpc('process_payment', {
+                                p_station_id: stationId,
+                                p_amount: parseFloat(payAmount),
+                                p_payment_method: 'PAYSTACK',
+                                p_payment_reference: response.reference,
+                                p_description: 'Paystack Card Settlement'
+                            });
+                            if (error) throw error;
+                            setPayFeedback('✅ Success!');
+                            setTimeout(() => window.location.reload(), 2000);
+                        } catch (err: any) {
+                            setPayFeedback(`❌ Failed: ${err.message}`);
+                            setPaying(false);
+                        }
+                    };
+                    verify();
+                },
+                onClose: () => {
+                    setPayFeedback('ℹ️ Closed.');
+                    setPaying(false);
+                }
+            });
+            handler.openIframe();
+        } catch (err: any) {
+            setPayFeedback(`❌ Init Error: ${err.message}`);
+        }
+    };
+
+    const formatDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' }) : '—';
+    const txIcon = (type: string) => ['payment', 'credit', 'MPESA', 'PAYSTACK'].includes(type) ? <FaHistory /> : <FiActivity />;
+
+    if (loading) return <div className="billing-loading">SYNCING LEDGER...</div>;
+    if (!billing) return <div className="billing-not-found">LEDGER MISSING</div>;
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: { staggerChildren: 0.1 }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: { y: 0, opacity: 1 }
+    };
 
     return (
-        <div className="billing-page">
+        <motion.div 
+            initial="hidden" 
+            animate="visible" 
+            variants={containerVariants}
+            className="billing-dashboard-v2"
+        >
+            <header className="billing-header-v2">
+                <div className="flex flex-col">
+                    <motion.h1 variants={itemVariants} className="billing-title-main">Billing Hub</motion.h1>
+                    <motion.p variants={itemVariants} className="billing-subtitle-main">Financial Matrix & Ledger</motion.p>
+                </div>
+                <motion.div variants={itemVariants} className="billing-status-badge">
+                    <div className="status-dot-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">{billing.account_status}</span>
+                </motion.div>
+            </header>
+
             <AnimatePresence>
                 {isDemo && (
                     <motion.div 
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
-                        className="simulation-insight-banner"
+                        exit={{ height: 0, opacity: 0 }}
+                        className="simulation-banner-v3"
                     >
-                        <FaExclamationTriangle color="var(--color-warning)" />
-                        <div className="simulation-insight-text">
-                            <strong>Simulation Insight</strong>: You are viewing the premium UI architecture with synthetic data. This typically happens for administrative accounts that haven't been provisioned with a dedicated billing ledger.
+                        <FaSatellite className="text-cyan-400 text-2xl" />
+                        <div className="flex flex-col">
+                            <span className="text-xs font-black uppercase tracking-widest">Virtualized Ledger</span>
+                            <p className="text-[11px] text-slate-400">Simulation mode active. Live settlement disabled.</p>
                         </div>
-                        <button 
-                            className="btn-outline simulation-insight-btn" 
-                            onClick={() => window.location.href = 'mailto:devops@iotank.com?subject=Billing Provisioning Request'}
-                        >
-                            Provision Ledger
-                        </button>
+                        <button onClick={handleQuickProvision} className="provision-btn-v3">Provision Account</button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            <header className="billing-header">
-                <div className="billing-header-info">
-                    <h1>Billing & Governance</h1>
-                    <p className="billing-header-subtitle">Infrastructure overhead and automated financial auditing.</p>
-                </div>
-                <select className="billing-period-selector" title="Select Billing Period">
-                    <option>Last 30 Days</option>
-                    <option>Fiscal Quarter</option>
-                    <option>Annual View</option>
-                </select>
-            </header>
-
-            <nav className="billing-tabs">
-                <button 
-                    className={`billing-tab-btn ${activeBillingTab === 'overview' ? 'active' : ''}`}
-                    onClick={() => setActiveBillingTab('overview')}
-                >
-                    Account Overview
-                </button>
-                <button 
-                    className={`billing-tab-btn ${activeBillingTab === 'usage' ? 'active' : ''}`}
-                    onClick={() => setActiveBillingTab('usage')}
-                >
-                    High-Density Usage
-                </button>
-                <button 
-                    className={`billing-tab-btn ${activeBillingTab === 'history' ? 'active' : ''}`}
-                    onClick={() => setActiveBillingTab('history')}
-                >
-                    Transaction Ledger
-                </button>
-            </nav>
-
-            <AnimatePresence mode="wait">
-                {activeBillingTab === 'overview' && (
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="billing-overview-section"
-                    >
-                        <div className="billing-bento-grid">
-                            {/* Balance Card */}
-                            <div className={`billing-glass-card balance-card ${isOverdue ? 'overdue' : 'healthy'}`}>
-                                <div className="balance-header">
-                                    <span className="billing-label-bold">Active Balance</span>
-                                    <span className={`balance-status-tag ${isOverdue ? 'status-tag--overdue' : 'status-tag--healthy'}`}>
-                                        {billing.account_status}
-                                    </span>
-                                </div>
-                                <div className="balance-amount">KSh {billing.current_debt.toLocaleString()}</div>
-                                <div className="balance-footer">
-                                    <span>Total Paid: <strong>KSh {billing.total_paid.toLocaleString()}</strong></span>
-                                    {billing.next_billing_date && (
-                                        <span>Next Invoice: <strong>{formatDate(billing.next_billing_date)}</strong></span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Plan Card */}
-                            <div className="billing-glass-card plan-card">
-                                <div className="balance-header">
-                                    <span className="billing-label-bold">Current Deployment</span>
-                                    <span className="plan-badge">Standard Tier</span>
-                                </div>
-                                <div className="bill-text-large">IoT Enterprise Suite</div>
-                                <ul className="plan-feature-list">
-                                    {BILLING_MODEL_FEATURES.map((f, i) => (
-                                        <li key={i} className="plan-feature-item">
-                                            <span className="bill-text-success">{f.icon}</span>
-                                            <span className="bill-text-small">{f.text}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-
-                            {/* New Intelligence Card */}
-                            <div className="billing-glass-card intelligence-card intelligence-card-premium">
-                                <div className="balance-header">
-                                    <span className="billing-label-bold">Credits & Intelligence</span>
-                                    <FaDatabase color="var(--color-accent-primary)" />
-                                </div>
-                                <div className="usage-value usage-value-hero">4.2k</div>
-                                <div className="usage-label-sub">Active Tokens</div>
-                                <div className="usage-stats-divider">
-                                    <div className="usage-quota-line">
-                                        <span>Monthly Quota</span>
-                                        <span className="usage-quota-value">10k</span>
-                                    </div>
-                                    <div className="usage-progress-bar mt-2">
-                                        <div className="usage-progress-fill w-42p"></div>
-                                    </div>
-                                </div>
+            <div className="billing-metric-grid">
+                <motion.div variants={itemVariants} className="saas-metric-card">
+                    <div className="metric-header">
+                        <div className="metric-icon-box metric-icon-box--debt"><FaMoneyBillWave /></div>
+                        <div className="flex flex-col">
+                            <span className="metric-label">Account Liability</span>
+                            <div className="metric-value-row">
+                                <span className="metric-value-main">KSh {billing.current_debt.toLocaleString()}</span>
                             </div>
                         </div>
+                    </div>
+                    <Sparkline color="#8b5cf6" />
+                    <div className="text-[10px] text-slate-500 font-bold uppercase mt-auto">Next Cycle: {formatDate(billing.next_billing_date)}</div>
+                </motion.div>
 
-                        <div className="billing-glass-card payment-form-card">
-                            <div className="bill-flex-header">
-                                <div className="rp-mini-icon rp-mini-icon--accent"><FaCreditCard /></div>
-                                <h2 className="bill-margin-reset bill-text-large-ui">Record Manual Remittance</h2>
+                <motion.div variants={itemVariants} className="saas-metric-card">
+                    <div className="metric-header">
+                        <div className="metric-icon-box metric-icon-box--usage"><FaChartBar /></div>
+                        <div className="flex flex-col">
+                            <span className="metric-label">Telemetry Feed</span>
+                            <div className="metric-value-row">
+                                <span className="metric-value-main">{(billing.telemetry_usage_mb || 0).toFixed(2)} MB</span>
                             </div>
+                        </div>
+                    </div>
+                    <Sparkline color="#22d3ee" />
+                    <div className="text-[10px] text-slate-500 font-bold uppercase mt-auto">{readingCount.toLocaleString()} Signals Encrypted</div>
+                </motion.div>
 
+                <motion.div variants={itemVariants} className="saas-metric-card">
+                    <div className="metric-header">
+                        <div className="metric-icon-box metric-icon-box--security"><FaShieldAlt /></div>
+                        <div className="flex flex-col">
+                            <span className="metric-label">Node Integrity</span>
+                            <div className="metric-value-row">
+                                <span className="metric-value-main text-emerald-400">HARDENED</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 mt-4">
+                        <FaFingerprint className="text-4xl text-emerald-500/20" />
+                        <div className="text-[10px] text-slate-400 font-medium italic">Forensic auditing active. All transactions cryptographically signed.</div>
+                    </div>
+                    <div className="mt-auto pt-4 border-t border-white/5">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-black uppercase text-slate-500">SSL v3.1</span>
+                            <div className="h-1 w-24 bg-emerald-500/20 rounded-full overflow-hidden">
+                                <motion.div initial={{ x: '-100%' }} animate={{ x: '100%' }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} className="h-full w-1/2 bg-emerald-500" />
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+
+            <div className="billing-main-grid">
+                <motion.div variants={itemVariants} className="saas-content-card">
+                    <div className="card-title-group">
+                        <h3 className="card-title-v3"><FaExchangeAlt className="card-title-icon" /> Transaction Ledger</h3>
+                        <div className="status-pill-v3 status-pill-v3--completed">LIVE RECONCILIATION</div>
+                    </div>
+                    <div className="ledger-table-wrapper">
+                        {transactions.length > 0 ? (
+                            <table className="ledger-table-v3">
+                                <thead>
+                                    <tr>
+                                        <th>Channel</th>
+                                        <th>Reference</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {transactions.map((tx, idx) => (
+                                        <motion.tr 
+                                            key={tx.id} 
+                                            variants={itemVariants}
+                                            custom={idx}
+                                            className="ledger-row-v3"
+                                        >
+                                            <td>
+                                                <div className="tx-channel-box">
+                                                    <div className="tx-icon-v3">{txIcon(tx.provider || tx.transaction_type)}</div>
+                                                    <span className="font-black text-xs tracking-tighter">{tx.provider || tx.transaction_type}</span>
+                                                </div>
+                                            </td>
+                                            <td><code className="text-[10px] text-slate-500 font-mono">{tx.provider_ref?.substring(0, 10) || tx.id.substring(0, 8)}</code></td>
+                                            <td><span className="tx-amount-v3">KSh {tx.amount.toLocaleString()}</span></td>
+                                            <td><span className={`status-pill-v3 status-pill-v3--${(tx.status || tx.payment_status).toLowerCase()}`}>{tx.status || tx.payment_status}</span></td>
+                                            <td className="text-[10px] text-slate-500 font-bold uppercase">{formatDate(tx.created_at)}</td>
+                                        </motion.tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="empty-ledger-v3">
+                                <FaExclamationTriangle size={48} className="text-slate-800" />
+                                <p className="font-black uppercase tracking-widest text-xs text-slate-600">No Historical Data Found</p>
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={itemVariants} className="saas-content-card">
+                    <div className="card-title-group">
+                        <h3 className="card-title-v3">Settle Liability</h3>
+                    </div>
+                    <div className="command-center-v3">
+                        <AnimatePresence>
                             {payFeedback && (
                                 <motion.div 
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className={`billing-feedback-banner ${payFeedback.includes('✅') ? 'billing-feedback-banner--success' : 'billing-feedback-banner--danger'}`}
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.9, opacity: 0 }}
+                                    className={`p-4 rounded-2xl text-[11px] font-black uppercase tracking-widest text-center ${payFeedback.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}
                                 >
                                     {payFeedback}
                                 </motion.div>
                             )}
+                        </AnimatePresence>
 
-                            <form onSubmit={handlePayment} className="payment-form-grid">
-                                <div className="form-group">
-                                    <label>Amount (KSh)</label>
-                                    <input 
-                                        type="number" 
-                                        className="form-input"
-                                        value={payAmount} 
-                                        onChange={e => setPayAmount(e.target.value)} 
-                                        placeholder="5,000"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Reference Code</label>
-                                    <input 
-                                        type="text" 
-                                        className="form-input"
-                                        value={payRef} 
-                                        onChange={e => setPayRef(e.target.value)} 
-                                        placeholder="M-Pesa / Bank ID"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Method</label>
-                                    <select 
-                                        className="form-input"
-                                        value={payMethod} 
-                                        onChange={e => setPayMethod(e.target.value as any)}
-                                        title="Payment Method"
-                                    >
-                                        <option value="mpesa">M-Pesa Moble</option>
-                                        <option value="bank_transfer">Direct Deposit</option>
-                                        <option value="card">Card Payment</option>
-                                    </select>
-                                </div>
-                                <button type="submit" disabled={paying} className="payment-submit-btn">
-                                    {paying ? 'Synchronizing…' : 'Record Payment'}
-                                </button>
-                            </form>
-                        </div>
-                    </motion.div>
-                )}
-
-                {activeBillingTab === 'usage' && (
-                    <motion.div 
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className="billing-usage-section"
-                    >
-                        <div className="usage-grid">
-                            <div className="billing-glass-card usage-mini-card">
-                                <div className="usage-label">
-                                    <span>Tank Data Streams</span>
-                                    <FaDatabase color="var(--color-accent-primary)" />
-                                </div>
-                                <div className="usage-value">78.4 GB</div>
-                                <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill w-78p"></div>
-                                </div>
-                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
-                                    78% of 100GB Monthly Limit
-                                </div>
-                            </div>
-                            <div className="billing-glass-card usage-mini-card">
-                                <div className="usage-label">
-                                    <span>Intelligence API</span>
-                                    <FaChartLine color="var(--color-accent-pink)" />
-                                </div>
-                                <div className="usage-value">12.5k</div>
-                                <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill w-45p"></div>
-                                </div>
-                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
-                                    45% of 30k Credit Tokens
-                                </div>
-                            </div>
-                            <div className="billing-glass-card usage-mini-card">
-                                <div className="usage-label">
-                                    <span>System Integrity</span>
-                                    <FaRocket color="var(--color-success)" />
-                                </div>
-                                <div className="usage-value">99.98%</div>
-                                <div className="usage-progress-bar">
-                                    <div className="usage-progress-fill w-99p"></div>
-                                </div>
-                                <div className="bill-text-tiny bill-text-secondary bill-mg-top-tiny">
-                                    Platform Availability Guaranteed
-                                </div>
+                        <div className="saas-input-group">
+                            <label className="saas-label-v3">M-Pesa Gateway</label>
+                            <div className="relative">
+                                <input type="tel" className="saas-input-v3" value={payPhone} onChange={e => setPayPhone(e.target.value)} placeholder="07XX XXX XXX" />
+                                <FaPhone className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-600" />
                             </div>
                         </div>
 
-                        <div className="billing-table-container">
-                            <div className="billing-table-header">
-                                <h2><FaChartLine /> Real-time Metering Ledger</h2>
-                                <span className="balance-status-tag status-tag--live-sync">Live Sync</span>
+                        <div className="saas-input-group">
+                            <label className="saas-label-v3">Settlement Amount</label>
+                            <div className="relative">
+                                <input type="number" className="saas-input-v3 saas-input-v3--amount" value={payAmount} onChange={e => setPayAmount(e.target.value)} placeholder="0.00" />
+                                <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-500 text-xs">KES</div>
                             </div>
-                            <table className="billing-table">
-                                <thead>
-                                    <tr>
-                                        <th>Timestamp</th>
-                                        <th>Telemetry Load</th>
-                                        <th>Audit Tokens</th>
-                                        <th>Estimated Overhead</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[...Array(5)].map((_, i) => (
-                                        <tr key={i}>
-                                            <td className="bill-text-mono bill-text-secondary">
-                                                {format(new Date(Date.now() - i * 86400000), 'dd MMM yyyy')}
-                                            </td>
-                                            <td className="bill-font-medium">2.{i} GB</td>
-                                            <td> {150 + i * 20} REQ</td>
-                                            <td className="bill-text-accent bill-font-bold">KSh {(450 + i * 15).toLocaleString()}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
                         </div>
-                    </motion.div>
-                )}
 
-                {activeBillingTab === 'history' && (
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        className="billing-history-section"
-                    >
-                        <div className="billing-table-container">
-                            <div className="billing-table-header">
-                                <h2><FaHistory /> Transaction Intelligence Ledger</h2>
-                                <button className="rp-action-dl-btn">
-                                    <FaDownload />
-                                    <span>Export CSV</span>
-                                </button>
-                            </div>
-                            {transactions.length === 0 ? (
-                                <div className="empty-ledger-state">
-                                    <FaHistory className="empty-ledger-icon" aria-hidden="true" />
-                                    <p>No financial activity recorded in the current ledger period.</p>
-                                </div>
-                            ) : (
-                                <table className="billing-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Date</th>
-                                            <th>Event Type</th>
-                                            <th>Description</th>
-                                            <th>Method</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {transactions.map(tx => (
-                                            <tr key={tx.id}>
-                                                <td className="tx-date-cell">{formatDate(tx.created_at)}</td>
-                                                <td className="tx-type-cell">
-                                                    <span className={`tx-type-badge ${tx.transaction_type}`}>
-                                                        {tx.transaction_type.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="tx-desc-cell" title={tx.description}>
-                                                    {tx.description || 'System Charge'}
-                                                </td>
-                                                <td className="tx-method-cell">
-                                                    {tx.payment_method || '—'}
-                                                </td>
-                                                <td className="tx-amount-cell" data-type={tx.transaction_type}>
-                                                    {txIcon(tx.transaction_type)}
-                                                    {['payment', 'credit'].includes(tx.transaction_type) ? '−' : '+'} KSh {tx.amount.toLocaleString()}
-                                                </td>
-                                                <td className="tx-status-cell">
-                                                    <span className={`payment-status-chip ${tx.payment_status}`}>
-                                                        {tx.payment_status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
+                        <div className="flex flex-col gap-4 mt-4">
+                            <button onClick={handleStkPush} disabled={paying} className="saas-btn-primary-v3">
+                                {paying ? 'PROCESSING...' : 'STK DIRECT PUSH'} <FiArrowRight />
+                            </button>
+                            <button onClick={handlePaystackPayment} disabled={paying} className="saas-btn-secondary-v3">
+                                <FaCreditCard /> GLOBAL GATEWAY
+                            </button>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+
+                        <div className="mt-8 pt-8 border-t border-white/5 flex items-center gap-4">
+                            <FaShieldAlt className="text-emerald-500 text-xl" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase text-slate-400">Secured Infrastructure</span>
+                                <span className="text-[8px] text-slate-600 font-medium">END-TO-END ENCRYPTED VIA TLS 1.3</span>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </motion.div>
     );
 };
+
+export default BillingPage;

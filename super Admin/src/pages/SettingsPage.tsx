@@ -13,11 +13,12 @@ import {
     FiSmartphone, FiKey
 } from 'react-icons/fi';
 import Layout from '../components/Layout';
+import { ApiKeyManager } from '../components/Settings/ApiKeyManager';
 import './SettingsPage.css';
 
 const SettingsPage: React.FC = () => {
     const { systemUser } = useAuth();
-    const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'activity'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'activity' | 'api'>('profile');
     const [isSaving, setIsSaving] = useState(false);
     const [fullName, setFullName] = useState(systemUser?.full_name || '');
     const [phone, setPhone] = useState('');
@@ -103,6 +104,13 @@ const SettingsPage: React.FC = () => {
                             <div className="cluster-header">Audit Trace</div>
                             <button className={`nav-item ${activeTab === 'activity' ? 'active' : ''}`} onClick={() => setActiveTab('activity')}>
                                 <FiActivity /> Node Activity
+                            </button>
+                        </div>
+
+                        <div className="nav-cluster">
+                            <div className="cluster-header">Financial Gateway</div>
+                            <button className={`nav-item ${activeTab === 'api' ? 'active' : ''}`} onClick={() => setActiveTab('api')}>
+                                <FiKey /> API Configuration
                             </button>
                         </div>
                     </aside>
@@ -254,6 +262,11 @@ const SettingsPage: React.FC = () => {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+                        {activeTab === 'api' && (
+                            <div className="settings-section">
+                                <ApiKeyManager />
                             </div>
                         )}
                     </main>

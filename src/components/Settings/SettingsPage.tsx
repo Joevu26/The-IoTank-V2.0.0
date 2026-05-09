@@ -633,11 +633,25 @@ err.message
         e.preventDefault();
         try {
             await verifySettingsPassword(resetAuthPassword);
-            alert("Factory reset completed successfully.");
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Factory Reset',
+                    message: 'Factory reset completed successfully.',
+                    type: 'success',
+                    attribution: 'SYSTEM SETTINGS'
+                }
+            }));
             setShowResetAuthModal(false);
             window.location.reload();
         } catch (err: any) {
-            alert(err.message || 'Verification failed.');
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Reset Failed',
+                    message: err.message || 'Verification failed.',
+                    type: 'error',
+                    attribution: 'SYSTEM SETTINGS'
+                }
+            }));
         }
     };
     if (isLocked) {
@@ -2204,21 +2218,45 @@ mfaStep === 'verify' && (
 <p className="mfa-text-main">
                                         Enter the 6-digit code from your authenticator app to finalize the security upgrade.                                    
 </p>
-                                    
-<input                                        id="mfa-code"                                        type="text"                                        className="settings-input mfa-input-verify"                                        inputMode="numeric"                                        maxLength={
-6
-}                                        value={
-mfaVerifyCode
-}                                        onChange={
-(e: React.ChangeEvent<HTMLInputElement>) => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-                                            setMfaVerifyCode(val);
-                                            if (val.length === 6 && !mfaLoading) {
-                                                handleVerifyMFAEnrollment(val);
-                                            
-}                                        
-}
-}                                        placeholder="000 000"                                        title="6-digit MFA Code"                                        autoFocus                                    />
+                                    <div className="mfa-digit-container">
+                                        {[...Array(6)].map((_, i) => (
+                                            <input
+                                                key={i}
+                                                id={`mfa-digit-${i}`}
+                                                type="text"
+                                                className={`mfa-digit-input ${mfaVerifyCode[i] ? 'filled' : ''}`}
+                                                inputMode="numeric"
+                                                maxLength={1}
+                                                value={mfaVerifyCode[i] || ''}
+                                                onChange={(e) => {
+                                                    const char = e.target.value.replace(/\D/g, '').slice(-1);
+                                                    const currentCode = mfaVerifyCode.split('');
+                                                    currentCode[i] = char;
+                                                    const newCode = currentCode.join('').slice(0, 6);
+                                                    setMfaVerifyCode(newCode);
+                                                    
+                                                    // Auto-focus next
+                                                    if (char && i < 5) {
+                                                        const nextInput = document.getElementById(`mfa-digit-${i + 1}`);
+                                                        nextInput?.focus();
+                                                    }
+                                                    
+                                                    // Trigger verification if complete
+                                                    if (newCode.length === 6 && !mfaLoading) {
+                                                        handleVerifyMFAEnrollment(newCode);
+                                                    }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Backspace' && !mfaVerifyCode[i] && i > 0) {
+                                                        const prevInput = document.getElementById(`mfa-digit-${i - 1}`);
+                                                        prevInput?.focus();
+                                                    }
+                                                }}
+                                                autoFocus={i === 0}
+                                                autoComplete="one-time-code"
+                                            />
+                                        ))}
+                                    </div>
                                     
 <div className="form-actions">
                                         

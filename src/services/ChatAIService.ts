@@ -27,7 +27,7 @@ export class RateLimitError extends Error {
 }
 
 export class ChatAIService {
-    private static modelPriority: AIModel[] = ['gemini', 'groq', 'deepseek'];
+    private static modelPriority: AIModel[] = ['groq', 'gemini', 'deepseek'];
 
     static async getChatResponse(message: string, history: { role: 'user' | 'assistant', content: string }[]): Promise<string> {
         const errors: string[] = [];
@@ -108,7 +108,7 @@ export class ChatAIService {
                 body: JSON.stringify({
                     action: 'chat',
                     body: { messages },
-                    endpoint: 'models/gemini-1.5-flash:generateContent'
+                    endpoint: 'models/gemini-1.5-flash-latest:generateContent'
                 })
             });
 

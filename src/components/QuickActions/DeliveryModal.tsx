@@ -424,7 +424,14 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                                 const file = e.target.files?.[0];
                                                 if (file) {
                                                     if (file.size > 5 * 1024 * 1024) {
-                                                        alert('File size limit exceeded (Max 5MB)');
+                                                        window.dispatchEvent(new CustomEvent('system-toast', {
+                                                            detail: {
+                                                                title: 'File Too Large',
+                                                                message: 'File size limit exceeded (Max 5MB)',
+                                                                type: 'error',
+                                                                attribution: 'UPLOAD MANAGER'
+                                                            }
+                                                        }));
                                                         return;
                                                     }
                                                     setInvoiceFile(file);

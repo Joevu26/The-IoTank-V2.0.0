@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
-import { MarketSignal, SupplyRisk, RegulatoryNotice, MarketData } from '@/types';
+import { MarketSignal, SupplyRisk, RegulatoryNotice, MarketData, MarketActionItem } from '@/types';
 import { NewsService } from '@/services/NewsService';
 import { extractPricesFromText } from './useMarketNews';
 
@@ -20,6 +20,7 @@ export const useMarketIntelligence = (stationId: string) => {
     const [risks, setRisks] = useState<SupplyRisk[]>([]);
     const [notices, setNotices] = useState<RegulatoryNotice[]>([]);
     const [prices, setPrices] = useState<MarketData[]>([]);
+    const [actionQueue, setActionQueue] = useState<MarketActionItem[]>([]);
 
     const [loading, setLoading] = useState<boolean>(() => {
         try {
@@ -57,6 +58,7 @@ export const useMarketIntelligence = (stationId: string) => {
 
         return () => {
             window.removeEventListener('market-news-update', handleNewSignal);
+            NewsService.stopListening();
         };
     }, []);
 
@@ -69,12 +71,12 @@ export const useMarketIntelligence = (stationId: string) => {
                 // 1. Fetch Historical News (Market News)
                 const historicalNews = await NewsService.fetchRecentNews(20);
 
-                // 2. Fetch Prices
+                // 2. Fetch Prices (Official Database)
                 const { data: priceData, error: priceError } = await supabase
                     .from('market_prices')
                     .select('*')
                     .order('effective_date', { ascending: false })
-                    .limit(10);
+                    .limit(20);
                 
                 if (priceError) throw priceError;
                 const mappedPricesValue = (priceData || []).map((p: any) => ({
@@ -108,32 +110,58 @@ export const useMarketIntelligence = (stationId: string) => {
                     attribution: s.attribution
                 } as MarketSignal));
 
+                // 4. Fetch Action Queue
+                const { data: queueData } = await supabase
+                    .from('market_action_queue')
+                    .select('*')
+                    .eq('station_id', stationId)
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false });
+
+                const mappedQueue = (queueData || []).map((q: any) => ({
+                    id: q.id,
+                    stationId: q.station_id,
+                    fuelType: q.fuel_type,
+                    oldPrice: q.old_price,
+                    newPrice: q.new_price,
+                    effectiveDate: q.effective_date,
+                    actionType: q.action_type,
+                    status: q.status,
+                    metadata: q.metadata,
+                    createdAt: q.created_at,
+                    updatedAt: q.updated_at
+                } as MarketActionItem));
+
                 // Merge Both Sources, Sort by Timestamp
                 const mergedSignals = [...historicalNews, ...mappedSignalsValue]
                     .sort((a, b) => b.timestamp - a.timestamp)
                     .slice(0, 30);
 
-                // ─── Price Extraction Logic ───
-                // Scan verified/high-relevance news for live updates
+                // ─── Forensic Extraction Logic ───
                 const extractedPrices: MarketData[] = [];
                 mergedSignals.forEach(signal => {
                     const detections = extractPricesFromText(signal.title + ' ' + signal.summary);
                     const topicTags = (signal as any).topicTags || [];
-                    const isEPRA = topicTags.includes('EPRA');
+                    const isEPRA = topicTags.includes('EPRA') || signal.source?.includes('EPRA') || signal.attribution?.includes('EPRA');
                     
                     detections.forEach(det => {
-                        // STRICT RULE: Fuel prices ONLY from EPRA sources.
-                        // Commodity data (Brent, FX) can come from any verified news.
-                        const isFuel = ['PETROL', 'DIESEL', 'KEROSENE'].includes(det.commodity.toUpperCase());
+                        // [FORENSIC RULE]: Fuel prices (PMS/AGO/IK) MUST come from EPRA sources.
+                        const commodityUpper = det.commodity.toUpperCase();
+                        const isFuel = ['PETROL', 'DIESEL', 'KEROSENE', 'PMS', 'AGO', 'IK'].includes(commodityUpper);
                         
                         if (det.commodity !== 'General' && (!isFuel || isEPRA)) {
+                            let fuelType = commodityUpper;
+                            if (fuelType === 'PETROL') fuelType = 'PMS';
+                            else if (fuelType === 'DIESEL') fuelType = 'AGO';
+                            else if (fuelType === 'KEROSENE') fuelType = 'IK';
+
                             extractedPrices.push({
-                                id: `extraction-${det.commodity}-${signal.id}`,
-                                fuelType: det.commodity.toUpperCase(),
+                                id: `extraction-${fuelType}-${signal.id}`,
+                                fuelType: fuelType,
                                 pricePerLiter: det.value,
                                 currency: det.currency,
                                 timestamp: signal.timestamp,
-                                source: 'api', // Tagged as live extraction
+                                source: 'api',
                                 metadata: { isLiveExtraction: true, sourceTitle: signal.title, isOfficial: isEPRA }
                             } as any);
                         }
@@ -147,23 +175,11 @@ export const useMarketIntelligence = (stationId: string) => {
                     if (existingIdx === -1) {
                         finalPrices.push(ext);
                     } else if (ext.timestamp > finalPrices[existingIdx].timestamp) {
-                        // Check if value changed significantly to trigger notification
-                        const oldVal = finalPrices[existingIdx].pricePerLiter;
-                        if (Math.abs(oldVal - ext.pricePerLiter) > 0.01 && isMounted) {
-                            window.dispatchEvent(new CustomEvent('system-toast', {
-                                detail: {
-                                    title: 'Live Market Update',
-                                    message: `${ext.fuelType} price update detected: KES ${ext.pricePerLiter.toFixed(2)} (Extracted: ${(ext as any).metadata?.sourceTitle?.substring(0, 40)}...)`,
-                                    type: 'market',
-                                    attribution: 'TankIQ • Intelligence Extra'
-                                }
-                            }));
-                        }
                         finalPrices[existingIdx] = ext;
                     }
                 });
 
-                // 4. Fetch Risks
+                // 5. Fetch Risks
                 const { data: riskData, error: riskError } = await supabase
                     .from('supply_risks')
                     .select('*')
@@ -181,7 +197,7 @@ export const useMarketIntelligence = (stationId: string) => {
                     source: r.source
                 } as SupplyRisk));
 
-                // 5. Fetch Notices
+                // 6. Fetch Notices
                 const { data: noticeData, error: noticeError } = await supabase
                     .from('regulatory_notices')
                     .select('*')
@@ -202,6 +218,7 @@ export const useMarketIntelligence = (stationId: string) => {
                 if (isMounted) {
                     setPrices(finalPrices);
                     setSignals(mergedSignals);
+                    setActionQueue(mappedQueue);
                     try {
                         localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mergedSignals));
                     } catch (e) {
@@ -231,5 +248,18 @@ export const useMarketIntelligence = (stationId: string) => {
         };
     }, [stationId, refreshTrigger]);
 
-    return { signals, risks, notices, prices, loading, refetch };
+    const completeAction = async (actionId: string) => {
+        try {
+            const { error } = await supabase
+                .from('market_action_queue')
+                .update({ status: 'completed', updated_at: new Date().toISOString() })
+                .eq('id', actionId);
+            if (error) throw error;
+            setActionQueue(prev => prev.filter(a => a.id !== actionId));
+        } catch (err) {
+            console.error('[MarketIntelligence] Failed to complete action:', err);
+        }
+    };
+
+    return { signals, risks, notices, prices, actionQueue, loading, refetch, completeAction };
 };

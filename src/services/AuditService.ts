@@ -39,7 +39,10 @@ export type EventType =
     | 'LEAK_DETECTED'
     | 'HARDWARE_PROVISIONED'
     | 'ALERTS_BULK_RESOLVED'
-    | 'ALERTS_BULK_DISMISSED';
+    | 'ALERTS_BULK_DISMISSED'
+    | 'MANUAL_OVERRIDE'
+    | 'CALIBRATION_APPLIED';
+
 
 export interface UnifiedEvent {
     category: EventCategory;
@@ -82,9 +85,9 @@ export class AuditService {
                 event_category: category,
                 event_type: type,
                 description,
-                severity,
                 metadata: {
                     ...metadata,
+                    severity,
                     actor_name: user.user_metadata?.full_name || user.email
                 },
                 created_at: new Date().toISOString()

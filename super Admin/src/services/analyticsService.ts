@@ -73,8 +73,8 @@ export const analyticsService = {
 
     async getScheduledReports(): Promise<ScheduledReport[]> {
         return [
-            { id: '1', type: 'Operational Summary', frequency: 'daily', last_run: '2026-03-21', recipients: ['admin@iotank.co.ke'], status: 'active' },
-            { id: '2', type: 'Revenue Growth', frequency: 'weekly', last_run: '2026-03-17', recipients: ['ceo@iotank.co.ke', 'cfo@iotank.co.ke'], status: 'active' }
+            { id: '1', type: 'Operational Summary', frequency: 'daily', last_run: '2026-03-21', recipients: ['admin@the-iotank-project.web.app'], status: 'active' },
+            { id: '2', type: 'Revenue Growth', frequency: 'weekly', last_run: '2026-03-17', recipients: ['ceo@the-iotank-project.web.app', 'cfo@the-iotank-project.web.app'], status: 'active' }
         ];
     },
 

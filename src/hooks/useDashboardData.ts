@@ -36,8 +36,9 @@ export const useDashboardData = () => {
     // ─── Real-Time "Live Listening" ────────────────────────────────
     
     // 1. Subscribe to Tank Updates
+    const tankChannelId = `live-tanks-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     const tankSubscription = supabase
-      .channel(`live-tanks-${stationId}`)
+      .channel(tankChannelId)
       .on(
         'postgres_changes',
         {
@@ -71,8 +72,9 @@ export const useDashboardData = () => {
       .subscribe();
 
     // 2. Subscribe to Alerts
+    const alertChannelId = `live-alerts-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
     const alertSubscription = supabase
-      .channel(`live-alerts-${stationId}`)
+      .channel(alertChannelId)
       .on(
         'postgres_changes',
         {

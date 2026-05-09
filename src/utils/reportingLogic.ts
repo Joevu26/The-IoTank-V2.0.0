@@ -21,6 +21,17 @@ export interface AggregatedMetrics {
 }
 
 /**
+ * Standardizes volume to 15°C based on thermal expansion coefficients.
+ * @param volume Raw volume reading
+ * @param temperature Temperature in Celsius
+ */
+export function calculateVCF(volume: number, temperature: number): number {
+    const baselineTemp = 15;
+    const expansionCoeff = 0.00084; // Typical for fuel
+    return volume * (1 - (temperature - baselineTemp) * expansionCoeff);
+}
+
+/**
  * Forensic Scanner: Aggregates daily reconciliation logs for a given period.
  * This is the "Brain" of the Reporting Hub.
  */
@@ -46,13 +57,10 @@ export async function scanStationHistory(
         const { data: transactions, error: txError } = await txQuery;
         if (txError) throw txError;
 
-        // 2. Fetch Daily Boundary Readings (Opening/Closing)
-        // Optimization: We only need readings near the start and end of each day
-        // For now, we'll fetch all sensor readings and filter in-memory for accuracy
-        // In a high-scale environment, this should be done via a Postgres RPC function
+        // 2. Fetch Daily Boundary Readings (Including Temperature for Forensic VCF)
         let readingsQuery = supabase
             .from('sensor_readings')
-            .select('timestamp, volume, tank_id')
+            .select('timestamp, volume, temperature, tank_id')
             .eq('station_id', stationId)
             .gte('timestamp', startDate.toISOString())
             .lte('timestamp', endDate.toISOString())
@@ -86,10 +94,19 @@ export async function scanStationHistory(
                 return ts >= dayStart && ts <= dayEnd;
             });
 
-            // Calculate metrics
-            const opening = dayReadings.length > 0 ? dayReadings[0].volume : 0;
-            const closing = dayReadings.length > 0 ? dayReadings[dayReadings.length - 1].volume : 0;
+            // Calculate basic metrics
+            const openingRaw = dayReadings.length > 0 ? dayReadings[0].volume : 0;
+            const closingRaw = dayReadings.length > 0 ? dayReadings[dayReadings.length - 1].volume : 0;
             
+            // Forensic VCF (Volume Correction Factor)
+            // If temp is available, we simulate the 'Standardized' volume at 15°C
+            // Typical expansion is 0.00084 per °C for diesel
+            const startTemp = dayReadings.length > 0 ? (dayReadings[0].temperature || 15) : 15;
+            const endTemp = dayReadings.length > 0 ? (dayReadings[dayReadings.length - 1].temperature || 15) : 15;
+            
+            const opening = calculateVCF(openingRaw, startTemp);
+            const closing = calculateVCF(closingRaw, endTemp);
+
             const deliveries = dayTx
                 .filter(tx => tx.type === 'delivery')
                 .reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -125,7 +142,7 @@ export async function scanStationHistory(
             totalThroughput,
             totalDeliveries: (transactions || []).filter(tx => tx.type === 'delivery').length,
             avgVariancePct: totalThroughput > 0 ? (netVariance / totalThroughput) * 100 : 0,
-            incidentCount: (transactions || []).filter(tx => tx.metadata?.varianceStatus === 'CRITICAL').length,
+            incidentCount: logs.filter(l => Math.abs(l.variancePct) > 1.0).length, // Flag variance > 1% as incident
             netVariance
         };
 
@@ -146,18 +163,21 @@ export function getReportHighlights(type: string, metrics: AggregatedMetrics): s
         highlights.push(`High Volume Period: Total throughput exceeded ${metrics.totalThroughput.toLocaleString()}L.`);
     }
 
+    // Forensic Logic
     if (Math.abs(metrics.avgVariancePct) < 0.1) {
-        highlights.push('Operational Excellence: Variance maintained within 0.1% threshold.');
-    } else if (Math.abs(metrics.avgVariancePct) > 0.5) {
-        highlights.push(`Forensic Alert: Significant variance detected (${metrics.avgVariancePct.toFixed(2)}%). Investigation recommended.`);
+        highlights.push('Operational Excellence: Net variance maintained within 0.1% (Standardized 15°C).');
+    } else if (Math.abs(metrics.avgVariancePct) < 0.5) {
+        highlights.push(`Forensic Scan: Minor drift detected (${metrics.avgVariancePct.toFixed(2)}%). Likely thermal contraction.`);
+    } else {
+        highlights.push(`Forensic Alert: Significant variance detected (${metrics.avgVariancePct.toFixed(2)}%). Verification of ATG probe calibration recommended.`);
     }
 
     if (metrics.incidentCount > 0) {
-        highlights.push(`Security: ${metrics.incidentCount} critical reconciliation incidents flagged during this window.`);
+        highlights.push(`Security: ${metrics.incidentCount} daily sessions exceeded the EPRA 1% variance threshold.`);
     }
 
     if (type === 'compliance-pack' && Math.abs(metrics.avgVariancePct) < 0.5) {
-        highlights.push('Compliance: Station meets the regulatory 90-day consistency standards.');
+        highlights.push('Compliance: Station meets the regulatory 90-day consistency standards with VCF correction active.');
     }
 
     return highlights.length > 0 ? highlights : ['No significant anomalies detected in this window.'];

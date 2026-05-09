@@ -116,7 +116,7 @@ export const Dashboard: React.FC = () => {
                 {/* Main HUD Area */}
                 <section className="tanks-section">
                     
-                    <ExecutiveOverview tanks={displayTanks} readings={readings} stationId={stationId} />
+                    <ExecutiveOverview tanks={displayTanks} readings={readings} stationId={stationId} alerts={alerts} />
                     
                     <div className={displayTanks.length === 1 ? 'single-tank-view mt-8' : 'mt-8'}>
                         <TelemetryErrorBoundary
@@ -179,7 +179,11 @@ export const Dashboard: React.FC = () => {
 
                     <LazyComponent minHeight="300px">
                         <TelemetryErrorBoundary>
-                            <SystemIntegrityCard stationId={stationId} />
+                            <SystemIntegrityCard 
+                                stationId={stationId} 
+                                tanks={displayTanks} 
+                                alerts={alerts} 
+                            />
                         </TelemetryErrorBoundary>
                     </LazyComponent>
                 </aside>

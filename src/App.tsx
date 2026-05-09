@@ -48,7 +48,11 @@ export const DeliveriesPageFactory = () => import('@/components/Deliveries/Deliv
 const DeliveriesPage = lazy(DeliveriesPageFactory);
 export const ShiftManagementPageFactory = () => import('@/components/Shifts/ShiftManagementPage').then(module => ({ default: module.ShiftManagementPage }));
 const ShiftManagementPage = lazy(ShiftManagementPageFactory);
+const NetworkPulsePage = lazy(() => import('@/components/Governance/NetworkPulsePage').then(module => ({ default: module.NetworkPulsePage })));
 const InadequateClearancePage = lazy(() => import('@/components/Auth/InadequateClearancePage').then(module => ({ default: module.InadequateClearancePage })));
+
+// PAYSTACK MODULES
+// Consolidated into BillingPage
 
 
 
@@ -111,13 +115,13 @@ function App() {
                                     <Route element={<ProtectedRoute requiredLevel={5}><MainLayout /></ProtectedRoute>}>
                                         <Route path="billing" element={<Suspense fallback={<PublicLoader />}><BillingPage /></Suspense>} />
                                         <Route path="users" element={<Suspense fallback={<PublicLoader />}><TeamManagement /></Suspense>} />
-                                        {/* HIGH-006: Settings moved from Level 6 to Level 5 — Admin-only */}
                                         <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                     </Route>
                                     
                                     {/* Protected Application Routes - Level 4 (Governance/Super Admin) */}
                                     <Route element={<ProtectedRoute requiredLevel={4}><MainLayout /></ProtectedRoute>}>
                                         {enableGovernanceConsole && <Route path="governance" element={<Suspense fallback={<PublicLoader />}><AIGovernancePage /></Suspense>} />}
+                                        <Route path="admin/pulse" element={<Suspense fallback={<PublicLoader />}><NetworkPulsePage /></Suspense>} />
                                     </Route>
                                     <Route path="/unauthorized" element={<Suspense fallback={<PublicLoader />}><InadequateClearancePage /></Suspense>} />
                                 </Routes>
