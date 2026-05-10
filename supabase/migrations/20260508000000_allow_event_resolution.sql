@@ -32,6 +32,7 @@ $$ LANGUAGE plpgsql;
 
 -- Update RLS Policy to allow UPDATE on is_resolved
 DROP POLICY IF EXISTS "No updates to unified_events" ON public.unified_events;
+DROP POLICY IF EXISTS "Users can resolve own station events" ON public.unified_events;
 CREATE POLICY "Users can resolve own station events" 
     ON public.unified_events
     FOR UPDATE 

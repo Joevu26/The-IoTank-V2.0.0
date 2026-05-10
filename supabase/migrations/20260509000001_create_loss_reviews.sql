@@ -34,6 +34,7 @@ ALTER TABLE public.loss_reviews ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Use JWT claim pattern (same as other tables in this project)
 -- This avoids any subquery on user profile tables and is safe against recursion.
+DROP POLICY IF EXISTS "loss_reviews_station_access" ON public.loss_reviews;
 CREATE POLICY "loss_reviews_station_access"
 ON public.loss_reviews
 FOR ALL
