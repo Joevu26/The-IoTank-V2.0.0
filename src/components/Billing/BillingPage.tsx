@@ -169,10 +169,9 @@ export const BillingPage: React.FC = () => {
     }
 
     const handleQuickProvision = async () => {
-        const newName = prompt("Enter Organization Name:", "My Station");
-        if (!newName) return;
         setLoading(true);
-        const { error } = await supabase.rpc('emergency_set_station_name', { p_name: newName });
+        // [NON-BLOCKING PROVISIONING]: Replaced blocking prompt() with automated setup
+        const { error } = await supabase.rpc('emergency_set_station_name', { p_name: "IoT-Node-Alpha" });
         if (error) {
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
@@ -183,7 +182,17 @@ export const BillingPage: React.FC = () => {
                 }
             }));
         }
-        else window.location.reload();
+        else {
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Account Provisioned',
+                    message: "Station 'IoT-Node-Alpha' has been successfully initialized in simulation mode.",
+                    type: 'success',
+                    attribution: 'SYSTEM PROVISIONING'
+                }
+            }));
+            setTimeout(() => window.location.reload(), 1500);
+        }
         setLoading(false);
     };
 

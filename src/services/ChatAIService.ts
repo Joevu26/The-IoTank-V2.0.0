@@ -34,7 +34,7 @@ export class ChatAIService {
 
         for (const model of this.modelPriority) {
             try {
-                console.log(`[ChatAIService] Attempting response with model: ${model}`);
+                // Intelligence flow: Attempting response
                 const response = await this.callModel(model, message, history);
                 if (response) return response;
 

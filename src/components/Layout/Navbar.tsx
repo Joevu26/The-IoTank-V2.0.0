@@ -377,10 +377,35 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                 className="pending-badge ml-2 flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (window.confirm('Clear pending command queue? This only stops client tracking, it does not cancel the command on the server.')) {
-                                        localStorage.removeItem('iotank_pending_commands');
-                                        setPendingCommandCount(0);
-                                    }
+                                    window.dispatchEvent(new CustomEvent('system-toast', {
+                                        detail: {
+                                            title: 'Clear Action Queue',
+                                            message: 'Are you sure you want to purge the local hardware command queue? This only stops tracking on this device; it does not cancel instructions already sent to the server or hardware.',
+                                            type: 'warning',
+                                            persistent: true,
+                                            actions: [
+                                                {
+                                                    label: 'Keep Queue',
+                                                    onClick: () => {}
+                                                },
+                                                {
+                                                    label: 'Purge Queue',
+                                                    primary: true,
+                                                    onClick: () => {
+                                                        localStorage.removeItem('iotank_pending_commands');
+                                                        setPendingCommandCount(0);
+                                                        window.dispatchEvent(new CustomEvent('system-toast', {
+                                                            detail: {
+                                                                title: 'Queue Purged',
+                                                                message: 'Local command tracking has been reset.',
+                                                                type: 'info'
+                                                            }
+                                                        }));
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }));
                                 }}
                                 title="Click to clear local action queue"
                             >

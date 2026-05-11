@@ -7,8 +7,7 @@ interface ToastData {
     id: string;
     title: string;
     message: string;
-    type: 'success' | 'error' | 'info' | 'warning' | 'market' | 'refill';
-    attribution?: string;
+    type: 'success' | 'error' | 'info' | 'warning';
     visible: boolean;
     progress: number;
     persistent?: boolean;
@@ -33,35 +32,19 @@ export const GlobalToast: React.FC = () => {
             const detail = customEvent.detail;
             const id = Math.random().toString(36).substring(2, 11);
             
-            let newToast: ToastData;
-            
-            if (event.type === 'market-news-update') {
-                const signal = detail;
-                newToast = {
-                    id,
-                    title: signal.title,
-                    message: signal.summary,
-                    type: 'market',
-                    attribution: `${signal.sourceType} • ${signal.attribution}`,
-                    visible: true,
-                    progress: 100,
-                    persistent: false
-                };
-            } else {
-                newToast = {
-                    ...detail,
-                    id,
-                    visible: true,
-                    progress: 100
-                };
-            }
+            const newToast: ToastData = {
+                ...detail,
+                id,
+                visible: true,
+                progress: 100
+            };
             
             setToasts(prev => [newToast, ...prev].slice(0, 5));
 
             const isPersistent = newToast.persistent === true;
             if (isPersistent) return;
 
-            const duration = detail?.type === 'refill' ? 8000 : 5000;
+            const duration = 5000;
             const step = 100;
             
             const progressInterval = setInterval(() => {
@@ -82,11 +65,9 @@ export const GlobalToast: React.FC = () => {
             }, duration);
         };
 
-        window.addEventListener('market-news-update', handleToast);
         window.addEventListener('system-toast', handleToast);
         
         return () => {
-            window.removeEventListener('market-news-update', handleToast);
             window.removeEventListener('system-toast', handleToast);
         };
     }, []);
@@ -104,8 +85,6 @@ export const GlobalToast: React.FC = () => {
             case 'warning': return <FaExclamationTriangle size={18} />;
             case 'error': return <FaExclamationCircle size={18} />;
             case 'info': 
-            case 'market':
-            case 'refill':
             default: return <FaInfoCircle size={18} />;
         }
     };
@@ -144,27 +123,14 @@ export const GlobalToast: React.FC = () => {
                                     ))}
                                 </div>
                             )}
-
-                            {toast.type === 'error' && (!toast.actions || toast.actions.length === 0) && (
-                                <div className="toast-action-row">
-                                    <span className="toast-action-link" onClick={() => removeToast(toast.id)}>
-                                        Investigate
-                                    </span>
-                                </div>
-                            )}
                         </div>
                         <button onClick={() => removeToast(toast.id)} className="toast-close-mini">
                             <FiX size={16} />
                         </button>
-                        
-                        <div className="toast-progress-industrial">
-                            <div className="toast-progress-bar-industrial" style={{ width: `${toast.progress}%` }} />
-                        </div>
                     </div>
                 </div>
             ))}
         </div>
     );
 };
-
 

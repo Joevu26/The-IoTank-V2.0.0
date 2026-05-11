@@ -120,14 +120,39 @@ export const TankIQSidebar: React.FC<TankIQSidebarProps> = ({ isOpen, onClose, o
 
     const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
         e.stopPropagation();
-        if (window.confirm('Delete this conversation?')) {
-            setSessions(prev => prev.filter(s => s.id !== sessionId));
-            if (currentSessionId === sessionId) {
-                setCurrentSessionId(null);
-                setView('list');
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Purge Intelligence Session',
+                message: 'Are you sure you want to permanently delete this TankIQ conversation? This will wipe the session metadata and associated history from this device.',
+                type: 'warning',
+                persistent: true,
+                actions: [
+                    {
+                        label: 'Keep Session',
+                        onClick: () => {}
+                    },
+                    {
+                        label: 'Delete Forever',
+                        primary: true,
+                        onClick: () => {
+                            setSessions(prev => prev.filter(s => s.id !== sessionId));
+                            if (currentSessionId === sessionId) {
+                                setCurrentSessionId(null);
+                                setView('list');
+                            }
+                            localStorage.removeItem(`tankiq_history_${currentUser?.stationId}_${sessionId}`);
+                            window.dispatchEvent(new CustomEvent('system-toast', {
+                                detail: {
+                                    title: 'Intelligence Purged',
+                                    message: 'The selected session has been removed from the local registry.',
+                                    type: 'info'
+                                }
+                            }));
+                        }
+                    }
+                ]
             }
-            localStorage.removeItem(`tankiq_history_${currentUser?.stationId}_${sessionId}`);
-        }
+        }));
     };
 
     const handleExportWhatsApp = () => {

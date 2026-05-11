@@ -83,6 +83,35 @@
     opacity: 0.8;
 }
 
+.toast-action-btn-industrial {
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: inherit;
+}
+
+.toast-action-btn-industrial:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+.toast-action-btn-industrial.primary {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-color: rgba(0, 0, 0, 0.9);
+}
+
+.toast-action-btn-industrial.primary:hover {
+    background: rgba(0, 0, 0, 1);
+}
+
 .toast-close-mini {
     background: transparent;
     border: none;

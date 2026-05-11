@@ -372,7 +372,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
             }
         } catch (err) {
-            logger.error('[MFA] Challenge initiation failed:', err, 'AUTH_MFA');
+            logger.warn('[MFA] Challenge initiation failed:', err, 'AUTH_MFA');
             mfaChallengeInProgressRef.current = false;
             updateLoadingState(false);
             throw err;
@@ -641,7 +641,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
             // Record the failed attempt
-            supabase.rpc('log_auth_attempt', { p_email: email, p_success: false }).then(({error: rpcErr}) => {
+            supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: false }).then(({error: rpcErr}) => {
                 if (rpcErr) debugLog('[signIn] log_auth_attempt failed', rpcErr);
             });
             updateLoadingState(false);

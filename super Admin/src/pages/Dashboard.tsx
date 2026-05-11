@@ -34,7 +34,7 @@ const Dashboard = () => {
             setStats(statsData);
             setDevices(devicesData);
         } catch (err) {
-            console.error("Dashboard Sync Error:", err);
+            
         } finally {
             setLoading(false);
         }
@@ -51,7 +51,6 @@ const Dashboard = () => {
                 'postgres_changes', 
                 { event: '*', schema: 'public', table: 'devices' }, 
                 () => {
-                    console.log('[DashboardRealtime] Hardware update detected. Refreshing stats...');
                     fetchData();
                 }
             )
@@ -59,7 +58,6 @@ const Dashboard = () => {
                 'postgres_changes', 
                 { event: '*', schema: 'public', table: 'tanks' }, 
                 () => {
-                    console.log('[DashboardRealtime] Inventory change detected. Refreshing stats...');
                     fetchData();
                 }
             )

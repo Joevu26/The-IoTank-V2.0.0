@@ -103,18 +103,49 @@ export const SettingsPage: React.FC = () => {
         
 }    
 };    const handleDisableMFA = async () => {
-        if (!confirm('Are you sure you want to remove Two-Factor Authentication? This will make your account less secure.')) return;
-        setMfaLoading(true);
-        try {
-            await unenrollMFA();
-            setMfaEnabled(false);
-            setToast({ message: 'Identity protection: Two-Factor Authentication has been removed. Account security level decreased.', type: 'success' });
-            await AuditService.log('SECURITY', 'MFA_DISABLED', currentUser?.stationId || 'SYSTEM', 'Security alert: Two-Factor Authentication de-registered. Manual bypass active.', 'WARNING', {});
-        } catch (err: any) {
-            setToast({ message: err.message || 'Failed to disable MFA.', type: 'error' });
-        } finally {
-            setMfaLoading(false);
-        }
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Security Alert: Remove Protection',
+                message: 'Are you sure you want to remove Two-Factor Authentication? This will significantly decrease your account security level and revert to legacy identity verification.',
+                type: 'error',
+                persistent: true,
+                actions: [
+                    {
+                        label: 'Maintain Security',
+                        onClick: () => {}
+                    },
+                    {
+                        label: 'Disable MFA',
+                        primary: true,
+                        onClick: async () => {
+                            setMfaLoading(true);
+                            try {
+                                await unenrollMFA();
+                                setMfaEnabled(false);
+                                window.dispatchEvent(new CustomEvent('system-toast', {
+                                    detail: {
+                                        title: 'MFA Disabled',
+                                        message: 'Identity protection has been removed. Account security level decreased.',
+                                        type: 'info'
+                                    }
+                                }));
+                                await AuditService.log('SECURITY', 'MFA_DISABLED', currentUser?.stationId || 'SYSTEM', 'Security alert: Two-Factor Authentication de-registered. Manual bypass active.', 'WARNING', {});
+                            } catch (err: any) {
+                                window.dispatchEvent(new CustomEvent('system-toast', {
+                                    detail: {
+                                        title: 'Operation Failed',
+                                        message: err.message || 'Failed to disable MFA.',
+                                        type: 'error'
+                                    }
+                                }));
+                            } finally {
+                                setMfaLoading(false);
+                            }
+                        }
+                    }
+                ]
+            }
+        }));
     };
 
     // Tank Selection & Modal State

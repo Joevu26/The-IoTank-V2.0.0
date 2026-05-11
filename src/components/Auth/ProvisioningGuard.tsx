@@ -61,7 +61,7 @@ export const ProvisioningGuard: React.FC<ProvisioningGuardProps> = ({ children }
         try {
             const { data, error } = await supabase.rpc('check_my_identity');
             if (error) throw error;
-            console.log('[DEBUG_LOG] IDENTITY_DIAGNOSTIC:', data);
+            // IDENTITY_DIAGNOSTIC checked
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Diagnostic Report',

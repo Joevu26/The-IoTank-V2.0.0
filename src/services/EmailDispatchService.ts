@@ -76,7 +76,7 @@ export class EmailDispatchService {
             }
 
             const data = await response.json();
-            console.log('[EmailDispatch] Tactical alert sent successfully:', data);
+            // Tactical alert sent successfully
             return data;
         } catch (err) {
             console.error('[EmailDispatch] Failed to dispatch tactical email:', err);
