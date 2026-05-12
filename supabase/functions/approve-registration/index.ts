@@ -198,12 +198,13 @@ Deno.serve(async (req) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                action: 'direct_transactional_email',
+                cmd: 'direct_transactional_email',
                 to: reg.email,
                 params: {
-                    type: 'WELCOME',
+                    type: 'TRIAL_WELCOME',
                     recipientName: reg.contact_person || 'Station Admin',
                     stationName: reg.station_name,
+                    trialEndDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(),
                     loginUrl: 'https://the-iotank-project.web.app/login'
                 }
             })

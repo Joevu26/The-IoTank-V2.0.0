@@ -318,9 +318,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
 
     useEffect(() => {
         const checkConnection = async () => {
+            if (!currentUser) return;
             try {
-                const { error } = await supabase.from('market_signals').select('id').limit(1);
-                setIsOnline(!error);
+                // Use a head request on profiles to verify DB connectivity without fetching data
+                // Every authenticated user has access to their own profile record.
+                const { error } = await supabase
+                    .from('profiles')
+                    .select('auth_user_id', { head: true, count: 'exact' })
+                    .eq('auth_user_id', currentUser.authUserId)
+                    .single();
+                
+                setIsOnline(!error || error.code === 'PGRST116'); // PGRST116 is "no rows", still means online
             } catch {
                 setIsOnline(false);
             }
@@ -328,7 +336,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
         checkConnection();
         const interval = setInterval(checkConnection, 60000);
         return () => clearInterval(interval);
-    }, []);
+    }, [currentUser?.authUserId]);
 
     const formattedTime = currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 

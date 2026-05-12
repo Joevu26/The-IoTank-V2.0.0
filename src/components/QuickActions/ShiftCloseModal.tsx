@@ -31,6 +31,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     const [dbStartTime, setDbStartTime] = useState<string | null>(null);
     const [isManualOverride, setIsManualOverride] = useState(false);
     const [manualClosingVolumes, setManualClosingVolumes] = useState<Record<string, string>>({});
+    const [criticalVarianceThreshold, setCriticalVarianceThreshold] = useState(500);
 
     // Read opening state from DB on mount/open
     useEffect(() => {
@@ -63,7 +64,21 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             }
         };
 
+        const fetchSettings = async () => {
+            const { data } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'CRITICAL_VARIANCE_THRESHOLD')
+                .maybeSingle();
+            
+            if (data?.value) {
+                const parsed = parseInt(data.value, 10);
+                if (!isNaN(parsed)) setCriticalVarianceThreshold(parsed);
+            }
+        };
+
         fetchActiveShift();
+        fetchSettings();
     }, [isOpen, stationId]);
 
     // Legacy fallback (maintained for zero-downtime transition)
@@ -126,7 +141,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     }, 0);
 
     const deficit = totalVolumetricSold - (totalCollected + spending);
-    const isCollusionSuspected = Math.abs(deficit) > 500; 
+    const isCollusionSuspected = Math.abs(deficit) > criticalVarianceThreshold; 
 
     const handleFinChange = (tankId: string, key: 'cash'|'mpesa'|'card'|'other', val: number) => {
         setFinancials(prev => ({
@@ -538,7 +553,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     { label: 'Volumetric Drawdown', value: `${totalDispensedLiters.toFixed(1)} L`, color: 'cyan', icon: <FiDroplet size={14} /> },
                     { label: 'Expected Revenue', value: `Ksh ${totalVolumetricSold.toFixed(0)}`, color: 'blue', icon: <FiTrendingUp size={14} /> },
                     { label: 'Cash Collated', value: `Ksh ${totalCollected.toFixed(0)}`, color: 'slate', icon: <FiCreditCard size={14} /> },
-                    { label: 'Calculated Variance', value: `Ksh ${Math.abs(deficit).toFixed(0)}`, color: deficit > 0 ? 'rose' : 'emerald', icon: <FiAlertTriangle size={14} />, alert: deficit > 50 }
+                    { label: 'Calculated Variance', value: `Ksh ${Math.abs(deficit).toFixed(0)}`, color: deficit > 0 ? 'rose' : 'emerald', icon: <FiAlertTriangle size={14} />, alert: deficit > (criticalVarianceThreshold / 10) }
                 ].map((card, i) => (
                     <div key={i} className={`forensic-hud-card ${card.color} ${card.alert ? 'animate-pulse' : ''}`}>
                         <div className="card-icon">{card.icon}</div>

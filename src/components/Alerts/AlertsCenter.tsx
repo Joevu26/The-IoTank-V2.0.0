@@ -105,9 +105,13 @@ const EscalationLadder: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts })
                 </div>
             </div>
             <div className="ladder-bar">
+                {/* eslint-disable-next-line no-inline-styles */}
                 <div className="ladder-segment critical" style={{ width: `${getWidth(counts.CRITICAL)}%` }} />
+                {/* eslint-disable-next-line no-inline-styles */}
                 <div className="ladder-segment high" style={{ width: `${getWidth(counts.HIGH)}%` }} />
+                {/* eslint-disable-next-line no-inline-styles */}
                 <div className="ladder-segment watch" style={{ width: `${getWidth(counts.WATCH)}%` }} />
+                {/* eslint-disable-next-line no-inline-styles */}
                 <div className="ladder-segment info" style={{ width: `${getWidth(counts.INFO)}%` }} />
             </div>
         </div>
@@ -122,6 +126,7 @@ const RiskTrendViz: React.FC<{ activeAlerts: Alert[] }> = ({ activeAlerts }) => 
             </div>
             <div className="viz-pulse-stack">
                 {[...Array(8)].map((_, i) => (
+                    // eslint-disable-next-line no-inline-styles
                     <div 
                         key={i} 
                         className="viz-bar active" 

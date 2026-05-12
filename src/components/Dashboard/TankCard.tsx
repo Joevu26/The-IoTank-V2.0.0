@@ -374,7 +374,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                                 <FiShield className="text-2xl" />
                                 <h3 className="text-xl font-black uppercase tracking-tighter">Secure Purge Protocol</h3>
                             </div>
-                            <button onClick={() => setShowDeleteModal(false)} className="text-secondary hover:text-white">
+                            <button onClick={() => setShowDeleteModal(false)} className="text-secondary hover:text-white" title="Close">
                                 <FiX size={20} />
                             </button>
                         </div>

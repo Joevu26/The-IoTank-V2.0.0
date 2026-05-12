@@ -168,7 +168,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                             debugLog(`[DEBUG_LOG] ENRICHMENT MFA: Finished listFactors!`);
                             return res;
                         })(),
-                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 4000))
+                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 10000))
                     ]).catch(e => {
                         logger.warn('[MFA] Factor list deferred or timed out:', e);
                         return { data: null, error: e };

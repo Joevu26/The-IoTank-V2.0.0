@@ -9,6 +9,7 @@
         ],
         "module": "ESNext",
         "skipLibCheck": true,
+        "ignoreDeprecations": "5.0",
         /* Bundler mode */
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
@@ -21,6 +22,7 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true,
+        "forceConsistentCasingInFileNames": true,
         /* Path aliases */
         "baseUrl": ".",
         "paths": {

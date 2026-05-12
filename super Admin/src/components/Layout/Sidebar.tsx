@@ -74,6 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'dashboard', path: '/', icon: <MdDashboard />, level: 4 },
         { name: 'fleet control', path: '/fleet', icon: <MdMemory />, level: 4 },
         { name: 'forensic hub', path: '/governance', icon: <FiShield />, level: 1 },
+        { name: 'pending requests', path: '/registrations', icon: <MdPersonAdd />, level: 1 },
         { name: 'security events', path: '/security-events', icon: <MdReportGmailerrorred />, level: 1 },
 
         { name: 'business & revenue', isSection: true, path: 'sec-biz', level: 4 },

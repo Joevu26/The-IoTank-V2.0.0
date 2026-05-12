@@ -583,6 +583,13 @@ export async function updateTank(tankId: string, updates: Partial<Tank>) {
  */
 export async function createTank(tankData: Partial<Tank> & { stationId: string }) {
     try {
+        // Fetch dynamic defaults
+        const { data: settings } = await supabase.from('system_settings').select('key, value').in('key', ['DEFAULT_LOW_LEVEL_THRESHOLD', 'DEFAULT_HIGH_TEMP_THRESHOLD']);
+        const getSetting = (key: string, def: number) => {
+            const s = settings?.find(x => x.key === key);
+            return s ? parseFloat(s.value) : def;
+        };
+
         const dbTank = {
             station_id: tankData.stationId,
             site_id: tankData.siteId,
@@ -598,8 +605,8 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
             sensor_height: tankData.sensorHeight,
             sensor_empty_distance: tankData.sensorEmptyDistance,
             sensor_full_distance: tankData.sensorFullDistance,
-            low_level_threshold: tankData.lowLevelThreshold || 20, // Reorder: 20% hardcoded benchmark
-            high_temperature_threshold: tankData.temperatureAlertThreshold || 60,
+            low_level_threshold: tankData.lowLevelThreshold || getSetting('DEFAULT_LOW_LEVEL_THRESHOLD', 20),
+            high_temperature_threshold: tankData.temperatureAlertThreshold || getSetting('DEFAULT_HIGH_TEMP_THRESHOLD', 60),
             status: 'active',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()

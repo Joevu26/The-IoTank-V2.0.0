@@ -6,6 +6,8 @@ import { useShiftStatus } from './useShiftStatus';
 import { supabase } from '@/config/supabase';
 import { calculateETE, calculateRate, TELEMETRY_CONSTANTS } from '@/utils/telemetryMath';
 
+const isValidUuid = (s?: string) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s || '');
+
 export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading[]) {
     const { pushEvent } = useTelemetryQueue();
     const { openedAt, status: shiftStatus } = useShiftStatus();
@@ -14,7 +16,8 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
     // Fetch Last 7 Days Average Dispense Rate
     useEffect(() => {
         const fetchHistoricalAverage = async () => {
-            if (!tank || !tank.id) return;
+                // Guard: only query Postgres when tank.id is a valid UUID. Skip placeholders like "ghost-tank".
+                if (!tank || !tank.id || !isValidUuid(tank.id)) return;
             
             try {
                 // Get last 7 shift closures for this tank

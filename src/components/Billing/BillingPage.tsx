@@ -12,8 +12,7 @@ import {
     FaExchangeAlt,
     FaPhone,
     FaCreditCard,
-    FaFingerprint,
-    FaSatellite
+    FaFingerprint
 } from 'react-icons/fa';
 import { FiArrowRight, FiActivity } from 'react-icons/fi';
 import './BillingPage.css';
@@ -46,22 +45,7 @@ interface Transaction {
     status: string;
 }
 
-const MOCK_BILLING: BillingInfo = {
-    station_id: 'demo-id',
-    current_debt: 12500,
-    total_paid: 450000,
-    account_status: 'healthy',
-    next_billing_date: new Date(Date.now() + 864000000).toISOString(),
-    station_name: 'Simulated Environment',
-    sub_tier: 'PRO',
-    sub_status: 'ACTIVE',
-    telemetry_usage_mb: 4.52
-};
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-    { id: '1', transaction_type: 'payment', amount: 5000, description: 'M-Pesa Remittance - QJK98X', payment_status: 'completed', payment_method: 'mpesa', created_at: new Date(Date.now() - 86400000).toISOString(), completed_at: new Date(Date.now() - 86400000).toISOString(), provider: 'MPESA', status: 'COMPLETED', provider_ref: 'MP_12345' },
-    { id: '2', transaction_type: 'charge', amount: 2500, description: 'Monthly Infrastructure Fee', payment_status: 'completed', payment_method: 'system', created_at: new Date(Date.now() - 172800000).toISOString(), completed_at: new Date(Date.now() - 172800000).toISOString(), provider: 'SYSTEM', status: 'COMPLETED', provider_ref: 'SYS_999' },
-];
+// Mock data removed. Component now strictly relies on dynamic database telemetry.
 
 const Sparkline: React.FC<{ color: string }> = ({ color }) => (
     <div className="metric-trend-sparkline">
@@ -98,7 +82,6 @@ export const BillingPage: React.FC = () => {
     const [paying, setPaying] = useState(false);
     const [payFeedback, setPayFeedback] = useState('');
     const [stationId, setStationId] = useState<string | null>(null);
-    const [isDemo, setIsDemo] = useState(false);
     const [readingCount, setReadingCount] = useState(0);
 
     useEffect(() => {
@@ -134,18 +117,12 @@ export const BillingPage: React.FC = () => {
 
                     setTransactions(txRes.data || []);
                     setReadingCount(readingRes.count || 0);
-                    setIsDemo(false);
                 } else {
-                    setBilling(MOCK_BILLING);
-                    setTransactions(MOCK_TRANSACTIONS);
-                    setStationId(MOCK_BILLING.station_id);
-                    setIsDemo(true);
+                    setBilling(null);
                 }
             } catch (err) {
                 console.error("[BILLING_SYSTEM_FAILURE]", err);
-                setBilling(MOCK_BILLING);
-                setTransactions(MOCK_TRANSACTIONS);
-                setIsDemo(true);
+                setBilling(null);
             } finally {
                 setLoading(false);
             }
@@ -168,33 +145,7 @@ export const BillingPage: React.FC = () => {
         );
     }
 
-    const handleQuickProvision = async () => {
-        setLoading(true);
-        // [NON-BLOCKING PROVISIONING]: Replaced blocking prompt() with automated setup
-        const { error } = await supabase.rpc('emergency_set_station_name', { p_name: "IoT-Node-Alpha" });
-        if (error) {
-            window.dispatchEvent(new CustomEvent('system-toast', {
-                detail: {
-                    title: 'Provisioning Error',
-                    message: "Error: " + error.message,
-                    type: 'error',
-                    attribution: 'SYSTEM PROVISIONING'
-                }
-            }));
-        }
-        else {
-            window.dispatchEvent(new CustomEvent('system-toast', {
-                detail: {
-                    title: 'Account Provisioned',
-                    message: "Station 'IoT-Node-Alpha' has been successfully initialized in simulation mode.",
-                    type: 'success',
-                    attribution: 'SYSTEM PROVISIONING'
-                }
-            }));
-            setTimeout(() => window.location.reload(), 1500);
-        }
-        setLoading(false);
-    };
+    // Quick provision removed
 
     const handleStkPush = async () => {
         if (!payAmount || parseFloat(payAmount) <= 0) { setPayFeedback('⚠️ Enter amount'); return; }
@@ -326,23 +277,7 @@ export const BillingPage: React.FC = () => {
                 </motion.div>
             </header>
 
-            <AnimatePresence>
-                {isDemo && (
-                    <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="simulation-banner-v3"
-                    >
-                        <FaSatellite className="text-cyan-400 text-2xl" />
-                        <div className="flex flex-col">
-                            <span className="text-xs font-black uppercase tracking-widest">Virtualized Ledger</span>
-                            <p className="text-[11px] text-slate-400">Simulation mode active. Live settlement disabled.</p>
-                        </div>
-                        <button onClick={handleQuickProvision} className="provision-btn-v3">Provision Account</button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             <div className="billing-metric-grid">
                 <motion.div variants={itemVariants} className="saas-metric-card">

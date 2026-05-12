@@ -249,6 +249,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         
         const volumeDrop = prevVol - currVol; // Positive if consuming
         const dropRate = -calculateTimeBasedSlope(points); // Slope is negative for drop, we want positive L/hr
+        
+        // [PHASE 3]: Backfill Anomaly Guard
+        // If the gap between readings is too large (e.g., > 2 hours), the dropRate calculation 
+        // for "Rapid Drawdown" is unreliable. We skip theft detection to avoid false positives.
+        const telemetryGapHr = (currTime - prevTime) / (1000 * 60 * 60);
+        const isBackfilledBatch = telemetryGapHr > 2.0; 
 
         // Heuristics
         const rapidDropThreshold = tank.rapidDefillThreshold || THRESHOLDS.FORENSICS.RAPID_DEFILL_LHR; 
@@ -258,7 +264,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
 
         if (!isShiftOpen) {
             // CASE A: Shift is CLOSED. Any drop is suspicious.
-            if (volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > rapidDropThreshold) {
+            if (!isBackfilledBatch && volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > rapidDropThreshold) {
                 const { score, label } = scoreByType('composite_supply_risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
@@ -301,7 +307,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             }
         } else {
             // CASE B: Shift is OPEN. Drop is expected, but siphoning (Parallel Pull) is theft.
-            if (volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > maxPumpFlow) {
+            if (!isBackfilledBatch && volumeDrop > THRESHOLDS.FORENSICS.MIN_THEFT_VOLUME_L && dropRate > maxPumpFlow) {
                 const { score, label } = scoreByType('composite_supply_risk', 0.95);
                 drafts.push({
                     tankId: tank.id,

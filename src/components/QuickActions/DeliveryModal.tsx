@@ -8,6 +8,8 @@ import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUpload
 import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
 import './QuickActions.css';
 import { NotificationService } from '@/services/NotificationService';
+import { SignaturePad } from '../Common/SignaturePad';
+
 
 interface DeliveryModalProps {
     isOpen: boolean;
@@ -42,6 +44,8 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
     const [uploadingInvoice, setUploadingInvoice] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [step, setStep] = useState<1 | 2>(1);
+    const [signature, setSignature] = useState('');
+
 
     const { reading: latestReading } = useLatestReading(stationId, formData.tankId);
 
@@ -126,7 +130,9 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                     },
                     density_api: formData.density,
                     temp_gradient: tempGradient,
-                    existing_temp_at_delivery: formData.existingTemp
+                    existing_temp_at_delivery: formData.existingTemp,
+                    witness_signature: signature || null,
+                    witness_name: currentUser.displayName || currentUser.email
                 }
             };
 
@@ -532,6 +538,14 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                     onChange={e => setFormData({ ...formData, varianceReason: e.target.value })}
                                 />
                             </div>
+
+                            <div className="form-group max-w-md mx-auto mt-6">
+                                <SignaturePad 
+                                    onSave={setSignature} 
+                                    onClear={() => setSignature('')} 
+                                />
+                            </div>
+
 
                             <div className="tm-verification-card max-w-[448px] mx-auto my-[10px] mt-[20px]">
                                 <FiCheckCircle size={18} />
