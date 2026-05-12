@@ -55,18 +55,12 @@ export const analyticsService = {
 
         return {
             totalTanks: data.health.totalTanks,
-            totalFuel: totalFuel || 1250000, 
-            readings30d: readingsCount || 1450000,
-            apiCalls30d: 85000,
-            smsSent30d: 12400,
+            totalFuel: totalFuel || 0, 
+            readings30d: readingsCount || 0,
+            apiCalls30d: 0,
+            smsSent30d: 0,
             alertsTriggered30d: data.support.pendingAdjustments * 10,
-            featureAdoption: {
-                '3D Digital Twin': 65,
-                'Procurement AI': 42,
-                'API Integration': 28,
-                'Mobile App': 88,
-                'Webhook Alerts': 15
-            }
+            featureAdoption: {}
         };
     },
 
@@ -77,11 +71,7 @@ export const analyticsService = {
             .order('created_at', { ascending: false });
         
         if (error || !data || data.length === 0) {
-            return [
-                { id: '1', name: 'Monthly Revenue - Feb 2026', type: 'Revenue', date: '2026-03-01' },
-                { id: '2', name: 'KRA Tax Compliance - Q1', type: 'Tax', date: '2026-03-20' },
-                { id: '3', name: 'Debt Aging Analysis', type: 'Debt', date: '2026-03-22' }
-            ];
+            return [];
         }
         return data;
     },
@@ -93,10 +83,7 @@ export const analyticsService = {
             .order('created_at', { ascending: false });
 
         if (error || !data || data.length === 0) {
-            return [
-                { id: '1', type: 'Operational Summary', frequency: 'daily', last_run: '2026-03-21', recipients: ['admin@the-iotank-project.web.app'], status: 'active' },
-                { id: '2', type: 'Revenue Growth', frequency: 'weekly', last_run: '2026-03-17', recipients: ['ceo@the-iotank-project.web.app', 'cfo@the-iotank-project.web.app'], status: 'active' }
-            ];
+            return [];
         }
         return data as any;
     },

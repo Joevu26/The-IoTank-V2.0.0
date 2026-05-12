@@ -157,9 +157,9 @@ const Dashboard = () => {
                                 <FiEngine size={14} className="text-amber-500" />
                             </div>
                             <div className="stat-val-group">
-                                <span className="stat-value">NOMINAL</span>
+                                <span className="stat-value">{stats?.health?.alertRate ? 'NOMINAL' : 'STANDBY'}</span>
                                 <div className="stat-footer">
-                                    <span>{stats?.health?.alertRate || '99.1%'} Prob</span>
+                                    <span>{stats?.health?.alertRate || '0%'} Reliability</span>
                                     <FiZap size={10} className="text-amber-500" />
                                 </div>
                             </div>
