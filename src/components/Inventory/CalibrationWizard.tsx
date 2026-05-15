@@ -5,6 +5,7 @@ import { supabase } from '@/config/supabase';
 import { Tank } from '@/types';
 import { AuditService } from '@/services/AuditService';
 import { NotificationService } from '@/services/NotificationService';
+import { validateUUID } from '@/utils/sanitization';
 import './CalibrationWizard.css';
 
 interface CalibrationWizardProps {
@@ -30,6 +31,7 @@ export const CalibrationWizard: React.FC<CalibrationWizardProps> = ({ isOpen, on
         if (!isOpen) return;
 
         const fetchLiveRaw = async () => {
+            if (!validateUUID(tank.id)) return;
             const { data } = await supabase
                 .from('sensor_readings')
                 .select('raw_distance')
@@ -42,6 +44,7 @@ export const CalibrationWizard: React.FC<CalibrationWizardProps> = ({ isOpen, on
         };
 
         fetchLiveRaw();
+        if (!validateUUID(tank.id)) return;
 
         // Establish real-time forensic handshake for ultra-low latency
         const channel = supabase

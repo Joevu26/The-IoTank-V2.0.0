@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
+import { validateUUID } from '@/utils/sanitization';
 
-export type EventCategory = 'SHIFT' | 'DELIVERY' | 'TEAM' | 'SECURITY' | 'SYSTEM' | 'FINANCE' | 'AI' | 'CALIBRATION';
+export type EventCategory = 'SHIFT' | 'DELIVERY' | 'ORDER' | 'TEAM' | 'SECURITY' | 'SYSTEM' | 'FINANCE' | 'AI' | 'CALIBRATION';
 
 export type EventType =
     | 'LOGIN'
@@ -41,7 +42,10 @@ export type EventType =
     | 'ALERTS_BULK_RESOLVED'
     | 'ALERTS_BULK_DISMISSED'
     | 'MANUAL_OVERRIDE'
-    | 'CALIBRATION_APPLIED';
+    | 'CALIBRATION_APPLIED'
+    | 'EMAIL_SUPPRESSED'
+    | 'SMS_SUPPRESSED'
+    | 'PUSH_ENABLED';
 
 
 export interface UnifiedEvent {
@@ -54,6 +58,10 @@ export interface UnifiedEvent {
 }
 
 export class AuditService {
+    private static cachedSession: any = null;
+    private static lastSessionFetch = 0;
+    private static SESSION_TTL = 30000; // 30 seconds
+
     /**
      * Records a high-fidelity event to the Unified Event Timeline.
      */
@@ -66,17 +74,33 @@ export class AuditService {
         metadata: any = {}
     ) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const user = session?.user;
+            // [PERFORMANCE]: Use cached session to avoid Gotrue Lock contention
+            const now = Date.now();
+            if (!this.cachedSession || (now - this.lastSessionFetch > this.SESSION_TTL)) {
+                const { data: { session } } = await supabase.auth.getSession();
+                this.cachedSession = session;
+                this.lastSessionFetch = now;
+            }
+            
+            const user = this.cachedSession?.user;
 
             if (!user) {
-                console.warn('[AuditService] No active session found, skipping log.');
-                return;
+                // Try one more time if critical
+                if (severity === 'CRITICAL') {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    this.cachedSession = session;
+                    if (!session?.user) {
+                        console.warn('[AuditService] No active session found for critical log, skipping.');
+                        return;
+                    }
+                } else {
+                    console.warn('[AuditService] No active session found, skipping log.');
+                    return;
+                }
             }
 
             // 🟢 Forensic Intelligence Sanitization: Ensure stationId is a valid UUID or null
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-            const validStationId = uuidRegex.test(stationId) ? stationId : null;
+            const validStationId = validateUUID(stationId) ? stationId : null;
 
             const { error } = await supabase.from('unified_events').insert({
                 station_id: validStationId,

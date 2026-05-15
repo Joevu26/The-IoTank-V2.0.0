@@ -7,6 +7,14 @@ import { extractPricesFromText } from './useMarketNews';
 export const useMarketIntelligence = (stationId: string) => {
     // Cache key for news feed
     const MI_CACHE_KEY_SIGNALS = 'mi_cache_signals';
+    
+    const VERIFIED_BASE_PRICES: MarketData[] = [
+        { id: 'init-pms', fuelType: 'PMS', region: 'Kenya', pricePerLiter: 206.97, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-ago', fuelType: 'AGO', region: 'Kenya', pricePerLiter: 206.84, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-ik', fuelType: 'IK', region: 'Kenya', pricePerLiter: 152.78, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-brent', fuelType: 'BRENT', region: 'Global', pricePerLiter: 83.45, currency: 'USD', timestamp: 1715500000000, source: 'api' },
+        { id: 'init-fx', fuelType: 'FX', region: 'Kenya', pricePerLiter: 132.50, currency: 'KES', timestamp: 1715500000000, source: 'api' },
+    ];
 
     const [signals, setSignals] = useState<MarketSignal[]>(() => {
         try {
@@ -19,12 +27,23 @@ export const useMarketIntelligence = (stationId: string) => {
 
     const [risks, setRisks] = useState<SupplyRisk[]>([]);
     const [notices, setNotices] = useState<RegulatoryNotice[]>([]);
-    const [prices, setPrices] = useState<MarketData[]>([]);
+    const [prices, setPrices] = useState<MarketData[]>(() => {
+        try {
+            const cached = localStorage.getItem('mi_cache_prices');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+            return VERIFIED_BASE_PRICES;
+        } catch {
+            return VERIFIED_BASE_PRICES;
+        }
+    });
     const [actionQueue, setActionQueue] = useState<MarketActionItem[]>([]);
 
     const [loading, setLoading] = useState<boolean>(() => {
         try {
-            return !localStorage.getItem(MI_CACHE_KEY_SIGNALS);
+            return !localStorage.getItem(MI_CACHE_KEY_SIGNALS) || !localStorage.getItem('mi_cache_prices');
         } catch {
             return true;
         }
@@ -64,7 +83,7 @@ export const useMarketIntelligence = (stationId: string) => {
 
     useEffect(() => {
         let isMounted = true;
-        if (signals.length === 0) setLoading(true);
+        if (signals.length === 0 || prices.length === 0) setLoading(true);
 
         const fetchData = async () => {
             try {
@@ -168,15 +187,28 @@ export const useMarketIntelligence = (stationId: string) => {
                     });
                 });
 
-                // Merge: Live Extraction (High Priority) > Database Prices
-                const finalPrices = [...mappedPricesValue];
+                // Merge: Live Extraction (High Priority) > Database Prices > Base Verified
+                let finalPrices = [...VERIFIED_BASE_PRICES];
+                
+                // Update with initial state/cache if fresher
+                prices.forEach(p => {
+                    const idx = finalPrices.findIndex(f => f.fuelType === p.fuelType);
+                    if (idx === -1) finalPrices.push(p);
+                    else if (p.timestamp > finalPrices[idx].timestamp) finalPrices[idx] = p;
+                });
+
+                // Update with DB data
+                mappedPricesValue.forEach(dbPrice => {
+                    const idx = finalPrices.findIndex(p => p.fuelType === dbPrice.fuelType);
+                    if (idx === -1) finalPrices.push(dbPrice);
+                    else if (dbPrice.timestamp >= finalPrices[idx].timestamp) finalPrices[idx] = dbPrice;
+                });
+
+                // Update with Live Extraction
                 extractedPrices.forEach(ext => {
-                    const existingIdx = finalPrices.findIndex(p => p.fuelType === ext.fuelType);
-                    if (existingIdx === -1) {
-                        finalPrices.push(ext);
-                    } else if (ext.timestamp > finalPrices[existingIdx].timestamp) {
-                        finalPrices[existingIdx] = ext;
-                    }
+                    const idx = finalPrices.findIndex(p => p.fuelType === ext.fuelType);
+                    if (idx === -1) finalPrices.push(ext);
+                    else if (ext.timestamp >= finalPrices[idx].timestamp) finalPrices[idx] = ext;
                 });
 
                 // 5. Fetch Risks
@@ -221,8 +253,9 @@ export const useMarketIntelligence = (stationId: string) => {
                     setActionQueue(mappedQueue);
                     try {
                         localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mergedSignals));
+                        localStorage.setItem('mi_cache_prices', JSON.stringify(finalPrices));
                     } catch (e) {
-                        console.warn('Failed to cache signals', e);
+                        console.warn('Failed to cache market data', e);
                     }
                     setRisks(mappedRisksValue);
                     setNotices(mappedNoticesValue);

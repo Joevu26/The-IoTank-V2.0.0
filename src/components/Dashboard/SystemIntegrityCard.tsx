@@ -33,7 +33,7 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({
     }, []);
 
     // ── PLATFORM UPTIME LOGIC ──
-    const { systemUptime, avgLatency, nodeId, edgeNodes } = useMemo(() => {
+    const { systemUptime, avgLatency, nodeId } = useMemo(() => {
         let baseUptime = 99.98;
         
         const unresolvedCriticalAlerts = alerts.filter(a => !a.resolved && a.severity === 'critical');
@@ -52,18 +52,10 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({
             ? `HUB-${stationId.substring(0, 4).toUpperCase()}`
             : 'HUB-01';
 
-        // Simulated Global Edge Nodes
-        const nodes = [
-            { id: 'EU-WEST-1', ping: (12 + Math.random() * 5).toFixed(0) },
-            { id: 'US-EAST-1', ping: (85 + Math.random() * 10).toFixed(0) },
-            { id: 'AF-SOUTH-1', ping: (8 + Math.random() * 3).toFixed(0) }
-        ];
-
         return {
             systemUptime: uptimeString,
             avgLatency: latencyString,
-            nodeId: derivedId,
-            edgeNodes: nodes
+            nodeId: derivedId
         };
     }, [stationId, healthData, alerts, jitter]);
 
@@ -101,21 +93,7 @@ export const SystemIntegrityCard: React.FC<SystemIntegrityCardProps> = ({
                 </div>
             </div>
 
-            {/* --- Edge Nodes Section (New Feature) --- */}
-            <div className="edge-nodes-section">
-                <p className="integrity-label !mb-1.5">Global Edge Intelligence</p>
-                <div className="space-y-2">
-                    {edgeNodes.map(node => (
-                        <div key={node.id} className="edge-node-row">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
-                                <span className="text-[10px] font-bold text-slate-600">{node.id}</span>
-                            </div>
-                            <span className="text-[9px] font-mono text-slate-400">{node.ping}ms</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
+
 
             {/* --- Footer --- */}
             <div className="integrity-footer">

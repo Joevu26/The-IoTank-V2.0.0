@@ -128,7 +128,7 @@ export const TeamManagement: React.FC = () => {
                         primary: true,
                         onClick: async () => {
                             try {
-                                await supabase.from('profiles').delete().eq('id', id);
+                                await supabase.from('profiles').delete().eq('auth_user_id', id);
                                 await AuditService.log(
                                     'TEAM',
                                     'MEMBER_REMOVED',

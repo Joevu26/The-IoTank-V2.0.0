@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
 import { DeliveryDocument } from '@/types';
+import { validateUUID } from '@/utils/sanitization';
 
 interface UseDeliveriesOptions {
     startDate?: string;
@@ -31,7 +32,7 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
             if (options.endDate) {
                 query = query.lte('created_at', options.endDate);
             }
-            if (options.tankId) {
+            if (options.tankId && validateUUID(options.tankId)) {
                 query = query.eq('tank_id', options.tankId);
             }
             if (options.status) {

@@ -9,7 +9,10 @@ const allowedEndpoints = new Set([
   'models/gemini-1.5-flash:generateContent',
   'models/gemini-1.5-flash-latest:generateContent',
   'models/gemini-1.5-pro:generateContent',
+  'models/gemini-1.5-pro-latest:generateContent',
+  'models/gemini-2.0-flash:generateContent',
   'models/gemini-2.0-flash-exp:generateContent',
+  'models/gemini-2.0-flash-lite:generateContent',
 ]);
 
 const CHAT_MAX_ANON    = 5;
@@ -95,7 +98,7 @@ Deno.serve(async (req) => {
        body.contents = [{ parts: [{ text: systemPrompt }] }];
     }
 
-    const targetEndpoint = endpoint || 'models/gemini-1.5-flash-latest:generateContent';
+    const targetEndpoint = endpoint || 'models/gemini-2.0-flash:generateContent';
     if (!allowedEndpoints.has(targetEndpoint)) {
       return new Response(JSON.stringify({ error: 'Endpoint is not allowed' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -129,8 +132,8 @@ Deno.serve(async (req) => {
         });
 
         if (response.status === 429) {
-          console.warn(`Gemini key rotation: 429 encountered, trying next key...`);
-          lastError = new Error('Rate limit reached on all keys');
+          console.warn(`Gemini key rotation: 429 encountered for key index ${keyIndex}, trying next key...`);
+          lastError = new Error('Rate limit reached (429) on this key');
           continue;
         }
 

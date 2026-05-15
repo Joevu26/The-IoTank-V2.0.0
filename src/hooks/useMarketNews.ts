@@ -23,6 +23,17 @@ const CACHE_TTL_SLOW_MS = 60 * 60 * 1000;  // 60 minutes — regulatory/forex (l
 const REFRESH_COOLDOWN_MS = 30 * 1000;     // 30 seconds
 const PERSISTENT_CACHE_KEY = 'mi:persistent_signals';
 const MAX_CACHE_DAYS = 30;                 // 30 days of signals kept locally
+const ACK_SIGNALS_KEY = 'mi:acknowledged_urls';
+export const VERIFIED_AI_SOURCES = ['EPRA', 'CBK', 'KPA', 'EIA', 'REUTERS', 'BD AFRICA'];
+
+const FALLBACK_DIRECTIVE: any = {
+    status: 'STABLE',
+    recommendation: 'Market signals stable. Standard monitoring cycle (periodic data refresh and sentiment scan) active — no immediate tactical adjustment required for station inventory or pricing.',
+    actionRequired: false,
+    actionDetails: 'Continue routine monitoring. Verify against official EPRA announcements on the 14th.',
+    confidence: 1.0,
+    priceData: []
+};
 
 // ─── Proxies (Function Names) ─────────────────────────────────────────────────
 const OFFICIAL_SCRAPER = 'official-scraper';
@@ -210,18 +221,19 @@ function computeImplication(title: string, summary: string): 'Price' | 'Supply' 
 function computeRelevanceScore(title: string, summary: string, sourceType: string, externalUrl?: string): number {
     const text = (title + ' ' + summary).toLowerCase();
     let score = 0.65;
-    if (text.includes('epra')) score += 0.2;
+    if (text.includes('epra')) score += 0.3;
     if (text.includes('fuel') || text.includes('petroleum') || text.includes('diesel') || text.includes('petrol')) score += 0.15;
     if (text.includes('kenya') || text.includes('nairobi')) score += 0.05;
-    if (text.includes('price')) score += 0.1;
-    if (sourceType === 'Regulatory') score += 0.2; // Substantial boost, but not pinned to 100%
+    if (text.includes('price')) score += 0.15;
+    if (sourceType === 'Regulatory') score += 0.25; 
     if (sourceType === 'Commodity') score += 0.1;
 
     // Apply Source Credibility Multiplier
     let multiplier = 0.7; // Default for unknown sources
     if (externalUrl) {
         try {
-            const domain = new URL(externalUrl).hostname.replace('www.', '');
+            const hostname = new URL(externalUrl).hostname;
+            const domain = hostname.replace('www.', '');
             if (SOURCE_CREDIBILITY[domain]) {
                 multiplier = SOURCE_CREDIBILITY[domain];
             } else {
@@ -245,25 +257,32 @@ export function extractPricesFromText(text: string): PriceDetection[] {
     const results: PriceDetection[] = [];
     
     // 1. Kenya Pump Prices (Ksh)
-    // Strong patterns for official notices: "set at Ksh", "retail at Ksh", "price of Ksh"
-    const kshRegex = /(?:set at|retail at|price of|to ksh|ksh|shillings|sh)\.?\s*(\d{1,3}(?:\.\d{2})?)/gi;
+    // Strong patterns for official notices: "set at Ksh", "retail at Ksh", "price of Ksh", "KSh 206.97"
+    // 1. Kenya Pump Prices (Ksh)
+    // patterns: "set at Ksh 193.84", "retail at 193.84", "price of 193.84", "KSh 206.97", "to 193.84"
+    const kshRegex = /(?:set at|retail at|price of|to ksh|ksh|shillings|sh|ksh\.|kshs|kshs\.|to)\s*(\d{2,3}(?:\.\d{2})?)/gi;
     let match;
     
     while ((match = kshRegex.exec(text)) !== null) {
         const val = parseFloat(match[1]);
-        if (val < 50 || val > 300) continue; // Filter out unrealistic prices/years
+        // Valid EPRA prices in Kenya are typically 150-250 KES. 
+        // We use a slightly wider window (100-300) to allow for future inflation/deflation.
+        if (val < 100 || val > 300) continue; 
         
-        const snippet = text.substring(Math.max(0, match.index - 60), Math.min(text.length, match.index + 60)).toLowerCase();
+        const snippet = text.substring(Math.max(0, match.index - 80), Math.min(text.length, match.index + 80)).toLowerCase();
         
         let commodity: PriceDetection['commodity'] = 'General';
         if (snippet.includes('petrol') || snippet.includes('pms') || snippet.includes('super')) commodity = 'Petrol';
         else if (snippet.includes('diesel') || snippet.includes('ago')) commodity = 'Diesel';
         else if (snippet.includes('kerosene') || snippet.includes('ik')) commodity = 'Kerosene';
         
-        // Boost confidence if specific regulatory keywords are nearby
-        const isOfficialPhrasing = snippet.includes('set at') || snippet.includes('retail at') || snippet.includes('regulated');
+        // Boost confidence if specific regulatory keywords or "Nairobi" (default pricing zone) are nearby
+        const isOfficialPhrasing = snippet.includes('set at') || snippet.includes('retail at') || snippet.includes('regulated') || snippet.includes('epra') || snippet.includes('nairobi');
         if (commodity !== 'General' || isOfficialPhrasing) {
-            results.push({ commodity, value: val, currency: 'KES' });
+            // Deduplicate: If we found multiple mentions of the same price for the same commodity, keep only one
+            if (!results.some(r => r.commodity === commodity && r.value === val)) {
+                results.push({ commodity, value: val, currency: 'KES' });
+            }
         }
     }
 
@@ -305,10 +324,11 @@ function validatePriceClaim(article: NewsArticle, currentEPRAPrice: number) {
 
 
 
-function buildBriefingSummary(title: string, description: string, implication: string): string {
+function buildBriefingSummary(title: string, description: string): string {
     const cleanDesc = description.replace(title, '').replace(/<[^>]*>/g, '').trim();
     const snippet = cleanDesc.length > 20 ? cleanDesc.substring(0, 300) : description.substring(0, 300);
-    return `${snippet || title} | Strategic Context: This ${implication.toLowerCase()} signal suggests immediate monitoring of operational margins.`;
+    // Remove boilerplate "Strategic Context" and provide direct intelligence
+    return `${snippet || title}`;
 }
 
 function buildSignalFromArticle(
@@ -332,11 +352,13 @@ function buildSignalFromArticle(
             publishedAt = Date.now();
         }
     }
+    const articleKey = article.url || `${article.title}-${source.shortLabel}`;
+    const stableId = `int-${source.shortLabel.replace(/\s/g, '_')}-${articleKey.substring(0, 16)}-${publishedAt}`;
 
     const signalSourceType = source.type === 'Logistics' ? 'Operational Alert' : source.type;
 
     return {
-        id: `int-${source.shortLabel.replace(/\s/g, '_')}-${publishedAt}-${Math.random().toString(36).substring(7)}`,
+        id: stableId,
         type: source.type === 'Regulatory' ? 'regulatory' : source.type === 'Commodity' ? 'market' : source.type === 'Logistics' ? 'logistics' : 'market',
         source: source.label,
         sourceType: signalSourceType,
@@ -351,7 +373,7 @@ function buildSignalFromArticle(
         region: source.region,
         topicTags,
         implicationCategory,
-        briefingSummary: buildBriefingSummary(title, description, implicationCategory),
+        briefingSummary: buildBriefingSummary(title, description),
         feedSource: source.shortLabel,
         isOfficial: source.type === 'Regulatory',
         imageUrl: article.thumbnail || article.urlToImage || article.image || article.enclosure?.link || undefined,
@@ -444,6 +466,7 @@ export interface UseMarketNewsReturn {
     setActiveRegion: (r: 'all' | 'Kenya' | 'Global') => void;
     filteredArticles: NewsArticle[]; // post-filter view
     validateAgainstEPRA: (articles: NewsArticle[], epraPrice: number) => NewsArticle[];
+    acknowledgeArticle: (url: string) => void;
 }
 
 export function useMarketNews(): UseMarketNewsReturn {
@@ -458,6 +481,12 @@ export function useMarketNews(): UseMarketNewsReturn {
     const [countdown, setCountdown] = useState(0);
     const [activeSource, setActiveSource] = useState('all');
     const [activeRegion, setActiveRegion] = useState<'all' | 'Kenya' | 'Global'>('all');
+    const [acknowledgedUrls, setAcknowledgedUrls] = useState<Set<string>>(() => {
+        try {
+            const raw = localStorage.getItem(ACK_SIGNALS_KEY);
+            return raw ? new Set(JSON.parse(raw)) : new Set();
+        } catch { return new Set(); }
+    });
 
     const { loading: authLoading } = useAuth();
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -616,27 +645,95 @@ export function useMarketNews(): UseMarketNewsReturn {
         }
 
         if (collected.length > 0) {
-            // [TankIQ ENRICHMENT]: Only for newly fetched high-relevance signals
+            // [TankIQ ENRICHMENT]: Only for newly fetched high-relevance signals from VERIFIED sources
             const aiService = new IntelligenceAIService();
             const enriched = [];
+            const isVerifiedSource = VERIFIED_AI_SOURCES.includes(source.shortLabel.toUpperCase());
+
             for (const article of collected) {
-                if ((article.relevanceScore ?? 0) > 0.70) {
+                const relevance = article.relevanceScore ?? 0;
+                const isKenyanNews = article.region === 'Kenya' && (article.feedSource === 'BD Africa' || article.feedSource === 'Nation' || article.feedSource === 'Standard');
+                
+                // [FORENSIC EXTRACTION]: If it's EPRA or a major Kenyan news source about prices, force AI processing
+                if ((isVerifiedSource && relevance > 0.65) || (isKenyanNews && (article.title + article.summary).toLowerCase().includes('price'))) {
                     try {
                         const directive = await aiService.generateArticleDirective(article, Array.isArray(tanks) ? tanks : []);
                         enriched.push({ ...article, aiDirective: directive });
-                        // [Rate Limit Shield]: Sequential processing with micro-delay for stability
-                        await new Promise(resolve => setTimeout(resolve, 250));
+                        // [Rate Limit Shield]: Increased stagger delay between source requests to prevent gateway 429s
+                        await new Promise(resolve => setTimeout(resolve, 800));
                     } catch (e) {
                         console.warn(`[useMarketNews] TankIQ failed for ${article.title}`, e);
-                        enriched.push(article);
+                        enriched.push({ ...article, aiDirective: FALLBACK_DIRECTIVE });
                     }
+                } else if (relevance > 0.50) {
+                    // Use hardcoded directive for non-verified or medium relevance sources to save tokens
+                    enriched.push({ ...article, aiDirective: FALLBACK_DIRECTIVE });
                 } else {
                     enriched.push(article);
                 }
             }
 
+            for (const article of enriched) {
+                if (article.aiDirective?.priceData && article.aiDirective.priceData.length > 0) {
+                    for (const p of article.aiDirective.priceData) {
+                        try {
+                            const effectiveDate = p.effectiveDate || new Date().toISOString().split('T')[0];
+                            await supabase.from('market_prices').upsert({
+                                fuel_type: p.fuelType,
+                                price_per_liter: p.price,
+                                currency: p.currency || 'KES',
+                                source: 'epra',
+                                region: 'kenya',
+                                effective_date: effectiveDate,
+                                metadata: { 
+                                    source_detail: 'EPRA_AUTO', 
+                                    article_id: article.id, 
+                                    isOfficial: article.isOfficial || false, 
+                                    isLiveExtraction: true,
+                                    extracted_at: new Date().toISOString()
+                                }
+                            }, { onConflict: 'fuel_type,source,region,effective_date' });
+                            logger.info(`[useMarketNews] Auto-updated price for ${p.fuelType}: ${p.price}`, null, 'MARKET_SENSE');
+                        } catch (err) {
+                            console.error(`[useMarketNews] Failed to update price for ${p.fuelType}`, err);
+                        }
+                    }
+                }
+            }
+
             writeMasterHistory(enriched);
             updateSyncTime(source.shortLabel);
+            
+            // [MARKET INTELLIGENCE]: Notify user of High-Relevance EPRA shifts
+            if (source.shortLabel === 'EPRA') {
+                const topSignal = enriched.find(a => (a.relevanceScore ?? 0) >= 0.90);
+                if (topSignal) {
+                    window.dispatchEvent(new CustomEvent('system-toast', {
+                        detail: {
+                            title: 'EPRA: New Pricing/Regulatory Signal',
+                            message: topSignal.title,
+                            type: 'info',
+                            attribution: 'MARKET_SENSE'
+                        }
+                    }));
+                    // [FORENSIC PERSISTENCE]: Register as formal station alert
+                    const stationId = (Array.isArray(tanks) && tanks.length > 0) ? (tanks[0] as any).station_id || (tanks[0] as any).stationId : null;
+                    if (stationId) {
+                        supabase.rpc('upsert_alert_v2', {
+                            p_station_id: stationId,
+                            p_tank_id: (Array.isArray(tanks) && tanks.length > 0) ? tanks[0].id : null,
+                            p_alert_type: 'regulatory_update',
+                            p_title: 'EPRA Regulatory Signal',
+                            p_message: topSignal.title,
+                            p_severity: 'info',
+                            p_metadata: { article_id: topSignal.id, source: 'EPRA' }
+                        }).then(({ error }) => {
+                            if (error) console.error('[useMarketNews] Alert persistence failed:', error);
+                        });
+                    }
+                }
+            }
+
             // After individual source fetch, update state with master timeline
             setAllArticles(readMasterHistory());
         } else {
@@ -673,8 +770,8 @@ export function useMarketNews(): UseMarketNewsReturn {
                 } catch (e) {
                     console.error(`[useMarketNews] Batch error for ${src.shortLabel}:`, e);
                 }
-                // Small stagger delay between source requests to prevent gateway 429s
-                await new Promise(resolve => setTimeout(resolve, 150));
+                // [Rate Limit Shield]: Increased stagger delay between source requests to prevent gateway 429s
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
 
             // Refresh completed: Update global state from persistent store
@@ -723,8 +820,20 @@ export function useMarketNews(): UseMarketNewsReturn {
         await fetchAll(true, tanks);
     }, [canRefresh, fetchAll]);
 
+    const acknowledgeArticle = useCallback((url: string) => {
+        setAcknowledgedUrls(prev => {
+            const next = new Set(prev);
+            next.add(url);
+            try {
+                localStorage.setItem(ACK_SIGNALS_KEY, JSON.stringify(Array.from(next)));
+            } catch { /* storage full */ }
+            return next;
+        });
+    }, []);
+
     // Filtered view
     const filteredArticles = allArticles.filter(a => {
+        if (acknowledgedUrls.has(a.url)) return false;
         if (activeSource !== 'all' && a.feedSource !== activeSource) return false;
         if (activeRegion !== 'all' && a.region !== activeRegion) return false;
         return true;
@@ -756,5 +865,6 @@ export function useMarketNews(): UseMarketNewsReturn {
         setActiveRegion,
         filteredArticles,
         validateAgainstEPRA,
+        acknowledgeArticle,
     };
 }

@@ -19,6 +19,10 @@ export interface EmailPayload {
 }
 
 export class EmailDispatchService {
+    private static cachedSession: any = null;
+    private static lastSessionFetch = 0;
+    private static SESSION_TTL = 30000; // 30 seconds
+
     private static async getSafeAuthHeaders(): Promise<Record<string, string>> {
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         const headers: Record<string, string> = { 
@@ -27,8 +31,15 @@ export class EmailDispatchService {
         };
 
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const isValidToken = session && (session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true);
+            const now = Date.now();
+            if (!this.cachedSession || (now - this.lastSessionFetch > this.SESSION_TTL)) {
+                const { data: { session } } = await supabase.auth.getSession();
+                this.cachedSession = session;
+                this.lastSessionFetch = now;
+            }
+            
+            const session = this.cachedSession;
+            const isValidToken = session && (session.expires_at ? session.expires_at > (now / 1000) + 10 : true);
             
             if (isValidToken && session?.access_token) {
                 headers['Authorization'] = `Bearer ${session.access_token}`;

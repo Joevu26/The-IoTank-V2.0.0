@@ -107,8 +107,15 @@ export function useEventLog(stationId: string) {
                 .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
             if (error) throw error;
+            
+            const filteredData = (data || []).filter(log => {
+                const desc = log.description || '';
+                return !desc.includes('detected on alerts') && 
+                       !desc.includes('detected on tanks') && 
+                       !desc.includes('detected on sensor_readings');
+            });
 
-            const mapped: EventLogEntry[] = (data || []).map(log => ({
+            const mapped: EventLogEntry[] = filteredData.map(log => ({
                 id: log.id,
                 category: log.event_category.toLowerCase() as EventCategory,
                 type: log.event_type,

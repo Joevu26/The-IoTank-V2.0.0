@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
 
         if (response.status === 429) {
           console.warn(`Groq key rotation: 429 encountered, trying next key...`);
+          lastError = new Error('Rate limit reached (429) on this key');
           continue;
         }
 

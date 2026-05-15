@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { validateUUID } from '../utils/sanitization';
 
 export const tankService = {
   /**
@@ -26,6 +27,7 @@ export const tankService = {
    * Fetches a specific tank by ID
    */
   async getTankById(id: string) {
+    if (!validateUUID(id)) return null;
     try {
       const { data, error } = await supabase
         .from('tanks')
@@ -48,6 +50,7 @@ export const tankService = {
    * Fetches recent sensor readings for a given tank
    */
   async getSensorReadings(tankId: string, limit = 50) {
+    if (!validateUUID(tankId)) return null;
     try {
       const { data, error } = await supabase
         .from('sensor_readings')

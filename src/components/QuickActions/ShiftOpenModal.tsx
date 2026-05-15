@@ -7,7 +7,9 @@ import { useTanks, useAllLatestReadings, createShift } from '@/hooks/useSupabase
 import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
+import { NotificationPreferencesService } from '@/services/NotificationPreferencesService';
 import { AuditService } from '@/services/AuditService';
+import { validateUUID } from '@/utils/sanitization';
 import { validateIdleStability } from '@/utils/telemetryMath';
 import { differenceInHours } from 'date-fns';
 import { Tank } from '@/types';
@@ -92,16 +94,18 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                             : `Precision Leak: Constant loss of ${forensic.rateLhr.toFixed(2)}L/hr detected while station was closed.`;
 
                         // Trigger Forensic Alert for Action Queue
-                        await supabase.from('alerts').insert({
-                            station_id: currentUser.stationId,
-                            tank_id: tank.id,
-                            alert_type: violationType,
-                            severity: severity,
-                            title: title,
-                            message: message,
-                            timestamp: nowString,
-                            alert_data: { delta: forensic.delta, rate: forensic.rateLhr, closedDuration: hrsClosed }
-                        });
+                        if (validateUUID(tank.id)) {
+                            await supabase.from('alerts').insert({
+                                station_id: currentUser.stationId,
+                                tank_id: tank.id,
+                                alert_type: violationType,
+                                severity: severity,
+                                title: title,
+                                message: message,
+                                timestamp: nowString,
+                                alert_data: { delta: forensic.delta, rate: forensic.rateLhr, closedDuration: hrsClosed }
+                            });
+                        }
 
                         await AuditService.log(
                             'SECURITY',
@@ -234,16 +238,32 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
             // 5. Off-Platform SMTP Tactical Email
             try {
-                await EmailDispatchService.sendSecurityAlert({
-                    to: currentUser?.stationEmail || currentUser?.email || '',
-                    type: 'SYSTEM_CRITICAL',
-                    siteName: currentUser?.companyName || 'Fuel Station',
-                    details: {
-                       timestamp: nowString,
-                       operator: currentUser?.email || 'Unknown',
-                       description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
-                    }
-                });
+                const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
+                const shouldSendUpdateEmail = currentUser?.authUserId
+                    ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
+                    : false;
+
+                if (emailRecipient && shouldSendUpdateEmail) {
+                    await EmailDispatchService.sendSecurityAlert({
+                        to: emailRecipient,
+                        type: 'SYSTEM_CRITICAL',
+                        siteName: currentUser?.companyName || 'Fuel Station',
+                        details: {
+                           timestamp: nowString,
+                           operator: currentUser?.email || 'Unknown',
+                           description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
+                        }
+                    });
+                } else if (emailRecipient && !shouldSendUpdateEmail) {
+                    await AuditService.log(
+                        'SYSTEM',
+                        'EMAIL_SUPPRESSED',
+                        currentUser.stationId,
+                        'Shift-start email suppressed by user notification preferences.',
+                        'INFO',
+                        { userId: currentUser.authUserId, flow: 'shift_open' }
+                    );
+                }
             } catch (mailErr) {
                 console.error('[ShiftOpen] Tactical email failed:', mailErr);
             }

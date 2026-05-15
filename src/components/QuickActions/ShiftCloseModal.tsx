@@ -7,6 +7,7 @@ import { useTanks, useAllLatestReadings, createShift } from '@/hooks/useSupabase
 import { supabase } from '@/config/supabase';
 import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
+import { NotificationPreferencesService } from '@/services/NotificationPreferencesService';
 import { AuditService } from '@/services/AuditService';
 import { Tank } from '@/types';
 import { logger } from '@/utils/logger';
@@ -182,12 +183,28 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             );
 
             if (isCollusionSuspected) {
-                await EmailDispatchService.sendSecurityAlert({
-                    to: currentUser?.stationEmail || currentUser?.email || '',
-                    type: 'COLLUSION',
-                    siteName: currentUser?.companyName || 'Fuel Station',
-                    details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Significant discrepancy detected.' }
-                });
+                const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
+                const shouldSendAlertEmail = currentUser?.authUserId
+                    ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'alerts')
+                    : false;
+
+                if (emailRecipient && shouldSendAlertEmail) {
+                    await EmailDispatchService.sendSecurityAlert({
+                        to: emailRecipient,
+                        type: 'COLLUSION',
+                        siteName: currentUser?.companyName || 'Fuel Station',
+                        details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Significant discrepancy detected.' }
+                    });
+                } else if (emailRecipient && !shouldSendAlertEmail) {
+                    await AuditService.log(
+                        'SYSTEM',
+                        'EMAIL_SUPPRESSED',
+                        stationId,
+                        'Collusion alert email suppressed by user notification preferences.',
+                        'INFO',
+                        { userId: currentUser?.authUserId, flow: 'shift_close_collusion' }
+                    );
+                }
             }
 
             const pumpReadings: Record<string, any> = {};
@@ -264,20 +281,36 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             const mins = Math.floor((durationMs % 3600000) / 60000);
             const durationStr = `${hrs}h ${mins}m`;
 
-            EmailDispatchService.sendSecurityAlert({
-                to: currentUser?.stationEmail || currentUser?.email || 'admin@iotank.com',
-                type: 'SHIFT_REPORT',
-                siteName: currentUser?.companyName || 'Fuel Station',
-                details: {
-                    timestamp: nowString,
-                    description: `Shift Summary for ${currentUser?.companyName}. Operator: ${currentUser?.displayName || currentUser?.email}.`,
-                    totalSales: totalCollected + spending,
-                    totalLiters: totalDispensedLiters,
-                    varianceValue: deficit,
-                    duration: durationStr,
-                    operator: currentUser?.displayName || currentUser?.email || 'Unknown'
-                }
-            });
+            const summaryRecipient = currentUser?.stationEmail || currentUser?.email || 'admin@iotank.com';
+            const shouldSendSummaryEmail = currentUser?.authUserId
+                ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
+                : false;
+
+            if (summaryRecipient && shouldSendSummaryEmail) {
+                EmailDispatchService.sendSecurityAlert({
+                    to: summaryRecipient,
+                    type: 'SHIFT_REPORT',
+                    siteName: currentUser?.companyName || 'Fuel Station',
+                    details: {
+                        timestamp: nowString,
+                        description: `Shift Summary for ${currentUser?.companyName}. Operator: ${currentUser?.displayName || currentUser?.email}.`,
+                        totalSales: totalCollected + spending,
+                        totalLiters: totalDispensedLiters,
+                        varianceValue: deficit,
+                        duration: durationStr,
+                        operator: currentUser?.displayName || currentUser?.email || 'Unknown'
+                    }
+                });
+            } else if (summaryRecipient && !shouldSendSummaryEmail) {
+                await AuditService.log(
+                    'SYSTEM',
+                    'EMAIL_SUPPRESSED',
+                    stationId,
+                    'Shift summary email suppressed by user notification preferences.',
+                    'INFO',
+                    { userId: currentUser?.authUserId, flow: 'shift_close_summary' }
+                );
+            }
 
             localStorage.removeItem('iotank_shift_start_time');
             localStorage.removeItem('iotank_shift_start_volumes');

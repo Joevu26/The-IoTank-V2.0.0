@@ -6,8 +6,9 @@ import { TankReading, Tank, Alert, User, ShiftDocument, Site } from '@/types';
 import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
 import { AuditService } from '@/services/AuditService';
 import { logger } from '@/utils/logger';
+import { validateUUID } from '@/utils/sanitization';
+import { getSmoothedVolume } from '@/utils/sensorFilter';
 
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Helper to safely cast to number with a default
@@ -90,9 +91,12 @@ const mapTank = (row: any): Tank => ({
 });
 
 const parseTimestamp = (ts: any) => {
-    if (!ts) return Date.now();
+    if (!ts) return 0;
     if (typeof ts === 'string') {
         return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z').getTime();
+    }
+    if (typeof ts === 'object' && typeof ts.toISOString === 'function') {
+        return new Date(ts.toISOString()).getTime();
     }
     return new Date(ts).getTime();
 };
@@ -215,6 +219,8 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
     const query = useQuery({
         queryKey: ['latest_reading', tankId],
         queryFn: async () => {
+            if (!validateUUID(tankId)) return null;
+
             const { data, error } = await supabase
                 .from('sensor_readings')
                 .select('*')
@@ -242,18 +248,28 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
                 table: 'sensor_readings',
                 filter: `tank_id=eq.${tankId}` 
             }, (payload) => {
-                const newReading = mapReading(payload.new);
+                let newReading = mapReading(payload.new);
                 
-                // Update specific latest_reading
-                queryClient.setQueryData(['latest_reading', tankId], newReading);
-
                 // Update history with sliding window (30 mins)
                 queryClient.setQueryData(['history', tankId], (oldData: any) => {
-                    if (!oldData) return [newReading];
-                    const updated = [...oldData, newReading];
-                    // Prune anything older than 30 minutes (1,800,000 ms)
-                    return pruneSlidingWindow(updated, 30 * 60 * 1000);
+                    const history = oldData ? [...oldData, newReading] : [newReading];
+                    const pruned = pruneSlidingWindow(history, 30 * 60 * 1000);
+                    
+                    // Apply smoothing to the latest reading based on recent history
+                    const recentVols = pruned.slice(-3).map(r => r.volume);
+                    const recentVolsCorrected = pruned.slice(-3).map(r => r.volumeCorrected);
+                    
+                    newReading = {
+                        ...newReading,
+                        volume: getSmoothedVolume(recentVols),
+                        volumeCorrected: getSmoothedVolume(recentVolsCorrected)
+                    };
+
+                    return pruned.map((r, i) => i === pruned.length - 1 ? newReading : r);
                 });
+
+                // Update specific latest_reading with smoothed values
+                queryClient.setQueryData(['latest_reading', tankId], newReading);
             })
             .subscribe();
 
@@ -278,23 +294,25 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
  */
 export function useAllLatestReadings(stationId: string | undefined, tankIds: string[], enabled: boolean = true) {
     const queryClient = useQueryClient();
-    const cacheKey = `latest_readings_${stationId}`;
+    const stabilizedTankIds = React.useMemo(() => JSON.stringify([...tankIds].sort()), [tankIds]);
+    const cacheKey = `latest_readings_${stationId}_${stabilizedTankIds}`;
     const [isOffline, setIsOffline] = useState(false);
 
     const query = useQuery({
-        queryKey: ['all_latest_readings', tankIds],
+        queryKey: ['all_latest_readings', stationId, stabilizedTankIds],
         initialData: () => {
             if (!stationId) return undefined;
             return cacheHelper.get(cacheKey) || undefined;
         },
         queryFn: async () => {
-            if (tankIds.length === 0) return {};
+            const validTankIds = tankIds.filter(id => validateUUID(id));
+            if (validTankIds.length === 0) return {};
             
             try {
                 const { data, error } = await supabase
                     .from('latest_sensor_readings')
                     .select('*')
-                    .in('tank_id', tankIds);
+                    .in('tank_id', validTankIds);
 
                 if (error) throw error;
                 
@@ -319,8 +337,6 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
         staleTime: 10000, 
     });
 
-    const stabilizedTankIds = React.useMemo(() => JSON.stringify([...tankIds].sort()), [tankIds]);
-
     useEffect(() => {
         if (!stationId || !enabled || tankIds.length === 0) return;
 
@@ -336,14 +352,31 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
                     filter: `station_id=eq.${stationId}`
                 },
                 (payload) => {
-                    const newReading = mapReading(payload.new);
+                    let newReading = mapReading(payload.new);
                     if (tankIds.includes(newReading.tankId)) {
-                        queryClient.setQueryData(['all_latest_readings', tankIds], (old: any) => {
+                        // We need the history for this specific tank to smooth
+                        const historyKey = ['history', newReading.tankId];
+                        const history = queryClient.getQueryData<TankReading[]>(historyKey) || [];
+                        const updatedHistory = [...history, newReading].slice(-10); // Keep small buffer for smoothing
+                        
+                        const recentVols = updatedHistory.slice(-3).map(r => r.volume);
+                        const recentVolsCorrected = updatedHistory.slice(-3).map(r => r.volumeCorrected);
+                        
+                        newReading = {
+                            ...newReading,
+                            volume: getSmoothedVolume(recentVols),
+                            volumeCorrected: getSmoothedVolume(recentVolsCorrected)
+                        };
+
+                        queryClient.setQueryData(['all_latest_readings', stationId, stabilizedTankIds], (old: any) => {
                             const updated = { ...old, [newReading.tankId]: newReading };
                             if (stationId) cacheHelper.set(cacheKey, updated);
                             return updated;
                         });
                         queryClient.setQueryData(['latest_reading', newReading.tankId], newReading);
+                        
+                        // Sync back to history if enabled
+                        queryClient.setQueryData(historyKey, updatedHistory);
                     }
                 }
             )
@@ -406,6 +439,24 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
 
     return { alerts: query.data || [], loading: query.isLoading, error: query.error as Error | null, refetch: query.refetch };
 }
+
+/**
+ * Hook for Live Market Prices (EPRA Sync)
+ */
+export function useLatestMarketPrices() {
+    return useQuery({
+        queryKey: ['market_prices'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('market_prices')
+                .select('*')
+                .order('effective_date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        },
+        staleTime: 30 * 60 * 1000, // 30 minutes
+    });
+}
 /**
  * Professional Supabase-based Hook for Sites
  */
@@ -451,7 +502,7 @@ export function useHistoricalReadings(
     const query = useQuery({
         queryKey: ['history', tankId, maxPoints, timeRange?.start, timeRange?.end],
         queryFn: async () => {
-            if (!tankId) return [];
+            if (!tankId || !validateUUID(tankId)) return [];
             let query = supabase
                 .from('sensor_readings')
                 .select('*')
@@ -740,8 +791,8 @@ export async function createShift(stationId: string, shiftData: Omit<ShiftDocume
     // Map ShiftDocument to snake_case table columns
     const dbShift = {
         station_id: stationId, 
-        site_id: (shiftData.siteId && uuidRegex.test(shiftData.siteId)) ? shiftData.siteId : null,
-        tank_id: (shiftData.tankId && uuidRegex.test(shiftData.tankId)) ? shiftData.tankId : null,
+        site_id: (shiftData.siteId && validateUUID(shiftData.siteId)) ? shiftData.siteId : null,
+        tank_id: (shiftData.tankId && validateUUID(shiftData.tankId)) ? shiftData.tankId : null,
         opened_at: shiftData.openedAt,
         closed_at: shiftData.closedAt,
         duration_min: shiftData.durationMin,
@@ -882,6 +933,15 @@ export async function deleteTank(tankId: string) {
  * Trigger a new Alert
  */
 export async function createAlert(alert: Partial<Alert> & { station_id: string }) {
+    // 🟢 UUID Validation: Prevent 400 errors from "ghost" or malformed IDs
+    const isValidStation = validateUUID(alert.station_id);
+    const isValidTank = !alert.tankId || validateUUID(alert.tankId);
+
+    if (!isValidStation || !isValidTank) {
+        logger.warn('[useSupabase] Skipping alert insertion due to invalid UUID:', { station_id: alert.station_id, tank_id: alert.tankId });
+        return null;
+    }
+
     const { data, error } = await supabase
         .from('alerts')
         .insert({

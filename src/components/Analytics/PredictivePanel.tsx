@@ -26,11 +26,11 @@ export const PredictivePanel: React.FC<PredictivePanelProps> = ({ stationId, tan
     // Find the specific tank if tankId is provided
     const tank = tankId ? tanks.find((t: Tank) => t.id === tankId) : null;
 
-    // Fetch readings for specific tank or empty if no tank
-    const { readings, loading: readingsLoading } = useHistoricalReadings(stationId, tankId || '', {
+    // Fetch readings for specific tank or skip entirely if no tank
+    const { readings, loading: readingsLoading } = useHistoricalReadings(stationId, tankId ?? '', {
         start: Date.now() - 24 * 60 * 60 * 1000,
         end: Date.now()
-    });
+    }, undefined, undefined, !!tankId);
 
     // Only run analytics if tank exists. We must invoke the hook unconditionally though.
     const emptyAnalytics = {

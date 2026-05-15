@@ -3,6 +3,7 @@ import { supabase } from '@/config/supabase';
 import { ShiftDocument } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/utils/logger';
+import { validateUUID } from '@/utils/sanitization';
 
 interface UseShiftsOptions {
     startDate?: Date;
@@ -44,7 +45,7 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
                 sbQuery = sbQuery.lte('closed_at', endOfDay.toISOString());
             }
 
-            if (options.tankId) {
+            if (options.tankId && validateUUID(options.tankId)) {
                 sbQuery = sbQuery.eq('tank_id', options.tankId);
             }
 

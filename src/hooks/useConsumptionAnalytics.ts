@@ -5,8 +5,8 @@ import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
 import { useShiftStatus } from './useShiftStatus';
 import { supabase } from '@/config/supabase';
 import { calculateETE, calculateRate, TELEMETRY_CONSTANTS } from '@/utils/telemetryMath';
+import { validateUUID } from '@/utils/sanitization';
 
-const isValidUuid = (s?: string) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s || '');
 
 export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading[]) {
     const { pushEvent } = useTelemetryQueue();
@@ -17,7 +17,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
     useEffect(() => {
         const fetchHistoricalAverage = async () => {
                 // Guard: only query Postgres when tank.id is a valid UUID. Skip placeholders like "ghost-tank".
-                if (!tank || !tank.id || !isValidUuid(tank.id)) return;
+                if (!tank || !tank.id || !validateUUID(tank.id)) return;
             
             try {
                 // Get last 7 shift closures for this tank
@@ -56,7 +56,9 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
                 return {
                     defillRate: 0,
                     ete: 'Calculating...',
+                    timeToOrderHrs: null,
                     predictedRefillDate: null,
+                    predictedOrderDate: null,
                     isTheftSuspected: false,
                     isLeakageSuspected: false,
                     trend: 'stable' as 'stable' | 'decreasing' | 'increasing',
@@ -86,10 +88,19 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
                 }
             }
 
-            // 2. ETE Calculation using Unified Logic
-            // If Refilling (negative rate), fallback to stable historical average for forecast
-            const depletionRate = currentShiftRate > 0 ? currentShiftRate : 0;
-            const effectiveRate = depletionRate || avgDailyRate || 0.1; 
+            // 2. ETE Calculation using Blended Activity Logic
+            // Strictly isolate dispense rates (must be positive)
+            const activeRate = currentShiftRate > 0 ? currentShiftRate : 0;
+            
+            // Weight current activity against historical norms to handle short telemetry windows
+            // If we have few readings (< 10), or current activity is very low, weight historical data more
+            const telemetryWeight = Math.min(1, readings.length / 20); 
+            const activitySignificance = activeRate > 1 ? 0.8 : 0.2; // If active, favor current rate
+            const blendFactor = telemetryWeight * activitySignificance;
+            
+            const blendedRate = (activeRate * blendFactor) + (avgDailyRate * (1 - blendFactor));
+            const effectiveRate = Math.max(0.05, blendedRate);
+            
             const hoursLeft = calculateETE(latestVolume, tank.capacity, effectiveRate);
 
             let ete = 'Stable';
@@ -97,7 +108,11 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
 
             if (hoursLeft !== null && hoursLeft > 0) {
                 predictedRefillDate = latest.timestamp + (hoursLeft * 60 * 60 * 1000);
-                if (hoursLeft > 24) {
+                
+                // [PRACTICAL CAP]: If ETE is > 30 days, show as "Stable" to avoid noise
+                if (hoursLeft > 30 * 24) {
+                    ete = 'Stable';
+                } else if (hoursLeft > 24) {
                     ete = `${(hoursLeft / 24).toFixed(1)} Days`;
                 } else {
                     ete = `${hoursLeft.toFixed(1)} Hours`;
@@ -109,10 +124,20 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
             // Real trend detection using raw rate
             const trend = currentShiftRate > 0.5 ? 'decreasing' : currentShiftRate < -0.5 ? 'increasing' : 'stable';
 
+            // [SMART REPLENISHMENT]: Lead Time Buffer (Default 48h)
+            // Time to Order = ETE - Lead Time
+            const leadTimeHrs = 48; 
+            const timeToOrderHrs = (hoursLeft !== null) ? (hoursLeft - leadTimeHrs) : null;
+            const predictedOrderDate = (timeToOrderHrs !== null && hoursLeft !== null) 
+                ? (latest.timestamp + (timeToOrderHrs * 60 * 60 * 1000)) 
+                : null;
+
             return {
                 defillRate: currentShiftRate, 
                 ete,
+                timeToOrderHrs,
                 predictedRefillDate,
+                predictedOrderDate,
                 isTheftSuspected: currentShiftRate > (tank.rapidDefillThreshold || TELEMETRY_CONSTANTS.RAPID_DEFILL_LHR),
                 isLeakageSuspected: currentShiftRate > 0.38 && currentShiftRate < 10, // precision leak alignment
                 trend,
@@ -123,7 +148,9 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
             return {
                 defillRate: 0,
                 ete: 'Error',
+                timeToOrderHrs: null,
                 predictedRefillDate: null,
+                predictedOrderDate: null,
                 isTheftSuspected: false,
                 isLeakageSuspected: false,
                 trend: 'stable' as const,

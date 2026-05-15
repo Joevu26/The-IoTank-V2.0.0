@@ -39,28 +39,30 @@ export class NewsService {
         // Only log at debug level to reduce noise
         logger.debug('Initializing Real-time News Listener...', { listeners: this.listenerCount }, 'NEWS_SERVICE');
 
-        this.channel = supabase
-            .channel('public:market_news')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'market_news'
-                },
-                (payload) => {
-                    this.dispatchNews(payload.new);
-                }
-            )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    this.isInitializing = false;
-                    logger.info('Market News Live Sync Active', { listeners: this.listenerCount }, 'NEWS_SERVICE');
-                } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                    this.isInitializing = false;
-                    this.channel = null;
-                }
-            });
+        // Create channel and add listeners BEFORE calling subscribe
+        const newChannel = supabase.channel('public:market_news');
+        
+        newChannel.on(
+            'postgres_changes',
+            {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'market_news'
+            },
+            (payload) => {
+                this.dispatchNews(payload.new);
+            }
+        );
+
+        this.channel = newChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                this.isInitializing = false;
+                logger.info('Market News Live Sync Active', { listeners: this.listenerCount }, 'NEWS_SERVICE');
+            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                this.isInitializing = false;
+                this.channel = null;
+            }
+        });
     }
 
     /**

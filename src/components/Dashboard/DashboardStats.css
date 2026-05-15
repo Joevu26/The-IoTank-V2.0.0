@@ -102,7 +102,7 @@
 }
 
 .stat-value-large {
-    font-size: clamp(1.4rem, 2.8vw, 1.8rem);
+    font-size: clamp(1.1rem, 2vw, 1.35rem);
     font-weight: 300; /* Light weight for elegance */
     color: var(--color-text-primary);
     line-height: 1.1;
@@ -513,7 +513,7 @@
 }
 
 .stat-card-clean .stat-main-value {
-    font-size: 1.35rem;
+    font-size: 1.125rem;
     font-weight: 700;
     color: #111827;
     margin: 0;
@@ -556,7 +556,7 @@
 }
 
 .stat-card-clean .stat-item-value {
-    font-size: 0.9375rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #111827;
 }

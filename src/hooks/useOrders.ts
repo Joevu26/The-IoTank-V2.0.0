@@ -1,18 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
-
-export interface FuelOrder {
-    id: string;
-    supplier: string;
-    product: string;
-    quantity: number;
-    expectedDate: string;
-    status: string;
-    priority: string;
-    actorEmail: string;
-    createdAt: string;
-    notes?: string;
-}
+import { FuelOrder } from '@/types';
 
 export function useOrders(stationId: string) {
     const [orders, setOrders] = useState<FuelOrder[]>([]);
@@ -35,6 +23,7 @@ export function useOrders(stationId: string) {
 
             const mappedOrders: FuelOrder[] = (data || []).map(log => ({
                 id: log.id,
+                orderRef: log.metadata?.order_ref || log.id.slice(0, 8),
                 supplier: log.metadata?.supplier || 'Unknown',
                 product: log.metadata?.product || 'Fuel',
                 quantity: Number(log.metadata?.quantity || 0),

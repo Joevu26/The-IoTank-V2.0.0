@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Tank, Alert } from '@/types';
-import { useAllLatestReadings } from '@/hooks/useSupabase';
+import { useAllLatestReadings, useLatestMarketPrices } from '@/hooks/useSupabase';
 import { ShiftCloseCard } from './ShiftCloseCard';
 import { FiTrendingUp, FiCheckCircle } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +21,9 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
     const navigate = useNavigate();
     const { canSee } = useAuth();
     
+    // Fetch live market prices for fallback valuation
+    const { data: marketPrices } = useLatestMarketPrices();
+    
     // --- CUMULATIVE METRICS LOGIC ---
     // Fetch readings for all tanks to calculate totals safely
     const tankIds = useMemo(() => tanks.map(t => t.id), [tanks]);
@@ -35,8 +38,24 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
             const reading = allReadings[tank.id];
             const vol = reading?.volumeCorrected || reading?.volume || tank.currentVolume || 0;
             
-            // [FORENSIC HARDENING]: Strictly use Authorized Retail Price from Settings (Tank Metadata)
-            const price = Number((tank as any).metadata?.retailPrice) || 0;
+            // [FORENSIC HARDENING]: Prefer Authorized Retail Price from Settings.
+            // Fallback to Live Market Price from EPRA Sync if manual price is 0.
+            let price = Number((tank as any).metadata?.retailPrice) || 0;
+            
+            if (price <= 0 && marketPrices) {
+                // Find latest price for this fuel type with alias matching
+                const fuelType = tank.fuelType?.toLowerCase();
+                const mPrice = marketPrices.find((mp: any) => {
+                    const mpType = mp.fuel_type?.toLowerCase();
+                    if (mpType === fuelType) return true;
+                    // Alias: PMS = Petrol / Super / Gasoline
+                    if ((fuelType === 'petrol' || fuelType === 'pms' || fuelType === 'super') && (mpType === 'pms' || mpType === 'petrol')) return true;
+                    // Alias: AGO = Diesel
+                    if ((fuelType === 'diesel' || fuelType === 'ago') && (mpType === 'ago' || mpType === 'diesel')) return true;
+                    return false;
+                });
+                if (mPrice) price = Number(mPrice.price_per_liter);
+            }
 
             volTotal += vol;
             assetTotal += (vol * price);
@@ -48,7 +67,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = ({
             totalAssetValue: assetTotal, 
             hasMissingPrices: missing 
         };
-    }, [allReadings, tanks]);
+    }, [allReadings, tanks, marketPrices]);
 
 
     // Trend calculation removed: using real pricing status below.

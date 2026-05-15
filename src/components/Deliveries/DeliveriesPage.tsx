@@ -282,7 +282,7 @@ export const DeliveriesPage: React.FC = () => {
                                 ) : (
                                     paginatedOrders.map((order) => (
                                         <tr key={order.id}>
-                                            <td className="font-mono text-indigo-600 font-bold">{order.id.slice(0, 8)}</td>
+                                            <td className="font-mono text-indigo-600 font-bold">{order.orderRef}</td>
                                             <td className="customer-name font-bold">{order.supplier}</td>
                                             <td className="text-slate-600 font-semibold">{order.product}</td>
                                             <td className="font-bold text-slate-800">{order.quantity.toLocaleString()} L</td>

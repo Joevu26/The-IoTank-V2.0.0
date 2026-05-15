@@ -4,6 +4,7 @@ import { FiAlertCircle, FiClock, FiZap, FiInfo, FiCheckCircle } from 'react-icon
 import { useTelemetryQueue, TelemetryEvent } from '@/contexts/TelemetryQueueContext';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveAlert } from '@/hooks/useSupabase';
 import { Toast } from '../Common/Toast';
 import { useModals } from '@/contexts/ModalContext';
 import './ActionQueue.css';
@@ -82,7 +83,21 @@ export const ActionQueue: React.FC = () => {
             return;
         }
 
-        clearEvent(item.id);
+        if (item.alertId) {
+            resolveAlert(item.alertId, currentUser?.displayName || 'USER_ACTION')
+                .then(() => {
+                    clearEvent(item.id);
+                })
+                .catch(err => {
+                    console.error('[ActionQueue] Failed to resolve alert:', err);
+                    setToast({
+                        message: 'Sync Error: Could not resolve alert on server.',
+                        type: 'error'
+                    });
+                });
+        } else {
+            clearEvent(item.id);
+        }
     };
 
     const getIcon = (type: TelemetryEvent['type']) => {

@@ -57,8 +57,28 @@ const InadequateClearancePage = lazy(() => import('@/components/Auth/InadequateC
 
 
 const PublicLoader = () => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-100">
-        <div className="spinner mb-4" />
+    <div className="clearance-overlay">
+        <div className="clearance-content">
+            <div className="advanced-loader">
+                <div className="loader-pulse"></div>
+                <div className="loader-ring"></div>
+                <div className="loader-ring"></div>
+                <div className="loader-ring"></div>
+            </div>
+            
+            <div className="clearance-status">
+                <p className="clearance-title">
+                    IoTank Intelligence
+                </p>
+                <p className="clearance-subtitle animate-pulse">
+                    Synchronizing secure telemetry baseline...
+                </p>
+            </div>
+
+            <div className="psych-progress-container">
+                <div className="psych-progress-bar"></div>
+            </div>
+        </div>
     </div>
 );
 

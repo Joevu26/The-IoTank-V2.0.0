@@ -42,10 +42,19 @@ serve(async (req) => {
     for (const site of SCRAPER_CONFIG) {
       console.log(`[OfficialScraper] Scanning ${site.name}...`);
       
+      // [FORENSIC WINDOW]: Increase aggression on the 14th and 15th
+      const now = new Date();
+      const isReviewDay = now.getDate() === 14 || now.getDate() === 15;
+      
+      if (isReviewDay) {
+        console.log(`[OfficialScraper] HIGH-INTENSITY SCAN: Detection window (14th/15th) active.`);
+      }
+
       const response = await fetch(site.url, {
         headers: { 
           'User-Agent': 'IoTank-Forensic-Bot/2.0 (+https://the-iotank-project.web.app)',
-          'Accept': 'text/html'
+          'Accept': 'text/html',
+          'Cache-Control': 'no-cache' // Bypass cache on review days
         }
       });
 
@@ -60,32 +69,40 @@ serve(async (req) => {
       const dateMatch = html.match(/(\d{1,2}(st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})/i);
       const pdfMatch = html.match(/href="([^"]+\.pdf)"/i);
 
-      if (dateMatch || pdfMatch) {
+      if (dateMatch || pdfMatch || isReviewDay) {
         const signalId = `official-${site.domain}-${Date.now()}`;
         const foundDate = dateMatch?.[0] || new Date().toISOString();
         
         // 2. Perform Forensic Extraction for EPRA
         if (site.domain === 'epra.go.ke') {
-          // Enhanced Forensic Regex: Better handling of table structures and spacing
-          const EPRA_FORENSIC_REGEX = /(Super Petrol|Diesel|Kerosene|PMS|AGO|IK).*?(\d{1,3}(?:\.\d{2})?)/gi;
+          // [FORENSIC REFINEMENT]: Target the primary price table or "Nairobi" specific rows
+          // Matches patterns like: Super Petrol retail at Ksh 193.84 or table cells with prices
+          const EPRA_FORENSIC_REGEX = /(Super Petrol|Diesel|Kerosene|PMS|AGO|IK).*?(?:Ksh|shillings|at)?\s*(\d{2,3}(?:\.\d{2})?)/gi;
           
           let match;
           const detections = [];
           
-          while ((match = EPRA_FORENSIC_REGEX.exec(html)) !== null) {
+          // Focus on the first 8000 characters of the HTML where latest news usually lives
+          const scanContent = html.slice(0, 8000); 
+          
+          while ((match = EPRA_FORENSIC_REGEX.exec(scanContent)) !== null) {
             const fuelLabel = match[1].toUpperCase();
             const price = parseFloat(match[2]);
             
-            if (price > 100 && price < 300) {
+            // Validate: EPRA prices in Kenya are currently between 160 and 220
+            if (price > 150 && price < 250) {
               // Map to standard fuel keys
               let fuelType = fuelLabel;
               if (fuelLabel.includes('PETROL') || fuelLabel === 'PMS') fuelType = 'PMS';
               else if (fuelLabel.includes('DIESEL') || fuelLabel === 'AGO') fuelType = 'AGO';
               else if (fuelLabel.includes('KEROSENE') || fuelLabel === 'IK') fuelType = 'IK';
 
+              // Prevent duplicates in same scan
+              if (detections.some(d => d.fuelType === fuelType)) continue;
+
               detections.push({ fuelType, price });
 
-              // 3. Trigger Forensic Update RPC (Match exact schema)
+              // 3. Trigger Forensic Update RPC
               await supabase.rpc('forensic_update_market_price', {
                 p_fuel_type: fuelType,
                 p_new_price: price,
@@ -95,7 +112,7 @@ serve(async (req) => {
               });
             }
           }
-          console.log(`[OfficialScraper] Detected ${detections.length} prices from EPRA.`);
+          console.log(`[OfficialScraper] Detected ${detections.length} prices from EPRA. Verified window: ${isReviewDay}`);
         }
 
         const signal = {

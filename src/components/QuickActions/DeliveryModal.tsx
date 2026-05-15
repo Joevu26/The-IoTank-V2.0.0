@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useTanks, useLatestReading } from '@/hooks/useSupabase';
+import { useTanks, useLatestReading, resolveAlert } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
+import { validateUUID } from '@/utils/sanitization';
 import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUploadCloud, FiChevronDown } from 'react-icons/fi';
 import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
 import './QuickActions.css';
 import { NotificationService } from '@/services/NotificationService';
 import { SignaturePad } from '../Common/SignaturePad';
+import { useModals } from '@/contexts/ModalContext';
 
 
 interface DeliveryModalProps {
@@ -21,6 +23,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
     const { currentUser } = useAuth();
     const stationId = currentUser?.stationId || '';
     const { tanks } = useTanks(stationId);
+    const { activeModal, modalData } = useModals();
 
     const [isHibernating, setIsHibernating] = useState(false);
     const [formData, setFormData] = useState({
@@ -55,11 +58,24 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 ...prev,
                 timestamp: new Date().toISOString().slice(0, 16)
             }));
+
+            // [FORENSIC AUTO-FILL]: If opened via refill verification, populate from metadata
+            if (activeModal === 'refill_verification' && modalData) {
+                const metadata = modalData.metadata || {};
+                setFormData(prev => ({
+                    ...prev,
+                    tankId: modalData.tank_id || prev.tankId,
+                    existingVolume: String(metadata.startVolume || ''),
+                    totalVolume: String(metadata.endVolume || ''),
+                    expectedVolume: String(metadata.deliveredVolume || ''),
+                    varianceReason: 'System automated detection'
+                }));
+            }
         } else {
             // Reset to step 1 when closed
             setStep(1);
         }
-    }, [isOpen]);
+    }, [isOpen, activeModal, modalData]);
 
     // Auto-fetch existing temperature
     useEffect(() => {
@@ -79,6 +95,11 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
         if (e) e.preventDefault();
         if (!currentUser?.stationId) {
             NotificationService.show('Submission Failed', { body: 'Organization context missing.' });
+            return;
+        }
+
+        if (!validateUUID(formData.tankId)) {
+            NotificationService.show('Invalid Tank', { body: 'Selected tank is not valid for cloud synchronization.' });
             return;
         }
 
@@ -105,6 +126,8 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 setUploadingInvoice(false);
             }
 
+            const actualVolumeMeasured = Number(formData.totalVolume) - Number(formData.existingVolume);
+            
             const payload = {
                 station_id: currentUser.stationId,
                 tank_id: formData.tankId,
@@ -117,8 +140,9 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 bol_photo_url: invoiceUrl,
                 tank_before_volume: Number(formData.existingVolume),
                 tank_after_volume: Number(formData.totalVolume),
-                actual_received_volume: Number(formData.expectedVolume), 
+                actual_received_volume: actualVolumeMeasured, 
                 actual_temperature: formData.temperature ? Number(formData.temperature) : null,
+                verification_status: 'verified_ok',
                 metadata: {
                     variance: variance,
                     variance_percentage: variancePcnt,
@@ -151,6 +175,13 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
 
             // 2. Persistent Systems (Run in background or caught separately)
             try {
+                // [AUTO-RESOLUTION]: If this modal was opened via an automated refill alert, resolve it now
+                if (activeModal === 'refill_verification' && modalData?.id) {
+                    resolveAlert(modalData.id, currentUser.authUserId).catch(err => {
+                        console.warn('[DeliveryModal] Failed to auto-resolve refill alert:', err);
+                    });
+                }
+
                 // Generate Formal Report
                 if (deliveryData) {
                     const reportPayload = {
@@ -237,6 +268,38 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
         showVariance = true;
         variance = total - expectedFinal;
         variancePcnt = (variance / expectedFinal) * 100;
+    }
+
+    // ── Thermal Variance Explanation (DISPLAY ONLY — no values are altered) ──
+    // The ESP32 sensor measures actual physical volume in the tank at the
+    // ambient delivery temperature. The BOL figure is typically stated at 15°C
+    // (the standard reference temperature). When delivered fuel is warmer than
+    // 15°C it occupies more volume; the tanker measured a warm volume, but by
+    // the time it enters the cooler tank it contracts. This explains a large
+    // portion of any apparent "shortage" without implying theft or error.
+    //
+    // Expansion coefficients (ASTM D1250 / EPRA standard):
+    //   Diesel / HFO : ~0.00085 per °C
+    //   Petrol / PMS  : ~0.00100 per °C
+    const fuelType = (selectedTank?.fuelType || '').toLowerCase();
+    const EXPANSION_COEFF = fuelType.includes('petrol') || fuelType.includes('pms') || fuelType.includes('gasoline')
+        ? 0.00100  // Petrol
+        : 0.00085; // Diesel / default
+    const REF_TEMP = 15; // °C  (industry standard reference temperature)
+
+    const deliveryTemp = formData.temperature ? Number(formData.temperature) : null;
+    let thermallyExplainedLiters: number | null = null;
+    let thermalExplanation = '';
+    if (deliveryTemp !== null && expected > 0 && variance < 0) {
+        // Thermal shrinkage: volume the BOL fuel "lost" when cooled from
+        // deliveryTemp → REF_TEMP after entering the tank.
+        const tempDelta = deliveryTemp - REF_TEMP;
+        thermallyExplainedLiters = expected * EXPANSION_COEFF * tempDelta;
+        const remaining = variance - (-Math.abs(thermallyExplainedLiters));
+        if (thermallyExplainedLiters > 0) {
+            const pctExplained = Math.min(100, (thermallyExplainedLiters / Math.abs(variance)) * 100);
+            thermalExplanation = `At ${deliveryTemp}°C delivery temp, thermal contraction accounts for ~${thermallyExplainedLiters.toFixed(0)}L (${pctExplained.toFixed(0)}% of variance). Unexplained residual: ${remaining.toFixed(0)}L.`;
+        }
     }
 
     return createPortal(
@@ -526,6 +589,21 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                         {Math.abs(Number(tempGradient)) <= 5 ? 'Status: OK' : 'Status: High Gradient'}
                                     </div>
                                 </div>
+
+                                {/* Thermal Variance Explanation — display only, no values changed */}
+                                {thermallyExplainedLiters !== null && thermallyExplainedLiters > 0 && variance < 0 && (
+                                    <div className="tm-disclosure-chip" style={{ gridColumn: '1 / -1', background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', border: '1.5px solid #93c5fd' }}>
+                                        <span className="tm-chip-label" style={{ color: '#1d4ed8', fontWeight: 700 }}>
+                                            🌡️ Thermal Variance Analysis
+                                        </span>
+                                        <span className="tm-chip-value" style={{ color: '#1e40af', fontSize: '0.8rem', fontWeight: 500, lineHeight: 1.5 }}>
+                                            {thermalExplanation}
+                                        </span>
+                                        <div className="tm-chip-status" style={{ background: '#dbeafe', color: '#1d4ed8', borderColor: '#93c5fd' }}>
+                                            ℹ️ Thermal Explanation — No system value altered
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="form-group max-w-md mx-auto mt-6">

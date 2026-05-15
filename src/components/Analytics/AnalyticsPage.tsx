@@ -12,6 +12,7 @@ import { LazyComponent } from '../Common/LazyComponent';
 import { useActiveShift } from '@/hooks/useShifts';
 import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useTankAnalytics30d } from '@/hooks/useSupabase';
+import { validateUUID } from '@/utils/sanitization';
 import { useTransactions } from '@/hooks/useTransactions';
 import { Tank, FuelTransaction } from '@/types';
 import {
@@ -27,8 +28,7 @@ export const AnalyticsPage: React.FC = () => {
     const { currentUser } = useAuth();
     
     // Forensic UUID validation to prevent RPC signature mismatches (PGRST202)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const isValidStation = currentUser?.stationId && uuidRegex.test(currentUser.stationId);
+    const isValidStation = currentUser?.stationId && validateUUID(currentUser.stationId);
     
     // Default to a system GUID if not authenticated to prevent hook crashes and signature errors
     const stationId = isValidStation ? currentUser.stationId : '00000000-0000-0000-0000-000000000000';

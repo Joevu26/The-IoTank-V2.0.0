@@ -14,6 +14,7 @@ import { useTanks } from '@/hooks/useSupabase';
 import { Tank } from '@/types';
 import { useReports } from '@/hooks/useReports';
 import { supabase } from '@/config/supabase';
+import { validateUUID } from '@/utils/sanitization';
 import { ExportService } from '@/services/ExportService';
 import { format, subDays } from 'date-fns';
 import { scanStationHistory, getReportHighlights } from '@/utils/reportingLogic';
@@ -245,7 +246,7 @@ export const ReportingPage: React.FC = () => {
         }
 
         // 2. Execute Forensic Scan
-        const { logs, metrics } = await scanStationHistory(stationId, start, end, selectedTankId || undefined);
+        const { logs, metrics } = await scanStationHistory(stationId, start, end, (selectedTankId && validateUUID(selectedTankId)) ? selectedTankId : undefined);
 
         // 3. Prepare professional forensic data for storage
         const dynamicHighlights = getReportHighlights(selectedTemplate.id, metrics);

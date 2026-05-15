@@ -1,5 +1,6 @@
 import React, { useEffect, useState, Suspense, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import {
   FiCheckCircle, FiMessageSquare, FiDroplet,
   FiTwitter, FiLinkedin, FiFacebook, FiMenu, FiX,
@@ -16,7 +17,7 @@ import {
 } from '../../hooks/useScrollAnimation';
 
 // Import Assets
-import brandMark from '@/assets/iotank-logo-v3.png';
+import brandMark from '@/assets/iotank-official-logo.png';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
 
 const ExcellenceSection = React.lazy(() => import('./ExcellenceSection'));
@@ -177,6 +178,14 @@ export const LandingPage: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // [AUTH BUGFIX]: Redirect authenticated users away from the landing page
+  const { currentUser, loading: authLoading } = useAuth();
+  useEffect(() => {
+    if (!authLoading && currentUser?.stationId) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [currentUser, authLoading, navigate]);
 
   // ── Magnetic Button ───────────────────────────────────────────
   const magneticBtnRef = useRef<HTMLButtonElement>(null);

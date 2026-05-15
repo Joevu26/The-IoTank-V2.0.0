@@ -63,23 +63,20 @@ export class NotificationService {
     }
 
     /**
-     * Show a notification
+     * Show a browser notification
      */
     static show(title: string, options?: NotificationOptions) {
-        // Double check permissions before showing, just in case
         if (!this.isEnabled()) {
-            logger.warn('[NotificationService] Blocked: Notifications disabled or permission denied.', null, 'NOTIFICATIONS');
             return;
         }
 
         try {
             const sanitizedTitle = sanitizeIds(title);
-            const sanitizedOptions = {
+            const sanitizedOptions: NotificationOptions = {
                 ...options,
                 body: options?.body ? sanitizeIds(options.body) : undefined,
                 icon: '/favicon.ico', 
-                badge: '/favicon.ico',
-                timestamp: Date.now()
+                badge: '/favicon.ico'
             };
 
             const notification = new Notification(sanitizedTitle, sanitizedOptions);
@@ -94,10 +91,10 @@ export class NotificationService {
     }
 
     /**
-     * Specialized notification for Security Breaches (Theft/Collusion/Leak)
+     * Specialized notification for Security Breaches (Theft/Collusion/Leak/Blackout)
      */
-    static notifySecurity(type: 'THEFT' | 'LEAK' | 'COLLUSION', site: string, detail: string) {
-        const title = `🚨 SECURITY ALERT: ${type}`;
+    static notifySecurity(type: 'THEFT' | 'LEAK' | 'COLLUSION' | 'DISCONNECT' | 'SYSTEM_CRITICAL', site: string, detail: string) {
+        const title = type === 'SYSTEM_CRITICAL' ? `🚨 CRITICAL: ${type}` : `🚨 SECURITY ALERT: ${type}`;
         const body = `Terminal: ${site}\n${detail}\nClick to view forensics.`;
         
         this.show(title, {
@@ -129,9 +126,11 @@ export class NotificationService {
                     return false;
                 }
 
+                const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+
                 subscription = await registration.pushManager.subscribe({
                     userVisibleOnly: true,
-                    applicationServerKey: vapidPublicKey
+                    applicationServerKey: convertedVapidKey
                 });
             }
 
@@ -155,4 +154,40 @@ export class NotificationService {
             return false;
         }
     }
+
+    /**
+     * Check if we should nudge the user to enable notifications
+     */
+    static shouldShowNudge(): boolean {
+        if (!this.isSupported()) return false;
+        if (Notification.permission !== 'default') return false;
+        
+        // Don't nudge if dismissed this session
+        return sessionStorage.getItem('iotank_notification_nudge_dismissed') !== 'true';
+    }
+
+    /**
+     * Dismiss the nudge for this session
+     */
+    static dismissNudge() {
+        sessionStorage.setItem('iotank_notification_nudge_dismissed', 'true');
+    }
+}
+
+/**
+ * Utility for VAPID key conversion
+ */
+function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+        .replace(/\-/g, '+')
+        .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
 }

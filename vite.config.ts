@@ -6,6 +6,9 @@ import path from 'path';
 
 // PWA options reused in plugin list
 const pwaOptions = {
+  strategies: 'injectManifest',
+  srcDir: 'src',
+  filename: 'sw.js',
   registerType: 'autoUpdate',
   includeAssets: ['favicon.ico', 'robots.txt', 'sitemap.xml', 'assets/**/*'],
   manifest: {
@@ -49,6 +52,9 @@ const pwaOptions = {
       },
     ],
   },
+  injectManifest: {
+    injectionPoint: undefined
+  }
 };
 
 // Build plugin list and avoid enabling the compression plugin on Windows

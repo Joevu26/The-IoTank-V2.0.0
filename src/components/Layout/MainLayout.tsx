@@ -14,7 +14,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi';
 import { PageLoader } from '../Common/PageLoader';
 import { TankIQSidebar } from '../Analysis/TankIQSidebar';
-import brandMark from '@/assets/iotank-logo-v3.png';
+import { useWindowSize } from '@/hooks/useWindowSize';
+import { NotificationService } from '@/services/NotificationService';
+import brandMark from '@/assets/iotank-official-logo.png';
 
 const TourGuide = lazy(() => import('../Tour/TourGuide').then(module => ({ default: module.TourGuide })));
 
@@ -146,8 +148,65 @@ export const MainLayout: React.FC = () => {
         });
     }, [readings, alertEngine]);
 
+    // [NOTIFICATION NUDGE]: Prompt user to enable browser alerts if not set
+    React.useEffect(() => {
+        const checkNudge = async () => {
+            if (NotificationService.shouldShowNudge()) {
+                // Wait a bit after mount for visual clarity
+                const timer = setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('system-toast', {
+                        detail: {
+                            title: 'Tactical Alerts: Enable Browser Dispatch',
+                            message: 'Get real-time browser notifications for critical security events and inventory levels even when you are on other tabs.',
+                            type: 'info',
+                            persistent: true,
+                            actions: [
+                                {
+                                    label: 'Dismiss',
+                                    onClick: () => NotificationService.dismissNudge()
+                                },
+                                {
+                                    label: 'Enable Alerts',
+                                    primary: true,
+                                    onClick: async () => {
+                                        const granted = await NotificationService.requestPermission();
+                                        if (granted && currentUser?.authUserId) {
+                                            await NotificationService.subscribeToPush(currentUser.authUserId);
+                                            window.dispatchEvent(new CustomEvent('system-toast', {
+                                                detail: {
+                                                    title: 'Alerts Activated',
+                                                    message: 'Browser dispatch is now active. You will receive mission-critical updates in real-time.',
+                                                    type: 'success'
+                                                }
+                                            }));
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }));
+                }, 3000);
+                return () => clearTimeout(timer);
+            }
+        };
+        checkNudge();
+    }, [currentUser?.authUserId]);
+
+    const { width } = useWindowSize();
+
+    // Auto-collapse sidebar on tablet, expand on desktop, use mobile menu on phone
+    React.useEffect(() => {
+        if (width <= 600) {
+            setSidebarCollapsed(false); // Mobile menu doesn't use 'collapsed' state usually
+        } else if (width > 600 && width <= 1024) {
+            setSidebarCollapsed(true);
+        } else {
+            setSidebarCollapsed(false);
+        }
+    }, [width]);
+
     const toggleSidebar = () => {
-        if (window.innerWidth <= 768) {
+        if (width <= 600) {
             setIsMobileMenuOpen(!isMobileMenuOpen);
         } else {
             setSidebarCollapsed(!sidebarCollapsed);

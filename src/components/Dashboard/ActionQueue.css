@@ -165,7 +165,12 @@
 
 .action-queue-item:hover {
     background: #fafafa;
+    border-color: #4f46e5;
+    box-shadow: 
+        0 4px 12px rgba(30, 27, 75, 0.05),
+        0 0 0 1px rgba(79, 70, 229, 0.1);
 }
+
 .action-queue-item[data-type="critical"],
 .action-queue-item[data-type="system_error"] {
     background: #fff1f2;

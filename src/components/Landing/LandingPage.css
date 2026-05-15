@@ -2537,19 +2537,14 @@ section[id="pricing"] .p-8 {
 }
 
 .footer-logo-frame {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .footer-logo-img {
-    width: 80%;
-    height: auto;
+    height: 32px;
+    width: auto;
 }
 
 .footer-company-desc {
@@ -3209,5 +3204,82 @@ section[id="pricing"] .p-8 {
 @media (max-width: 640px) {
     .hero-kinetic-h1 {
         font-size: clamp(1.9rem, 7vw, 2.5rem);
+    }
+}
+
+/* ============================================================
+   GRANULAR RESPONSIVE OVERRIDES (9-Tier Alignment)
+   ============================================================ */
+
+/* Tier 1: Small Smartphones (320px - 360px) */
+@media (max-width: 360px) {
+    .navbar {
+        padding: 0 12px;
+        height: 64px;
+    }
+    .brand {
+        font-size: 1.1rem;
+    }
+    .hero-kinetic-h1 {
+        font-size: 1.8rem !important;
+    }
+    .cta-actions-modern {
+        flex-direction: column;
+        gap: 12px;
+        width: 100%;
+    }
+    .btn-cta-primary, .btn-cta-outline {
+        width: 100%;
+        padding: 12px 24px;
+    }
+}
+
+/* Tier 2: Standard Smartphones (360px - 414px) */
+@media (min-width: 361px) and (max-width: 414px) {
+    .section {
+        padding: 32px 0;
+    }
+    .hero-kinetic-h1 {
+        font-size: 2.1rem !important;
+    }
+}
+
+/* Tier 3: Large/Max Smartphones (414px - 480px) */
+@media (min-width: 415px) and (max-width: 480px) {
+    .container {
+        padding: 0 20px;
+    }
+}
+
+/* Tier 5: Standard Tablets (Portrait) (600px - 768px) */
+@media (min-width: 601px) and (max-width: 768px) {
+    .nav-links {
+        display: none; /* Keep links hidden for clean tablet portrait */
+    }
+    .mobile-menu-toggle {
+        display: flex;
+    }
+}
+
+/* Tier 7: Small Laptops (1024px - 1280px) */
+@media (min-width: 1025px) and (max-width: 1280px) {
+    .hero-kinetic-h1 {
+        font-size: 3rem;
+    }
+    .container {
+        max-width: 980px;
+    }
+}
+
+/* Tier 9: Large Displays (HD/4K) (1920px+) */
+@media (min-width: 1920px) {
+    .container {
+        max-width: 1600px;
+    }
+    .hero-kinetic-h1 {
+        font-size: 4.5rem;
+    }
+    .body-text {
+        font-size: 1.25rem;
     }
 }

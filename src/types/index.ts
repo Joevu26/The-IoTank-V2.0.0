@@ -37,7 +37,7 @@ export interface TankReading {
     metadata?: any;
 }
 
-export type TankState = 'idle' | 'dispensing' | 'delivery' | 'leak_suspicion' | 'offline';
+export type TankState = 'idle' | 'dispensing' | 'delivery' | 'leak_suspicion' | 'rapid_defill' | 'offline';
 
 export interface Tank {
     id: string;
@@ -122,7 +122,7 @@ export interface Alert {
     id: string;
     tankId?: string;
     siteId?: string;
-    type: 'leak' | 'theft' | 'theft_detected' | 'leak_detected' | 'overfill' | 'low_level' | 'low_level_critical' | 'low_level_warning' | 'high_temperature' | 'sensor_failure' | 'anomaly' | 'refill' | 'refill_detected' | 'unauthorized_refill' | 'connectivity_lost' | 'market_news' | 'regulatory_update' | 'delivery_variance' | 'telemetry_gap' | 'compliance_deadline' | 'composite' | 'info';
+    type: 'leak' | 'theft' | 'theft_detected' | 'leak_detected' | 'overfill' | 'low_level' | 'low_level_critical' | 'low_level_warning' | 'high_temperature' | 'sensor_failure' | 'anomaly' | 'refill' | 'refill_detected' | 'unauthorized_refill' | 'connectivity_lost' | 'market_news' | 'regulatory_update' | 'delivery' | 'delivery_variance' | 'telemetry_gap' | 'compliance_deadline' | 'composite' | 'info';
     severity: 'info' | 'warning' | 'critical';
     severityLabel?: AlertSeverityLabel;  // INFO | WATCH | HIGH | CRITICAL
     score?: number;            // 0-100 calculated severity score
@@ -164,6 +164,12 @@ export interface Alert {
         atgVolume?: number;
         startVolume?: number;
         endVolume?: number;
+        currVol?: number;
+        volumeIncrease?: number;
+        tankCapacity?: number;
+        startTimestamp?: number;
+        endTimestamp?: number;
+        endTemperature?: number | null;
         detectedAt?: string;
         type?: string;
         // Escalation ladder
@@ -182,6 +188,8 @@ export interface Alert {
         openedBy?: any;
         closing_volume?: number;
         tankName?: string;
+        maxPumpFlow?: number;
+        volumeLost?: number;
     };
 }
 
@@ -194,6 +202,8 @@ export interface MarketData {
     timestamp: number;
     source: 'platts' | 'argus' | 'bloomberg' | 'eia' | 'mock' | 'epra' | 'api';
     volatilityIndex?: number;
+    effective_date?: string;
+    metadata?: any;
 }
 
 export type SignalSourceType = 'API' | 'Public Notice' | 'Corporate Announcement' | 'News Outlet' | 'Commodity' | 'Operational Alert' | 'Price Impact' | 'Supply Chain' | 'Regulatory';
@@ -528,6 +538,20 @@ export interface DeliveryDocument {
     createdAt: string; // ISO String
     notes?: string;
     bolPhotoUrl?: string;
+}
+
+export interface FuelOrder {
+    id: string;
+    orderRef: string;
+    supplier: string;
+    product: string;
+    quantity: number;
+    expectedDate: string;
+    status: string;
+    priority: string;
+    actorEmail: string;
+    createdAt: string;
+    notes?: string;
 }
 
 // --- Lightweight Workflow Types (Legacy) ---

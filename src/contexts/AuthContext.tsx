@@ -10,7 +10,7 @@ import { NewsService } from '@/services/NewsService';
 import { logger } from '@/utils/logger';
 
 // HIGH-003: Only emit debug logs in development — never in production
-const debugLog = (msg: string, ctx?: any) => logger.info(msg, ctx, 'AUTH_CONTEXT');
+const debugLog = (msg: string, ctx?: any) => logger.debug(msg, ctx, 'AUTH_CONTEXT');
 
 const CACHE_KEY = 'iotank_cached_user';
 // HIGH-001: Fields stored in the localStorage cache — sensitive auth fields (role, authLevel)
@@ -47,6 +47,7 @@ export interface AuthContextType {
     verifyMFA: (code: string) => Promise<void>;
     unenrollMFA: () => Promise<void>;
     cancelMFAChallenge: () => void;
+    checkMFAChallenge: () => Promise<boolean>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -150,31 +151,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     return false;
                 }
 
-                // 1. IDENTITY BUNDLE: Fetch everything in one single database round-trip
-                // 1.5 MFA STATUS: Check for verified factors in parallel
-                debugLog(`[DEBUG_LOG] ENRICHMENT STEP 2: Firing Promise.all for DB and MFA...`);
+                // [PARALLEL ENRICHMENT]: Fetch DB bundle and MFA factors in parallel to reduce latency.
+                // The RPC call doesn't use the Auth Lock, so it's safe to run alongside listFactors.
+                debugLog(`[DEBUG_LOG] ENRICHMENT: Launching parallel DB + MFA fetch...`);
+                
                 const [bundleResult, mfaResult] = await Promise.all([
-                    (async () => {
-                        debugLog(`[DEBUG_LOG] ENRICHMENT DB: Starting get_user_bundle_v2...`);
-                        const res = await supabase.rpc('get_user_bundle_v2');
-                        debugLog(`[DEBUG_LOG] ENRICHMENT DB: Finished get_user_bundle_v2! Error: ${!!res.error}`);
-                        return res;
-                    })(),
-                    // MFA check is secondary - don't let it hang the whole identity handshake
+                    supabase.rpc('get_user_bundle_v2'),
                     Promise.race([
-                        (async () => {
-                            debugLog(`[DEBUG_LOG] ENRICHMENT MFA: Starting listFactors...`);
-                            const res = await supabase.auth.mfa.listFactors();
-                            debugLog(`[DEBUG_LOG] ENRICHMENT MFA: Finished listFactors!`);
-                            return res;
-                        })(),
-                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 10000))
+                        supabase.auth.mfa.listFactors(),
+                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 5000))
                     ]).catch(e => {
                         logger.warn('[MFA] Factor list deferred or timed out:', e);
                         return { data: null, error: e };
                     })
                 ]);
-                debugLog(`[DEBUG_LOG] ENRICHMENT STEP 3: Promise.all completed!`);
+
+                debugLog(`[DEBUG_LOG] ENRICHMENT: Parallel fetch complete.`);
 
                 const { data: bundle, error } = bundleResult;
                 const { data: factors } = mfaResult;
@@ -348,6 +340,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         mfaChallengeInProgressRef.current = true;
         try {
+            // [OPTIMIZATION]: Check session user metadata first for AAL level to avoid extra RPC
+            if (session.user?.aud === 'authenticated' && session.user?.app_metadata?.aal === 'aal2') {
+                mfaChallengeInProgressRef.current = false;
+                return false;
+            }
+
             const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
             if (error) throw error;
 
@@ -402,10 +400,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         const initializeAuth = async () => {
             if (handshakeInProgressRef.current) return;
+            handshakeInProgressRef.current = true;
             
             debugLog("[DEBUG_LOG] BOOT: Launching secure handshake...");
             isBootingRef.current = true;
-            handshakeInProgressRef.current = true;
 
             // [RECOVERY SCAN]: Detect if the user landed on ANY page with a recovery hash
             // This is a fail-safe for when Supabase ignores the redirectTo parameter.
@@ -578,33 +576,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                                     updateLoadingState(false);
                                     unlockedByCache = true;
                                 } else {
+                                    setCurrentUser(mapToUnprovisionedUser(session.user));
+                                }
+                            } catch {
                                 setCurrentUser(mapToUnprovisionedUser(session.user));
                             }
-                        } catch {
+                        } else {
                             setCurrentUser(mapToUnprovisionedUser(session.user));
                         }
                     } else {
-                        setCurrentUser(mapToUnprovisionedUser(session.user));
+                        debugLog("[DEBUG_LOG] AUTH_EVENT: Same-user auth refresh detected, preserving current identity.");
                     }
                     
                     currentUserAuthIdRef.current = session.user.id;
-                }
                 
-                const enrichmentPromise = enrichUserFromSupabase(session.user);
+                    const enrichmentPromise = enrichUserFromSupabase(session.user);
                 
-                // If we already unlocked the UI with a provisional/cached identity,
-                // do not block here. Let it finish in the background.
-                // We use unlockedByCache to bypass the potentially stale 'loading' state.
-                if (!unlockedByCache && isLoadingRef.current) {
-                    await enrichmentPromise;
+                    // If we already unlocked the UI with a provisional/cached identity,
+                    // do not block here. Let it finish in the background.
+                    // We use unlockedByCache to bypass the potentially stale 'loading' state.
+                    if (!unlockedByCache && isLoadingRef.current) {
+                        await enrichmentPromise;
+                        updateLoadingState(false);
+                    }
+                } else {
+                    debugLog("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
+                    currentUserAuthIdRef.current = null;
+                    setCurrentUser(null);
                     updateLoadingState(false);
                 }
-            } else {
-                debugLog("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
-                currentUserAuthIdRef.current = null;
-                setCurrentUser(null);
-                updateLoadingState(false);
-            }
             }, 0);
         });
 
@@ -670,28 +670,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (!mfaFactorId || !mfaChallengeIdRef.current) {
             throw new Error('No active MFA challenge. Please sign in again.');
         }
+        
+        // [FORENSIC DEBUG]: Verify session state before MFA verification
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr || !session) {
+            logger.error('[MFA] Verification failed: No active session found', sessionErr);
+            throw new Error('Session timed out. Please sign in again.');
+        }
+
+        debugLog(`[MFA] Attempting verification for factor ${mfaFactorId} with challenge ${mfaChallengeIdRef.current}`);
+
         const { error } = await supabase.auth.mfa.verify({
             factorId: mfaFactorId,
             challengeId: mfaChallengeIdRef.current,
             code,
         });
-        if (error) throw error;
+
+        if (error) {
+            logger.warn('[MFA] Verification rejected:', error);
+            
+            // [FORENSIC ERROR MAPPING]: Explain IP Mismatch security protocol
+            if (error.message?.includes('IP addresses mismatch')) {
+                throw new Error('Security Protocol Violation: Your network IP address changed during verification. Please sign in again from a stable connection.');
+            }
+            if (error.name === 'NavigatorLockAcquireTimeoutError') {
+                throw new Error('Authentication Lock Timeout: Multiple sign-in attempts detected. Please wait a moment and try again.');
+            }
+            
+            throw error;
+        }
         
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            // Mark as handshaking to prevent listener from double-enriching
+        // [AAL2 SYNC]: Supabase internally escalates the session after verify().
+        // We rely on onAuthStateChange to detect the shift and trigger enrichment.
+        // Manual refreshSession() here often causes NavigatorLock contention.
+
+        // We still fetch the session to get the latest user object for enrichment,
+        // but we use getSession() which is generally safer/cached.
+        const { data: { session: updatedSession } } = await supabase.auth.getSession();
+
+        if (updatedSession?.user) {
             handshakeInProgressRef.current = true;
-            await enrichUserFromSupabase(session.user);
+            await enrichUserFromSupabase(updatedSession.user);
             handshakeInProgressRef.current = false;
         }
 
-        // MFA verified and user enriched — now we can safely clear the MFA UI state.
-        // This prevents the LoginForm from navigating to /dashboard before the user's
-        // authLevel is fully populated, which was causing the Unauthorized modal.
         setMfaChallengeRequired(false);
         mfaChallengeInProgressRef.current = false;
         setMfaFactorId(null);
         mfaChallengeIdRef.current = null;
+        debugLog('[MFA] Verification successful. Session escalated to AAL2.');
     };
 
     const cancelMFAChallenge = () => {
@@ -802,6 +829,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) throw error;
     };
 
+    const checkMFAChallenge = async (): Promise<boolean> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return false;
+        
+        try {
+            const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (error) throw error;
+
+            if (data.currentLevel !== data.nextLevel && data.nextLevel === 'aal2') {
+                const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
+                if (factorsError) throw factorsError;
+
+                const totpFactor = factors.totp.find(f => f.status === 'verified');
+                if (totpFactor) {
+                    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+                    if (challengeError) throw challengeError;
+
+                    mfaChallengeIdRef.current = challenge.id;
+                    setMfaFactorId(totpFactor.id);
+                    setMfaChallengeRequired(true);
+                    return true;
+                }
+            }
+            return false;
+        } catch (err) {
+            logger.error('[MFA] Manual challenge failed:', err);
+            return false;
+        }
+    };
+
     const updateMasterPassword = async (password: string) => {
         if (!currentUser) throw new Error("Not authenticated");
         const { error } = await supabase.rpc('update_master_password', { new_password: password });
@@ -895,6 +952,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         verifyMFA,
         unenrollMFA,
         cancelMFAChallenge,
+        checkMFAChallenge,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

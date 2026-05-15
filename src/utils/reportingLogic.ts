@@ -1,5 +1,6 @@
 import { supabase } from '@/config/supabase';
 import { format, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
+import { validateUUID } from './sanitization';
 
 export interface DailySnapshot {
     date: string;
@@ -41,6 +42,10 @@ export async function scanStationHistory(
     endDate: Date,
     tankId?: string
 ): Promise<{ logs: DailySnapshot[]; metrics: AggregatedMetrics }> {
+    // 🟢 Forensic UUID Guard
+    if (!validateUUID(stationId)) return { logs: [], metrics: { totalThroughput: 0, totalDeliveries: 0, avgVariancePct: 0, incidentCount: 0, netVariance: 0 } };
+    if (tankId && !validateUUID(tankId)) return { logs: [], metrics: { totalThroughput: 0, totalDeliveries: 0, avgVariancePct: 0, incidentCount: 0, netVariance: 0 } };
+
     try {
         // 1. Fetch Transactions (Deliveries and Sales)
         let txQuery = supabase

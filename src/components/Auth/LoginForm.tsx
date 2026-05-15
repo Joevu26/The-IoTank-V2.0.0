@@ -11,7 +11,7 @@ import { RegistrationRequestForm } from './RegistrationRequestForm';
 
 import { supabase } from '@/config/supabase';
 import { getAuthFriendlyErrorMessage } from '@/utils/authErrors';
-import brandMark from '@/assets/iotank-logo-v3.png';
+import brandMark from '@/assets/iotank-official-logo.png';
 
 
 

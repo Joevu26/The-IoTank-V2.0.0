@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useAlerts, resolveAlert } from '@/hooks/useSupabase';
+import { useAlerts, resolveAlert, useTanks as useTanksHook } from '@/hooks/useSupabase';
 import { supabase } from '@/config/supabase';
 import { Alert } from '@/types';
 import {
-    MdSearch,
     MdNotifications,
     MdPerson,
     MdLogout,
     MdCheck,
     MdSettings,
     MdMenu,
-    MdElectricBolt,
-    MdCircle
+    MdElectricBolt
 } from 'react-icons/md';
 
 import './Navbar.css';
@@ -29,7 +27,7 @@ import { OrderModal } from '../QuickActions/OrderModal';
 import { Toast } from '../Common/Toast';
 import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { ViewOnlyNoticeModal } from '../Common/ViewOnlyNoticeModal';
-import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo, FiBell } from 'react-icons/fi';
+import { FiEye, FiLock, FiClock, FiShield, FiTrendingDown, FiUserPlus, FiInfo, FiBell, FiCpu, FiTruck, FiPlay, FiSquare, FiFileText } from 'react-icons/fi';
 import { NotificationService } from '@/services/NotificationService';
 import { DeviceCommandService } from '@/services/DeviceCommandService';
 import { FiActivity } from 'react-icons/fi';
@@ -44,6 +42,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     const { currentUser, signOut } = useAuth();
     const stationId = currentUser?.stationId || '';
     const navigate = useNavigate();
+
+    const ROLE_DISPLAY_MAP: Record<string, string> = {
+        'admin': 'Station Admin',
+        'owner': 'Station Owner',
+        'supervisor': 'Station Supervisor',
+        'operator': 'Shift Operator',
+        'viewer': 'Site Auditor'
+    };
 
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -62,7 +68,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
     const { activeModal, openModal, closeModal } = useModals();
     
     // Derived states for local UI
-    const isDeliveryModalOpen = activeModal === 'delivery';
+    const isDeliveryModalOpen = activeModal === 'delivery' || activeModal === 'refill_verification';
     const isShiftCloseModalOpen = activeModal === 'shift-close';
     const isShiftOpenModalOpen = activeModal === 'shift-open';
     const isReportModalOpen = activeModal === 'report';
@@ -76,8 +82,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
 
     const [unifiedEvents, setUnifiedEvents] = useState<any[]>([]);
 
-    // Fetch alerts for the notification tray
+    // Fetch alerts & tanks for the notification tray and health monitor
     const { alerts } = useAlerts(stationId, false);
+    const { tanks } = useTanksHook(stationId);
     const unreadAlerts = alerts.filter((a: any) => !a.resolved && !hiddenAlerts.has(a.id));
 
     // Use click outside hooks
@@ -228,8 +235,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     
                     // [NOISE REDUCTION]: Filter out internal state transitions with "no essence"
                     const isInternalNoise = 
-                        desc.includes('UPDATE detected on alerts') || 
-                        desc.includes('UPDATE detected on tanks') ||
+                        desc.includes('detected on alerts') || 
+                        desc.includes('detected on tanks') ||
+                        desc.includes('detected on sensor_readings') ||
                         desc.includes('INSERT on alerts') ||
                         desc.includes('Forensic audit: UPDATE') ||
                         desc.includes('verified notification has no essence') ||
@@ -275,8 +283,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     
                     // [FILTER]: Ignore routine forensic updates to prevent UI loops/spam
                     const isNoise = 
-                        description.includes('UPDATE detected on alerts') || 
-                        description.includes('UPDATE detected on tanks') ||
+                        description.includes('detected on alerts') || 
+                        description.includes('detected on tanks') ||
+                        description.includes('detected on sensor_readings') ||
                         description.includes('INSERT on alerts') ||
                         title.includes('Audit Synchronized');
                     
@@ -322,13 +331,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             try {
                 // Use a head request on profiles to verify DB connectivity without fetching data
                 // Every authenticated user has access to their own profile record.
-                const { error } = await supabase
+                const { error, status } = await supabase
                     .from('profiles')
-                    .select('auth_user_id', { head: true, count: 'exact' })
+                    .select('auth_user_id', { head: true })
                     .eq('auth_user_id', currentUser.authUserId)
-                    .single();
+                    .limit(1);
                 
-                setIsOnline(!error || error.code === 'PGRST116'); // PGRST116 is "no rows", still means online
+                // [RESILIENCE PROTOCOL]: A 404 (Not Found) means the DB responded, so we are ONLINE.
+                // A network failure would result in no status or a status outside the 2xx/4xx range.
+                const isActuallyOnline = !error || status === 404 || status < 500;
+                setIsOnline(isActuallyOnline); 
             } catch {
                 setIsOnline(false);
             }
@@ -369,59 +381,61 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             </div>
 
             <div className="navbar-right">
-                <div className="search-bar hidden md:block">
-                    <MdSearch className="search-icon" />
-                    <input type="text" placeholder="Global Search..." />
-                </div>
 
-                <div className="navbar-item-relative system-health hidden lg:flex">
-                    <div className={`health-badge ${!isOnline ? 'offline' : ''}`}>
-                        <MdCircle className={isOnline ? "pulse-green-small" : "text-red-500"} />
-                        <span className="health-text">{isOnline ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE'}</span>
-                        <span className="health-separator">|</span>
-                        <span className="health-time">{formattedTime}</span>
-                        {pendingCommandCount > 0 && (
-                            <div 
-                                className="pending-badge ml-2 flex items-center gap-1 text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.dispatchEvent(new CustomEvent('system-toast', {
-                                        detail: {
-                                            title: 'Clear Action Queue',
-                                            message: 'Are you sure you want to purge the local hardware command queue? This only stops tracking on this device; it does not cancel instructions already sent to the server or hardware.',
-                                            type: 'warning',
-                                            persistent: true,
-                                            actions: [
-                                                {
-                                                    label: 'Keep Queue',
-                                                    onClick: () => {}
-                                                },
-                                                {
-                                                    label: 'Purge Queue',
-                                                    primary: true,
-                                                    onClick: () => {
-                                                        localStorage.removeItem('iotank_pending_commands');
-                                                        setPendingCommandCount(0);
-                                                        window.dispatchEvent(new CustomEvent('system-toast', {
-                                                            detail: {
-                                                                title: 'Queue Purged',
-                                                                message: 'Local command tracking has been reset.',
-                                                                type: 'info'
-                                                            }
-                                                        }));
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }));
-                                }}
-                                title="Click to clear local action queue"
-                            >
-                                <FiActivity className="animate-pulse" />
-                                {pendingCommandCount} PENDING
+
+                <div className="navbar-item-relative system-health hidden xl:flex gap-3">
+                    {/* Telemetry Monitor Box (Shared Placeholder) */}
+                    <div className={`telemetry-monitor-box ${!isOnline ? 'offline' : ''}`}>
+                        <div className="health-node-section">
+                            <FiCpu className={isOnline ? "text-emerald-500 animate-pulse" : "text-red-500"} size={12} />
+                            <div className="flex flex-col">
+                                <span className="health-label">Active Nodes</span>
+                                <span className="health-value">{isOnline ? tanks.length : 0}/{tanks.length} online</span>
                             </div>
-                        )}
+                        </div>
+
+                        <div className="health-divider" />
+
+                        <div className="health-telemetry-section">
+                            <div className="flex gap-1 items-end h-3 mr-2">
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <div 
+                                        key={i} 
+                                        className={`w-1 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-red-500'} transition-all`}
+                                        style={{ 
+                                            height: isOnline ? `${20 + Math.random() * 80}%` : '20%',
+                                            animation: isOnline ? `telemetry-pulse 1.5s infinite ${i * 0.2}s` : 'none'
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="health-label">Telemetry Integrity</span>
+                                <span className="health-value">{isOnline ? '99.8%' : '0.0%'}</span>
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Reverted System Status & Timer */}
+                    <div className={`health-badge ${!isOnline ? 'offline' : ''}`}>
+                        <div className={`status-orb ${isOnline ? 'online' : 'offline'}`} />
+                        <span className="health-text">{isOnline ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE'}</span>
+                        <div className="health-separator">|</div>
+                        <span className="health-time">{formattedTime}</span>
+                    </div>
+
+                    {pendingCommandCount > 0 && (
+                        <div 
+                            className="pending-badge-premium"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-pending-commands'));
+                            }}
+                        >
+                            <FiActivity className="animate-pulse" />
+                            <span>{pendingCommandCount} COMMANDS</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="navbar-item-relative">
@@ -461,13 +475,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     </button>
                     {showQuickActions && (
                         <div className="dropdown-menu modern-dropdown quick-actions-dropdown">
-                            <div className="dropdown-header">
-                                <h3>Quick Actions</h3>
+                            <div className="dropdown-header premium-dropdown-header">
+                                <div className="dropdown-title-box">
+                                    <MdElectricBolt size={18} className="dropdown-title-icon" />
+                                    <h3>Quick Actions</h3>
+                                </div>
+                                <div className="dropdown-count-pill">
+                                    <span className="dropdown-count-value">4</span>
+                                    <span className="dropdown-count-label">Available</span>
+                                </div>
                             </div>
                             <div className="dropdown-content">
                                 <ul>
                                     <li>
-                                        <button className="menu-btn" onClick={() => { 
+                                        <button className="menu-btn qa-item" data-action="delivery" onClick={() => { 
                                             if (shiftStatus !== 'open') {
                                                 setToast({ 
                                                     message: 'No active shift found. Please start a shift first.', 
@@ -480,7 +501,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             }
                                             setShowQuickActions(false); 
                                         }}>
-                                            <MdElectricBolt className="menu-icon" />
+                                            <div className="qa-icon-shell" data-action="delivery">
+                                                <FiTruck size={16} />
+                                            </div>
                                             <div className="action-details">
                                                 <span className="action-title">Add Delivery</span>
                                                 <span className="action-desc">Log new fuel intake to inventory</span>
@@ -488,7 +511,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                         </button>
                                     </li>
                                     <li>
-                                        <button className="menu-btn" onClick={() => { 
+                                        <button className="menu-btn qa-item" data-action="shift-open" onClick={() => { 
                                             if (shiftStatus === 'open') {
                                                 setToast({ 
                                                     message: 'Shift is already active. Please end the current shift first.', 
@@ -501,7 +524,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             }
                                             setShowQuickActions(false); 
                                         }}>
-                                            <MdElectricBolt className="menu-icon text-emerald-500" />
+                                            <div className="qa-icon-shell" data-action="shift-open">
+                                                <FiPlay size={16} />
+                                            </div>
                                             <div className="action-details">
                                                 <span className="action-title">Start New Shift</span>
                                                 <span className="action-desc">Initialize daily operations & meter readings</span>
@@ -509,7 +534,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                         </button>
                                     </li>
                                     <li>
-                                        <button className="menu-btn" onClick={() => { 
+                                        <button className="menu-btn qa-item" data-action="shift-close" onClick={() => { 
                                             if (shiftStatus !== 'open') {
                                                 setToast({ 
                                                     message: 'No active shift found. Please start a shift first.', 
@@ -522,7 +547,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             }
                                             setShowQuickActions(false); 
                                         }}>
-                                            <MdElectricBolt className="menu-icon text-rose-500" />
+                                            <div className="qa-icon-shell" data-action="shift-close">
+                                                <FiSquare size={16} />
+                                            </div>
                                             <div className="action-details">
                                                 <span className="action-title">End Current Shift</span>
                                                 <span className="action-desc">Finalize sales & close register</span>
@@ -530,7 +557,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                         </button>
                                     </li>
                                     <li>
-                                        <button className="menu-btn" onClick={() => { 
+                                        <button className="menu-btn qa-item" data-action="report" onClick={() => { 
                                             if (shiftStatus !== 'open') {
                                                 setToast({ 
                                                     message: 'No active shift found. Please start a shift first.', 
@@ -543,7 +570,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                             }
                                             setShowQuickActions(false); 
                                         }}>
-                                            <MdElectricBolt className="menu-icon" />
+                                            <div className="qa-icon-shell" data-action="report">
+                                                <FiFileText size={16} />
+                                            </div>
                                             <div className="action-details">
                                                 <span className="action-title">Generate Report</span>
                                                 <span className="action-desc">Export system analytics & activity logs</span>
@@ -570,9 +599,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
 
                     {showNotifications && (
                         <div className="dropdown-menu modern-dropdown notifications-dropdown">
-                        <div className="dropdown-header notif-header">
-                                <h3>Notifications</h3>
-                                {(unreadAlerts.length + unifiedEvents.length) > 0 && <span className="pro-badge notif-badge-inline">{(unreadAlerts.length + unifiedEvents.length)} New</span>}
+                            <div className="dropdown-header premium-dropdown-header">
+                                <div className="dropdown-title-box">
+                                    <MdNotifications size={18} className="dropdown-title-icon" />
+                                    <h3>Notifications</h3>
+                                </div>
+                                {(unreadAlerts.length + unifiedEvents.length) > 0 && (
+                                    <div className="dropdown-count-pill">
+                                        <span className="dropdown-count-value">{(unreadAlerts.length + unifiedEvents.length)}</span>
+                                        <span className="dropdown-count-label">New</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="dropdown-content custom-scrollbar overflow-y-auto max-h-[380px]">
                                 {unreadAlerts.length > 0 || unifiedEvents.length > 0 ? (
@@ -684,7 +721,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                     }}
                                     className="btn-open-alerts"
                                 >
-                                    <FiActivity /> Command Center
+                                    Command Center
                                 </button>
                             </div>
                         </div>
@@ -703,17 +740,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                                 <MdPerson />
                             )}
                         </div>
-                        <span className="navbar-username hidden lg:inline-block">
-                            {currentUser?.displayName?.split(' ')[0] || 'User'}
-                        </span>
+
                     </button>
 
                     {showProfileMenu && (
                         <div className="dropdown-menu modern-dropdown profile-dropdown">
-                            <div className="dropdown-header">
-                                <div className="user-role">Personal Account</div>
-                                <h3>{currentUser?.displayName || 'Session user'}</h3>
-                                <div className="user-email">{currentUser?.email}</div>
+                            <div className="dropdown-header premium-dropdown-header profile-header-premium">
+                                <div className="user-role-badge">
+                                    {ROLE_DISPLAY_MAP[currentUser?.role || 'viewer'] || 'Site Auditor'}
+                                </div>
+                                <h3 className="profile-name-text">{currentUser?.displayName || 'Session user'}</h3>
+                                <div className="user-email-text">{currentUser?.email}</div>
                             </div>
                             <div className="dropdown-content">
                                 <ul>

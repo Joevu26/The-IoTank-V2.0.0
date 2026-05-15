@@ -1,7 +1,7 @@
 import React from 'react';
 import { FiTwitter, FiLinkedin, FiFacebook, FiMail } from 'react-icons/fi';
 import './Footer.css';
-import brandMark from '@/assets/iotank-logo-v3.png';
+import brandMark from '@/assets/iotank-official-logo.png';
 
 const Footer: React.FC = () => {
     return (

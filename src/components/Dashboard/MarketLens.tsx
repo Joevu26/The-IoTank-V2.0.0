@@ -1,6 +1,6 @@
 import { FiExternalLink, FiClock, FiRss, FiCheck } from 'react-icons/fi';
-import React, { useState, useMemo } from 'react';
-import { useMarketNews } from '@/hooks/useMarketNews';
+import React, { useMemo } from 'react';
+import { useMarketNews, VERIFIED_AI_SOURCES } from '@/hooks/useMarketNews';
 import '../Common/DesignSystemCards.css';
 import './MarketLens.css';
 
@@ -9,26 +9,36 @@ interface MarketLensProps {
 }
 
 export const MarketLens: React.FC<MarketLensProps> = () => {
-    const { filteredArticles, status } = useMarketNews();
-    const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+    const { filteredArticles, status, acknowledgeArticle } = useMarketNews();
     const loading = status === 'loading';
 
-    // Filter Logic: Only Price, Political, and Compliance news. Hide acknowledged items.
+    // Safe URL parsing to prevent component crashes on malformed links
+    const getSafeHostname = (url: string | undefined) => {
+        try {
+            if (!url) return 'google.com';
+            return new URL(url).hostname;
+        } catch {
+            return 'google.com';
+        }
+    };
+
+    // Filter Logic: Only Verified Sources and specific categories.
     const displayedArticles = useMemo(() => {
         if (!filteredArticles) return [];
         return filteredArticles.filter(a => 
-            !acknowledged[a.id] && 
+            VERIFIED_AI_SOURCES.includes(a.feedSource.toUpperCase()) &&
             (a.implicationCategory === 'Price' || 
              a.implicationCategory === 'Political' || 
-             a.implicationCategory === 'Compliance')
+             a.implicationCategory === 'Compliance' ||
+             a.implicationCategory === 'Supply' ||
+             a.implicationCategory === 'Logistics')
         );
-    }, [filteredArticles, acknowledged]);
+    }, [filteredArticles]);
 
-    const handleAcknowledge = (id: string, e: React.MouseEvent) => {
+    const handleAcknowledge = (url: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        // The item will disappear due to the useMemo filter
-        setAcknowledged(prev => ({ ...prev, [id]: true }));
+        acknowledgeArticle(url);
     };
 
     return (
@@ -65,15 +75,22 @@ export const MarketLens: React.FC<MarketLensProps> = () => {
                             <div className="market-item-main">
                                 <div className="market-item-header">
                                     <div className="flex items-center gap-2">
-                                        <img 
-                                            src={`https://www.google.com/s2/favicons?domain=${new URL(signal.url || 'https://google.com').hostname}&sz=32`} 
-                                            alt="" 
-                                            className="w-3.5 h-3.5 rounded-sm grayscale group-hover:grayscale-0 transition-all object-contain"
-                                            onError={(e) => { 
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.opacity = '0';
-                                            }}
-                                        />
+                                        <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                                            <img 
+                                                src={`https://www.google.com/s2/favicons?domain=${getSafeHostname(signal.url)}&sz=32`} 
+                                                alt="" 
+                                                className="w-full h-full rounded-sm grayscale group-hover:grayscale-0 transition-all object-contain"
+                                                onError={(e) => { 
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    const fallback = target.nextElementSibling as HTMLElement;
+                                                    if (fallback) fallback.style.display = 'flex';
+                                                }}
+                                            />
+                                            <div className="hidden absolute inset-0 items-center justify-center text-slate-400">
+                                                <FiRss size={12} />
+                                            </div>
+                                        </div>
                                         <span className="market-item-source">{signal.attribution || signal.source}</span>
                                     </div>
                                     <div className="market-item-time">
@@ -93,7 +110,7 @@ export const MarketLens: React.FC<MarketLensProps> = () => {
                                         Source Report <FiExternalLink size={10} />
                                     </a>
                                     <button 
-                                        onClick={(e) => handleAcknowledge(signal.id, e)}
+                                        onClick={(e) => handleAcknowledge(signal.url, e)}
                                         className="market-item-ack-btn group"
                                         title="Dismiss Intelligence"
                                     >

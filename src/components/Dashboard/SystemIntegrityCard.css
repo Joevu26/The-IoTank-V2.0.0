@@ -116,26 +116,7 @@
     font-family: 'Roboto Mono', monospace;
 }
 
-/* --- Edge Nodes Section --- */
-.edge-nodes-section {
-    background: #fbfcfe;
-    border: 1px solid #f1f5f9;
-    border-radius: 10px;
-    padding: 8px 10px;
-}
 
-.edge-node-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1px 0;
-}
-
-.edge-node-row:not(:last-child) {
-    border-bottom: 1px solid #f1f5f9;
-    margin-bottom: 2px;
-    padding-bottom: 3px;
-}
 
 /* --- Footer --- */
 .integrity-footer {

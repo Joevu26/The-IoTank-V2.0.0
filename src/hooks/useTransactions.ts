@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { FuelTransaction } from '@/types';
+import { validateUUID } from '@/utils/sanitization';
 
 export function useTransactions(stationId: string, tankId?: string) {
     const [transactions, setTransactions] = useState<FuelTransaction[]>([]);
@@ -27,7 +28,7 @@ export function useTransactions(stationId: string, tankId?: string) {
     };
 
     useEffect(() => {
-        if (!stationId) return;
+        if (!stationId || (stationId !== 'SYSTEM_GOVERNANCE' && !validateUUID(stationId))) return;
 
         const fetchTransactions = async () => {
             try {
@@ -43,7 +44,7 @@ export function useTransactions(stationId: string, tankId?: string) {
                     .order('timestamp', { ascending: false })
                     .limit(500); // Increased from 50 — analytics needs full period data for variance calculation
 
-                if (tankId) {
+                if (tankId && validateUUID(tankId)) {
                     query = query.eq('tank_id', tankId);
                 }
 

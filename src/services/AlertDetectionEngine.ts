@@ -175,26 +175,33 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     if (latestReading && (now - readingTimestamp) > telemetryGapMs) {
         const gapMinutes = Math.round((now - readingTimestamp) / 60000);
         const { score, label } = scoreByType('telemetry_gap', 0.85);
+        
+        // [FORENSIC UPGRADE]: Detect 3-Day (4320 mins) Sensor Blackout
+        const isBlackout = gapMinutes >= 4320; 
         const isCritical = gapMinutes >= THRESHOLDS.TELEMETRY.OFFLINE_CRITICAL_MINS;
         
         drafts.push({
             tankId: tank.id,
             siteId: tank.siteId,
-            type: 'connectivity_lost',
-            title: isCritical ? `CRITICAL OFFLINE: ${tank.name}` : `Offline: ${tank.name}`,
-            description: `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
-            message: `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
-            severity: isCritical ? 'critical' : 'warning',
-            severityLabel: isCritical ? 'CRITICAL' : label,
-            score: isCritical ? 98 : score,
+            type: isBlackout ? 'sensor-blackout' : 'connectivity-lost',
+            title: isBlackout ? `SENSOR BLACKOUT: ${tank.name}` : (isCritical ? `CRITICAL OFFLINE: ${tank.name}` : `Offline: ${tank.name}`),
+            description: isBlackout 
+                ? `CRITICAL DOWNTIME: ${tank.name} sensor has been blacked out for ${formatForensicDuration(gapMinutes)}. This indicates total power/link failure for 3+ consecutive days.`
+                : `Real-time link interrupted. ${tank.name} hardware has been unreachable for ${formatForensicDuration(gapMinutes)}. Monitoring paused.`,
+            message: isBlackout 
+                ? `SENSOR BLACKOUT: ${tank.name} unreachable for 3+ days`
+                : `Offline: ${tank.name} connection lost for ${formatForensicDuration(gapMinutes)}`,
+            severity: (isCritical || isBlackout) ? 'critical' : 'warning',
+            severityLabel: (isCritical || isBlackout) ? 'CRITICAL' : label,
+            score: isBlackout ? 100 : (isCritical ? 98 : score),
             source: 'system',
             state: 'ACTIVE',
             resolved: false,
             detectionMethod: 'deterministic',
-            aiConfidence: 0.85,
+            aiConfidence: 0.95,
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
             metadata: { 
-                type: 'CONNECTIVITY_LOST',
+                type: isBlackout ? 'SENSOR_BLACKOUT' : 'CONNECTIVITY_LOST',
                 telemetryGapMinutes: gapMinutes 
             },
         });
@@ -331,56 +338,81 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         }
 
         // ── 6. REFILL DETECTION (Automated Delivery Sensing) ───────────────────────
+        //
+        // ⚠️  OWNERSHIP NOTE
+        // All volume-increase events — whether authorized (open shift) or
+        // unauthorized (closed shift) — are exclusively tracked and finalized
+        // by the STATEFUL engine in useAlertEngine.ts.
+        //
+        // That engine:
+        //   • applies multi-cycle confirmation (eliminates sensor noise)
+        //   • captures accurate start/end volumes across the delivery window
+        //   • writes the single, definitive alert to the database
+        //
+        // This stateless engine must NOT emit 'unauthorized_refill' or normal
+        // 'refill_detected' drafts for volume increases, as doing so creates
+        // duplicate alerts and race conditions in the notification pipeline.
+        //
+        // OFFLINE BACKFILL GUARD
+        // If the gap between the two readings is > 2 hours (isBackfilledBatch),
+        // the volume jump is caused by historical data syncing after the hardware
+        // came back online. Skip all refill alerting entirely to prevent a flood
+        // of false anomaly alerts on reconnect.
+        //
         const refillThreshold = ctx.tank.capacity ? (ctx.tank.capacity * 0.01) : (ctx.refillDetectionThreshold || 20);
         const volumeIncrease = currVol - prevVol;
 
-        if (volumeIncrease > refillThreshold) {
+        if (!isBackfilledBatch && volumeIncrease > refillThreshold) {
+            // The ONLY case where the stateless engine emits a refill-related
+            // draft is a true physical INTEGRITY BREACH: where the measured
+            // volume exceeds the tank's known physical capacity by > 2%.
+            // This cannot be confirmed by the stateful engine (which tracks
+            // relative deltas), so it is kept here as a hard-limit guard.
             const isOverCapacity = tank.capacity && (currVol > tank.capacity * 1.02);
-            const isUnauthorized = !isShiftOpen;
 
-            const { score, label } = scoreByType(
-                isOverCapacity ? 'composite_supply_risk' : (isUnauthorized ? 'composite_supply_risk' : 'refill_detected'), 
-                0.90
-            );
-
-            drafts.push({
-                tankId: tank.id,
-                siteId: tank.siteId,
-                type: isOverCapacity ? 'anomaly' : (isUnauthorized ? 'unauthorized_refill' : 'refill_detected'),
-                title: isOverCapacity 
-                    ? `INTEGRITY BREACH: Over-Capacity detected on ${tank.name}` 
-                    : (isUnauthorized ? `🔴 UNAUTHORIZED REFILL: ${tank.name}` : `Refill Identified (Add Delivery)`),
-                description: isOverCapacity 
-                    ? `Critical integrity error: Tank level (${currVol.toFixed(1)}L) exceeds physical capacity (${tank.capacity}L). This indicates severe calibration drift or sensor malfunction.`
-                    : (isUnauthorized
-                        ? `SECURITY BREACH: Fuel inflow of ${volumeIncrease.toFixed(1)}L detected while shift is CLOSED. Out-of-hours delivery requires immediate verification.`
-                        : `Significant volume increase of ${volumeIncrease.toFixed(1)}L detected. Automated delivery record required for forensic reconciliation.`),
-                message: isOverCapacity 
-                    ? `CRITICAL: ${tank.name} measured volume exceeds physical capacity. Integrity breach.`
-                    : (isUnauthorized
-                        ? `SECURITY: Unauthorized ${tank.name} refill (+${volumeIncrease.toFixed(1)}L) while closed.`
-                        : `INFO: ${tank.name} refill sensing (+${volumeIncrease.toFixed(1)}L). Please add delivery record.`),
-                severity: (isOverCapacity || isUnauthorized) ? 'critical' : 'info',
-                severityLabel: label,
-                score: (isOverCapacity || isUnauthorized) ? 98 : score,
-                source: 'system',
-                state: 'ACTIVE',
-                resolved: false,
-                detectionMethod: 'deterministic',
-                aiConfidence: 0.95,
-                rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
-                metadata: { 
-                    type: isOverCapacity ? 'INTEGRITY_BREACH' : (isUnauthorized ? 'UNAUTHORIZED_REFILL' : 'REFILL'), 
-                    volumeIncrease, 
-                    currVol, 
-                    tankCapacity: tank.capacity 
-                }
-            });
+            if (isOverCapacity) {
+                const { score, label } = scoreByType('composite_supply_risk', 0.98);
+                drafts.push({
+                    tankId: tank.id,
+                    siteId: tank.siteId,
+                    type: 'anomaly',
+                    title: `INTEGRITY BREACH: Over-Capacity on ${tank.name}`,
+                    description: `Critical integrity error: Tank level (${currVol.toFixed(1)}L) exceeds physical capacity (${tank.capacity}L). This indicates severe calibration drift or sensor malfunction.`,
+                    message: `CRITICAL: ${tank.name} measured volume exceeds physical capacity. Integrity breach.`,
+                    severity: 'critical',
+                    severityLabel: label,
+                    score,
+                    source: 'system',
+                    state: 'ACTIVE',
+                    resolved: false,
+                    detectionMethod: 'deterministic',
+                    aiConfidence: 0.98,
+                    rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
+                    metadata: {
+                        type: 'INTEGRITY_BREACH',
+                        volumeIncrease,
+                        startVolume: prevVol,
+                        endVolume: currVol,
+                        startTimestamp: prevTime,
+                        endTimestamp: currTime,
+                        tankCapacity: tank.capacity
+                    }
+                });
+            }
+            // All other refill types (normal + unauthorized) are owned
+            // exclusively by the stateful tracker in useAlertEngine.ts.
         }
     }
 
-    // Filter out 'refill_detected' from drafts as we handle it statefully above
-    return drafts.filter(d => d.type !== 'refill_detected');
+    // ──────────────────────────────────────────────────────────────
+    // Final output filter
+    // ──────────────────────────────────────────────────────────────
+    // Suppress any draft types that are exclusively owned by the stateful
+    // engine in useAlertEngine.ts to guarantee zero duplicate alerts:
+    //   - 'refill_detected'   → handled by stateful tracker
+    //   - 'unauthorized_refill' → handled by stateful tracker
+    // 'anomaly' type for over-capacity is the ONLY exception and is kept.
+    return drafts.filter(d => d.type !== 'refill_detected' && d.type !== 'unauthorized_refill');
 }
 
 /**

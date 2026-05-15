@@ -22,12 +22,22 @@ export interface ArticleAIDirective {
     actionRequired: boolean;
     actionDetails?: string;
     confidence: number;
+    priceData?: {
+        fuelType: 'AGO' | 'PMS' | 'IK' | 'BRENT' | 'FX';
+        price: number;
+        currency: string;
+        effectiveDate?: string;
+    }[];
 }
 
 export class IntelligenceAIService {
     constructor(_config?: AIProviderConfig) {
         // AI proxy securely handles configuration now
     }
+
+    private static cachedSession: any = null;
+    private static lastSessionFetch = 0;
+    private static SESSION_TTL = 30000; // 30 seconds
 
     private async getSafeAuthHeaders(): Promise<Record<string, string>> {
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -37,17 +47,20 @@ export class IntelligenceAIService {
         };
 
         try {
-            const { data: { session }, error } = await supabase.auth.getSession();
+            const now = Date.now();
+            if (!IntelligenceAIService.cachedSession || (now - IntelligenceAIService.lastSessionFetch > IntelligenceAIService.SESSION_TTL)) {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) throw error;
+                IntelligenceAIService.cachedSession = session;
+                IntelligenceAIService.lastSessionFetch = now;
+            }
             
-            if (error || !session?.access_token) {
+            const session = IntelligenceAIService.cachedSession;
+            
+            if (!session?.access_token) {
                 throw new Error('TankIQ intelligence requires an active authenticated session.');
             }
             
-            const isValidToken = session.expires_at ? session.expires_at > (Date.now() / 1000) + 10 : true;
-            if (!isValidToken) {
-                throw new Error('TankIQ session expired. Please re-authenticate.');
-            }
-
             headers['Authorization'] = `Bearer ${session.access_token}`;
         } catch (e: any) {
             logger.error('[IntelligenceAIService] Authentication enforcement failed:', e);
@@ -159,7 +172,7 @@ export class IntelligenceAIService {
         try {
             const headers = await this.getSafeAuthHeaders();
             const modelMap: Record<string, string> = {
-                gemini: 'gemini-2.0-flash-exp',
+                gemini: 'gemini-1.5-flash',
                 groq: 'llama-3.3-70b-versatile',
                 deepseek: 'deepseek-chat'
             };
@@ -258,7 +271,7 @@ export class IntelligenceAIService {
                 body: JSON.stringify({
                     action: actionType === 'directive' ? 'intelligence' : actionType,
                     context,
-                    endpoint: 'models/gemini-2.0-flash-exp:generateContent',
+                    endpoint: 'models/gemini-1.5-flash:generateContent',
                     body: {
                         generationConfig: { temperature: 0.7 },
                     }
@@ -331,7 +344,13 @@ export class IntelligenceAIService {
 
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => ({}));
-                throw new Error(`DeepSeek error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+                const errorMsg = errorBody.error?.message || response.statusText;
+                
+                if (errorMsg.includes('Insufficient Balance')) {
+                    throw new Error('DeepSeek error: Insufficient Credits. Please top up your balance or wait for failover.');
+                }
+                
+                throw new Error(`DeepSeek error: ${response.statusText}${errorBody.error ? ` - ${JSON.stringify(errorBody.error)}` : ''}`);
             }
 
             const data = await response.json();
@@ -352,7 +371,8 @@ export class IntelligenceAIService {
                 recommendation: data.recommendation || data.text || 'Monitor market conditions.',
                 actionRequired: !!data.actionRequired || !!data.suggestsAction,
                 actionDetails: data.actionDetails || data.details,
-                confidence: data.confidence || 0.85
+                confidence: data.confidence || 0.85,
+                priceData: data.priceData || data.extractedPrices || []
             };
         } catch (e) {
             logger.error(`[IntelligenceAIService] Directive parsing failure for ${provider}:`, e);
