@@ -701,6 +701,7 @@ export function useMarketNews(): UseMarketNewsReturn {
             const isVerifiedSource = VERIFIED_AI_SOURCES.includes(source.shortLabel.toUpperCase());
             const existingHistory = readMasterHistory();
 
+            let aiProcessedCount = 0;
             for (const article of collected) {
                 // Deduplication & Cache Check: Check if article has already been processed with an AI directive
                 const cachedArticle = existingHistory.find(
@@ -714,11 +715,12 @@ export function useMarketNews(): UseMarketNewsReturn {
                 const relevance = article.relevanceScore ?? 0;
                 const isKenyanNews = article.region === 'Kenya' && (article.feedSource === 'BD Africa' || article.feedSource === 'Nation' || article.feedSource === 'Standard');
                 
-                // [FORENSIC EXTRACTION]: If it's EPRA or a major Kenyan news source about prices, force AI processing
-                if ((isVerifiedSource && relevance > 0.65) || (isKenyanNews && (article.title + article.summary).toLowerCase().includes('price'))) {
+                // [FORENSIC EXTRACTION]: Cap AI processing at 1 article per source fetch cycle to protect API limits and eliminate UI lag
+                if (aiProcessedCount < 1 && ((isVerifiedSource && relevance > 0.65) || (isKenyanNews && (article.title + article.summary).toLowerCase().includes('price')))) {
                     try {
                         const directive = await aiService.generateArticleDirective(article, Array.isArray(tanks) ? tanks : []);
                         enriched.push({ ...article, aiDirective: directive });
+                        aiProcessedCount++;
                         // [Rate Limit Shield]: Increased stagger delay between source requests to prevent gateway 429s
                         await new Promise(resolve => setTimeout(resolve, 800));
                     } catch (e) {

@@ -179,8 +179,8 @@ export function useTanks(stationId: string) {
             }
         },
         enabled: true,
-        staleTime: 5 * 60 * 1000,
-        refetchInterval: 30000, // Realtime channel handles instant updates; 30s is the safety fallback
+        staleTime: 1000, // 1s — fleet list must reflect changes near-instantly
+        refetchInterval: 2000, // 2s live polling
         retry: 1,
         retryDelay: 10000, // Back off 10s before retry to avoid hammering a paused DB
     });
@@ -215,7 +215,7 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
         },
         enabled: !!tankId && enabled,
         staleTime: 0, // Telemetry is always moving
-        refetchInterval: enabled ? 2000 : false, // 2-second real-time polling
+        refetchInterval: enabled ? 1500 : false, // 1.5s real-time polling
     });
 
     const reading = query.data || null;
@@ -273,8 +273,8 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
             }
         },
         enabled: enabled && !!stationId && tankIds.length > 0,
-        staleTime: 10000,
-        refetchInterval: enabled ? 3000 : false, // 3-second real-time fleet polling
+        staleTime: 1000, // 1s — fleet telemetry must be near real-time
+        refetchInterval: enabled ? 1500 : false, // 1.5s real-time fleet polling
     });
 
     return { 
@@ -307,8 +307,8 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
             return mapped;
         },
         enabled: true,
-        staleTime: 10 * 1000,
-        refetchInterval: 30000, // Realtime channel pushes inserts live; 30s is the safety fallback
+        staleTime: 1000, // 1s — alerts must surface immediately
+        refetchInterval: 2000, // 2s live polling
         retry: 1,
         retryDelay: 10000,
     });
@@ -517,6 +517,28 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
             return s ? parseFloat(s.value) : def;
         };
 
+        // [EPRA PRICE INIT]: Seed retailPrice from live market_prices so new tanks are never unconfigured
+        const FUEL_PRICE_FALLBACKS: Record<string, number> = {
+            PMS: 210.0, AGO: 200.0, IK: 150.0,
+            PETROL: 210.0, DIESEL: 200.0, KEROSENE: 150.0
+        };
+        let initialRetailPrice: number | undefined;
+        const fuelTypeKey = (tankData.fuelType || '').toUpperCase();
+        try {
+            const { data: priceRow } = await supabase
+                .from('market_prices')
+                .select('price_per_liter, fuel_type')
+                .ilike('fuel_type', tankData.fuelType || '')
+                .order('effective_date', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            initialRetailPrice = priceRow?.price_per_liter
+                ?? FUEL_PRICE_FALLBACKS[fuelTypeKey]
+                ?? 210.0;
+        } catch {
+            initialRetailPrice = FUEL_PRICE_FALLBACKS[fuelTypeKey] ?? 210.0;
+        }
+
         const dbTank = {
             station_id: tankData.stationId,
             site_id: tankData.siteId,
@@ -535,6 +557,8 @@ export async function createTank(tankData: Partial<Tank> & { stationId: string }
             low_level_threshold: tankData.lowLevelThreshold || getSetting('DEFAULT_LOW_LEVEL_THRESHOLD', 20),
             high_temperature_threshold: tankData.temperatureAlertThreshold || getSetting('DEFAULT_HIGH_TEMP_THRESHOLD', 60),
             status: 'active',
+            // [PRICE INIT]: Pre-seed with live EPRA price so operator is never prompted on first open
+            metadata: { ...(tankData.metadata || {}), retailPrice: initialRetailPrice },
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
@@ -791,6 +815,53 @@ export async function resolveAlert(alertId: string, resolvedBy: string) {
  * [DESTRUCTIVE OPERATION]: Only accessible to authLevel <= 5.
  */
 export async function deleteTank(tankId: string) {
+    // 1. Fetch tank info first for the audit log station ID and metadata
+    const { data: tank } = await supabase
+        .from('tanks')
+        .select('name, station_id')
+        .eq('id', tankId)
+        .maybeSingle();
+
+    const tankName = tank?.name || 'Unknown Tank';
+    const stationId = tank?.station_id || '';
+
+    // 2. Cascade delete dependent child records
+    // A. Delete alerts
+    const { error: alertErr } = await supabase
+        .from('alerts')
+        .delete()
+        .eq('tank_id', tankId);
+    if (alertErr) console.warn('[deleteTank] Alerts deletion warning:', alertErr);
+
+    // B. Delete sensor readings
+    const { error: readingsErr } = await supabase
+        .from('sensor_readings')
+        .delete()
+        .eq('tank_id', tankId);
+    if (readingsErr) console.warn('[deleteTank] Sensor readings deletion warning:', readingsErr);
+
+    // C. Delete deliveries
+    const { error: deliveriesErr } = await supabase
+        .from('deliveries')
+        .delete()
+        .eq('tank_id', tankId);
+    if (deliveriesErr) console.warn('[deleteTank] Deliveries deletion warning:', deliveriesErr);
+
+    // D. Delete shift closures
+    const { error: shiftErr } = await supabase
+        .from('shift_closures')
+        .delete()
+        .eq('tank_id', tankId);
+    if (shiftErr) console.warn('[deleteTank] Shift closures deletion warning:', shiftErr);
+
+    // E. Delete fuel transactions
+    const { error: txErr } = await supabase
+        .from('fuel_transactions')
+        .delete()
+        .eq('tank_id', tankId);
+    if (txErr) console.warn('[deleteTank] Fuel transactions deletion warning:', txErr);
+
+    // 3. Delete parent tank record
     const { error } = await supabase
         .from('tanks')
         .delete()
@@ -802,10 +873,10 @@ export async function deleteTank(tankId: string) {
     await AuditService.log(
         'SECURITY',
         'DELETE_TANK',
-        '', 
-        `Tank identity ${tankId} permanently purged from system.`,
+        stationId, 
+        `Tank '${tankName}' (ID: ${tankId}) permanently purged from system.`,
         'CRITICAL',
-        { tankId }
+        { tankId, tankName }
     ).catch(() => {});
 
     return true;

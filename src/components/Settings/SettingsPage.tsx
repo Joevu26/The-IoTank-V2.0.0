@@ -10,7 +10,7 @@ import {
 import { MdWifi, MdRefresh } from 'react-icons/md';
 import { DeviceCommandService, DeviceCommand } from '@/services/DeviceCommandService';
 import { convertToWebP } from '@/utils/performance';
-import { useTanks, updateTank as syncTankToDb, createAlert, useSites } from '@/hooks/useSupabase';
+import { useTanks, updateTank as syncTankToDb, createAlert, useSites, deleteTank } from '@/hooks/useSupabase';
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
@@ -217,11 +217,23 @@ export const SettingsPage: React.FC = () => {
         
         setIsDeleting(true);
         setDeleteError(null);
+        
+        // [AUDIT TRAIL]: Log initial administrative purge attempt
+        await AuditService.log(
+            'SECURITY',
+            'DELETE_TANK',
+            stationId,
+            `User initiated administrative purge attempt for tank: ${tankToDelete.name} (${tankToDelete.id})`,
+            'WARNING',
+            { tankId: tankToDelete.id, tankName: tankToDelete.name, status: 'attempt' }
+        ).catch(() => {});
+
         try {
+            // Step 1: Verify the administrative settings password
             await verifySettingsPassword(deletePassword);
             
-            const { error: delError } = await supabase.from('tanks').delete().eq('id', tankToDelete.id);
-            if (delError) throw delError;
+            // Step 2: Perform the cascading delete using the robust service helper
+            await deleteTank(tankToDelete.id);
             
             setIsDeleteModalOpen(false);
             setTankToDelete(null);
@@ -231,17 +243,42 @@ export const SettingsPage: React.FC = () => {
                 type: 'success'
             });
             
+            // Step 3: Log completed deletion
             await AuditService.log(
                 'SYSTEM', 
                 'DELETE_TANK', 
                 stationId, 
                 `Permanently deleted tank: ${tankToDelete.name}`,
                 'CRITICAL',
-                { tankId: tankToDelete.id }
+                { tankId: tankToDelete.id, status: 'completed' }
             ).catch(() => {});
             
         } catch (err: any) {
-            setDeleteError(err.message || 'Verification failed. Incorrect password.');
+            console.error('[SettingsPage] Delete tank failed:', err);
+            
+            // Step 4: Log the failure to the security audit trail
+            await AuditService.log(
+                'SECURITY',
+                'DELETE_TANK',
+                stationId,
+                `Purge failed for tank: ${tankToDelete.name}. Error: ${err.message || 'unknown'}`,
+                'CRITICAL',
+                { tankId: tankToDelete.id, error: err, status: 'failed' }
+            ).catch(() => {});
+
+            // Step 5: Render highly granular user-friendly errors
+            let userFriendlyMsg = 'Verification failed. Incorrect password.';
+            if (err.message) {
+                if (err.message.includes('password') || err.message.includes('Invalid credentials')) {
+                    userFriendlyMsg = 'Incorrect password. Administrative verification failed.';
+                } else if (err.code === '23503' || err.message.includes('foreign key') || err.message.includes('violates foreign key constraint')) {
+                    userFriendlyMsg = 'Database Integrity Violation: Cannot purge this tank as it is referenced by other records. Please delete dependent records first.';
+                } else {
+                    userFriendlyMsg = `Purge failed: ${err.message}`;
+                }
+            }
+            
+            setDeleteError(userFriendlyMsg);
             setIsDeleting(false);
         }
     };
@@ -2483,76 +2520,75 @@ handleCropComplete
             )
 }            {/* Password Protected Deletion Modal - 2 STEP */}
             {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}>
-                    <div className="bg-slate-900 border border-slate-700/50 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                <div className="add-tank-modal-overlay" onClick={(e) => e.stopPropagation()}>
+                    <div className="add-tank-modal-content modal-w-md" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="header-text-container">
+                                <h2>Critical Action Required</h2>
+                                <p>Permanently purge tank and history</p>
+                            </div>
+                            <div className="modal-header-badges">
+                                <span className="modal-badge red">Danger</span>
+                            </div>
+                            <button className="close-btn" onClick={() => { setIsDeleteModalOpen(false); setTankToDelete(null); }} title="Cancel">
+                                <FiX />
+                            </button>
+                        </div>
                         
+                        <div className="security-modal-body">
                         {deletionStep === 'warning' ? (
                             <>
-                                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                                    <FiAlertTriangle className="text-red-500" />
-                                    Critical Action Required
-                                </h3>
-                                <p className="text-sm text-slate-300 mb-6 leading-relaxed">
-                                    You are initiating a <strong className="text-red-400 underline underline-offset-4">Hard Delete</strong> for <strong className="text-white">{tankToDelete?.name}</strong>. 
+                                <p className="mb-6 text-sm text-slate-600 leading-relaxed">
+                                    You are initiating a <strong>Hard Delete</strong> for <strong>{tankToDelete?.name}</strong>. 
                                     <br /><br />
-                                    This will permanently purge all telemetry records, historical consumption data, and configuration logs from the secure vault. This action is <span className="font-black italic">irreversible</span>.
+                                    This will permanently purge all telemetry records, historical consumption data, and configuration logs from the secure vault. This action is <em>irreversible</em>.
                                 </p>
-                                <div className="flex flex-col gap-2">
+                                <div className="form-actions mt-8">
                                     <button
-                                        className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg transition-all shadow-lg shadow-red-900/20 uppercase text-xs tracking-widest"
-                                        onClick={() => setDeletionStep('password')}
-                                    >
-                                        I Understand, Proceed to Verify
-                                    </button>
-                                    <button
-                                        className="w-full py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                                        className="btn-danger"
                                         onClick={() => { setIsDeleteModalOpen(false); setTankToDelete(null); }}
                                     >
-                                        Cancel and Keep Data
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="btn-submit"
+                                        onClick={() => setDeletionStep('password')}
+                                    >
+                                        I Understand, Proceed
                                     </button>
                                 </div>
                             </>
                         ) : (
                             <>
-                                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                                    <FiShield className="text-blue-400" />
-                                    Identity Verification
-                                </h3>
-                                <p className="text-xs text-slate-400 mb-4 uppercase tracking-tighter">
-                                    Security challenge for {tankToDelete?.name} deletion
-                                </p>
-                                
-                                <div className="mb-4">
-                                    <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest">
-                                        Admin Authorization Key
-                                    </label>
+                                <div className="input-group">
+                                    <label>Admin Authorization Key</label>
                                     <input
                                         type="password"
-                                        className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-red-500 transition-colors shadow-inner"
+                                        className="settings-input"
                                         placeholder="Enter secure password"
                                         value={deletePassword}
                                         onChange={(e) => setDeletePassword(e.target.value)}
                                         autoFocus
                                     />
                                     {deleteError && (
-                                        <div className="flex items-center gap-2 mt-3 p-2 bg-red-500/10 border border-red-500/20 rounded">
-                                            <FiAlertCircle className="text-red-500" size={14} />
-                                            <p className="text-red-400 text-[10px] font-bold leading-tight">{deleteError}</p>
+                                        <div className="flex items-center gap-2 mt-3 p-2 bg-red-50 text-red-600 border border-red-100 rounded text-sm">
+                                            <FiAlertCircle size={14} />
+                                            <p className="font-bold">{deleteError}</p>
                                         </div>
                                     )}
                                 </div>
                                 
-                                <div className="flex justify-between items-center gap-4 mt-6">
+                                <div className="form-actions mt-8">
                                     <button
-                                        className="text-xs font-bold text-slate-500 hover:text-white transition-colors"
+                                        className="btn-secondary"
                                         onClick={() => setDeletionStep('warning')}
                                         disabled={isDeleting}
                                     >
                                         Back
                                     </button>
                                     <button
-                                        className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg transition-all shadow-lg shadow-red-900/20 text-xs tracking-widest uppercase disabled:opacity-30"
+                                        className="btn-danger"
+                                        style={{ backgroundColor: '#dc2626' }}
                                         onClick={handleDeleteTank}
                                         disabled={isDeleting || !deletePassword}
                                     >
@@ -2561,6 +2597,7 @@ handleCropComplete
                                 </div>
                             </>
                         )}
+                        </div>
                     </div>
                 </div>
             )}

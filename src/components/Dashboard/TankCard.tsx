@@ -25,6 +25,7 @@ interface TankCardProps {
 
 export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, initialReading }) => {
     const navigate = useNavigate();
+    const isGhost = tank.id === 'ghost-tank';
     const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletePassword, setDeletePassword] = useState('');
@@ -39,6 +40,58 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
         const interval = setInterval(() => setNow(Date.now()), 15000);
         return () => clearInterval(interval);
     }, []);
+
+    // [PRICE CALIBRATION NUDGE]: Recurring 20min nudge for unconfigured / newly created tanks
+    const retailPrice = (tank as any).metadata?.retailPrice;
+    const isPriceNotSet = !isGhost && (!retailPrice || retailPrice <= 0);
+    const storageKey = useMemo(() => `iotank_last_price_nudge_${tank.id}`, [tank.id]);
+
+    useEffect(() => {
+        if (!isPriceNotSet) return;
+
+        const showNudge = () => {
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Asset Value Calibration Required',
+                    message: `Tank "${tank.name}" has no retail price configured. Please calibrate its retail price in Settings to enable real-time financial tracking.`,
+                    type: 'warning',
+                    persistent: true,
+                    attribution: 'GOVERNANCE CORE',
+                    actions: [
+                        {
+                            label: 'Calibrate Now',
+                            primary: true,
+                            onClick: () => {
+                                navigate(`/settings?tab=inventory&tankId=${tank.id}`);
+                            }
+                        }
+                    ]
+                }
+            }));
+            localStorage.setItem(storageKey, Date.now().toString());
+        };
+
+        const checkNudge = () => {
+            const lastNudge = localStorage.getItem(storageKey);
+            const nowTime = Date.now();
+            const intervalMs = 20 * 60 * 1000; // 20 minutes
+
+            if (!lastNudge || (nowTime - parseInt(lastNudge)) >= intervalMs) {
+                showNudge();
+            }
+        };
+
+        // Run nudge check 3 seconds after mounting to allow initial dashboard render to settle
+        const initialTimeout = setTimeout(checkNudge, 3000);
+
+        // Periodically verify elapsed time every 30 seconds
+        const periodicInterval = setInterval(checkNudge, 30000);
+
+        return () => {
+            clearTimeout(initialTimeout);
+            clearInterval(periodicInterval);
+        };
+    }, [isPriceNotSet, tank.id, tank.name, navigate, storageKey]);
 
     const formatTime = (timestamp: number) => {
         const diff = now - timestamp;
@@ -78,7 +131,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
     const { readings } = useHistoricalReadings(stationId, tank.id, timeRange, 100, 'hour', showDetailedAnalytics);
     const analytics = useConsumptionAnalytics(tank, readings);
 
-    const isGhost = tank.id === 'ghost-tank';
 
     const handleCardClick = () => {
         if (!isGhost) {

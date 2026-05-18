@@ -87,7 +87,7 @@ export function useAlertEngine(
     // ⚠️ HOOKS ORDER CRITICAL: useShiftStatus must come before all useRef/useState.
     // It internally calls useQuery (react-query) whose internal hook count can vary
     // under network errors. Placing it mid-block after refs caused hook slot drift.
-    const { status: shiftStatus } = useShiftStatus();
+    const { status: shiftStatus, isLoading: isShiftLoading } = useShiftStatus();
     const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
     const [riskIndex, setRiskIndex] = useState<RiskIndex>({
         fuel: { score: 0, label: 'LOW' },
@@ -224,7 +224,7 @@ export function useAlertEngine(
 
     // ── Detection scan ───────────────────────────────────────────────────────
     const runScan = useCallback(async () => {
-        if (!tanks.length || isScanningRef.current || !hasLoadedAlerts) return;
+        if (!tanks.length || isScanningRef.current || !hasLoadedAlerts || isShiftLoading) return;
         
         // Prevent redundant scans if performed very recently (within 10s)
         const now = Date.now();
