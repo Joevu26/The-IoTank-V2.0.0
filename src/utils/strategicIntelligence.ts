@@ -160,7 +160,7 @@ export function calculateMarketSentiment(
     label,
     momentum,
     confidence,
-    sourceAgreement: bullishSources,
+    sourceAgreement,
     totalSources: signals.length
   };
 }

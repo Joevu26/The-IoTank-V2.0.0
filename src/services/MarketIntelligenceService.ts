@@ -266,7 +266,7 @@ export class MarketIntelligenceService {
                         fuel_type: 'crude_oil',
                         region: 'Global/EIA',
                         price_per_liter: parseFloat(item.value),
-                        currency: 'USD',
+                        currency: 'KES',
                         timestamp: new Date(item.period).getTime() || Date.now(),
                         source: 'eia',
                         created_at: new Date().toISOString()
@@ -286,7 +286,7 @@ export class MarketIntelligenceService {
                     fuel_type: b.symbol,
                     region: 'Global',
                     price_per_liter: parseFloat(b.data.value),
-                    currency: 'USD',
+                    currency: 'KES',
                     timestamp: Date.now(),
                     source: 'alpha-vantage',
                     created_at: new Date().toISOString()

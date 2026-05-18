@@ -33,7 +33,16 @@ export const TelemetryQueueProvider: React.FC<{ children: ReactNode }> = ({ chil
             return [];
         }
         const saved = localStorage.getItem('iotank_telemetry_queue');
-        return saved ? JSON.parse(saved) : [];
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                // Corrupted JSON — wipe and start clean to prevent app crash
+                localStorage.removeItem('iotank_telemetry_queue');
+                return [];
+            }
+        }
+        return [];
     });
 
     React.useEffect(() => {

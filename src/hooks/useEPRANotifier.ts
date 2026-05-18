@@ -35,12 +35,14 @@ export const useEPRANotifier = () => {
 
                 if (!data) return;
 
-                // Check if this specific alert was already acknowledged
-                const lastAcknowledgedAlert = localStorage.getItem('iotank_epra_last_acknowledged_time');
-                const alertTime = new Date(data.effective_date).getTime();
+                // Fingerprint this specific EPRA record by combining effective_date + fuel_type.
+                // Using timestamp alone fails for future-dated records: Date.now() < futureDate
+                // means the alert re-fires every 5 min indefinitely until acknowledged.
+                const alertKey = `${data.effective_date}::${data.fuel_type}`;
+                const lastAcknowledgedKey = localStorage.getItem('iotank_epra_last_acknowledged_key');
 
-                if (lastAcknowledgedAlert && parseInt(lastAcknowledgedAlert) >= alertTime) {
-                    return; // Already acknowledged
+                if (lastAcknowledgedKey === alertKey) {
+                    return; // This exact record was already acknowledged
                 }
 
                 // If we reach here, we have an unacknowledged EPRA alert and we're not snoozing!
@@ -55,8 +57,8 @@ export const useEPRANotifier = () => {
                                 label: 'Acknowledge & Update',
                                 primary: true,
                                 onClick: () => {
-                                    // Mark as permanently acknowledged
-                                    localStorage.setItem('iotank_epra_last_acknowledged_time', alertTime.toString());
+                                    // Mark this specific record as permanently acknowledged
+                                    localStorage.setItem('iotank_epra_last_acknowledged_key', alertKey);
                                     
                                     // Dispatch event to open AutoUpdatePriceModal
                                     window.dispatchEvent(new CustomEvent('system-modal', {
@@ -67,7 +69,7 @@ export const useEPRANotifier = () => {
                             {
                                 label: 'Remind Me in 1 Hr',
                                 onClick: () => {
-                                    // Snooze for 1 hour
+                                    // Snooze for 1 hour (but do NOT acknowledge — will re-check after snooze)
                                     const nextSnooze = Date.now() + EPRA_SNOOZE_DURATION;
                                     localStorage.setItem('iotank_epra_snooze_until', nextSnooze.toString());
                                 }

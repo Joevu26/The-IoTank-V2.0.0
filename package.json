@@ -109,7 +109,6 @@
     "serialize-javascript": "^7.0.5",
     "@tootallnate/once": "2.1.0"
   },
-  "main": "audit-org-rls.js",
   "keywords": [],
   "author": "",
   "license": "ISC"

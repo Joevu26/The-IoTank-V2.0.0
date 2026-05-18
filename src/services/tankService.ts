@@ -5,11 +5,13 @@ export const tankService = {
   /**
    * Fetches all tanks belonging to the current user
    */
-  async getTanks() {
+  async getTanks(stationId: string) {
+    if (!validateUUID(stationId)) return null;
     try {
       const { data, error } = await supabase
         .from('tanks')
         .select('*')
+        .eq('station_id', stationId)
         .order('created_at', { ascending: true });
 
       if (error) {

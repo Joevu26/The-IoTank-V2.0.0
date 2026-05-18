@@ -103,6 +103,7 @@ export function useAlertEngine(
     });
     const latestReadingsRef = useRef<Record<string, TankReading | null>>({});
     const previousReadingsRef = useRef<Record<string, TankReading | null>>({});
+    const runScanRef = useRef<() => void>(() => {}); // CRIT-04: stable ref so interval never captures stale closure
     const refillSessionsRef = useRef<Record<string, { 
         isActive: boolean; 
         startVolume: number; 
@@ -158,6 +159,7 @@ export function useAlertEngine(
                 const { data, error } = await supabase
                     .from('alerts')
                     .select('*')
+                    .eq('station_id', stationId)
                     .eq('is_resolved', false)
                     .order('created_at', { ascending: false });
 
@@ -304,15 +306,18 @@ export function useAlertEngine(
                 if (latestReading && (tank.currentVolume || 0) > 500) {
                      const lastMovementStr = localStorage.getItem(`iotank_last_movement_${tank.id}`);
                      const lastVol = parseFloat(localStorage.getItem(`iotank_vol_snapshot_${tank.id}`) || '0');
-                     const now = Date.now();
+                     // MED-03 FIX: Renamed from 'now' to 'scanNow' to avoid shadowing the outer const now.
+                     const scanNow = Date.now();
                      
                      if (Math.abs((tank.currentVolume || 0) - lastVol) > 10) {
-                         localStorage.setItem(`iotank_last_movement_${tank.id}`, now.toString());
+                         localStorage.setItem(`iotank_last_movement_${tank.id}`, scanNow.toString());
                          localStorage.setItem(`iotank_vol_snapshot_${tank.id}`, (tank.currentVolume || 0).toString());
-                     } else if (lastMovementStr && (now - parseInt(lastMovementStr) > 259200000)) {
+                     } else if (lastMovementStr && (scanNow - parseInt(lastMovementStr) > 259200000)) {
                          drafts.push({
                              tankId: tank.id,
                              siteId: tank.siteId || '',
+                             // HIGH-02 FIX: type must be 'anomaly' with metadata.subType='dead_stock'
+                             // (NOT 'dead_stock') so the SMS dispatch check below matches correctly.
                              type: 'anomaly',
                              severity: 'critical',
                              severityLabel: 'CRITICAL',
@@ -493,16 +498,24 @@ export function useAlertEngine(
                                 }
                             };
 
-                            supabase.rpc('upsert_alert_v2', {
-                                p_station_id: refillAlert.station_id,
-                                p_tank_id: refillAlert.tank_id,
-                                p_alert_type: refillAlert.alert_type,
-                                p_title: refillAlert.title,
-                                p_message: refillAlert.message,
-                                p_severity: refillAlert.severity,
-                                p_metadata: refillAlert.metadata || {}
-                            })
-                                .then(({ data: savedAlerts }) => {
+                            // CRIT-03 + HIGH-05 FIX: Converted from fire-and-forget .then() to an
+                            // async IIFE with proper error handling. If the RPC fails, the error is
+                            // logged to the structured logger — forensic alert + email/SMS are no
+                            // longer silently dropped on a network or DB failure.
+                            (async () => {
+                                try {
+                                    const { data: savedAlerts, error: rpcErr } = await supabase.rpc('upsert_alert_v2', {
+                                        p_station_id: refillAlert.station_id,
+                                        p_tank_id: refillAlert.tank_id,
+                                        p_alert_type: refillAlert.alert_type,
+                                        p_title: refillAlert.title,
+                                        p_message: refillAlert.message,
+                                        p_severity: refillAlert.severity,
+                                        p_metadata: refillAlert.metadata || {}
+                                    });
+
+                                    if (rpcErr) throw rpcErr;
+
                                     const savedAlert = Array.isArray(savedAlerts) ? savedAlerts[0] : savedAlerts;
                                     const alertWithId = { ...refillAlert, id: savedAlert?.id };
 
@@ -534,26 +547,29 @@ export function useAlertEngine(
                                         actionLabel: 'Finalize Forensic Record',
                                         metadata: {
                                             tankId: tank.id,
-                                            modalType: 'refill_verification', 
-                                            alertData: alertWithId 
+                                            modalType: 'refill_verification',
+                                            alertData: alertWithId
                                         }
                                     });
 
-                                // [FORENSIC UPGRADE]: Tactical Email Dispatch for Refill
-                                if (allowAlertEmails) {
-                                    EmailDispatchService.sendSecurityAlert({
-                                        to: currentUser?.stationEmail || currentUser?.email || 'security@iotank.com',
-                                        type: isUnauthorized ? 'UNAUTHORIZED_REFILL' : 'REFILL',
-                                        siteName: currentUser?.companyName || 'IoTank Site',
-                                        details: {
-                                            timestamp: new Date().toISOString(),
-                                            description: refillAlert.message,
-                                            lossVolume: deliveredVolume,
-                                            dropRate: 0 // Refill is gain, not loss
-                                        }
-                                    });
+                                    // [FORENSIC UPGRADE]: Tactical Email Dispatch for Refill
+                                    if (allowAlertEmails) {
+                                        EmailDispatchService.sendSecurityAlert({
+                                            to: currentUser?.stationEmail || currentUser?.email || 'security@iotank.com',
+                                            type: isUnauthorized ? 'UNAUTHORIZED_REFILL' : 'REFILL',
+                                            siteName: currentUser?.companyName || 'IoTank Site',
+                                            details: {
+                                                timestamp: new Date().toISOString(),
+                                                description: refillAlert.message,
+                                                lossVolume: deliveredVolume,
+                                                dropRate: 0 // Refill is gain, not loss
+                                            }
+                                        }).catch(err => logger.error('[AlertEngine] Refill Email dispatch failed:', err));
+                                    }
+                                } catch (rpcErr) {
+                                    logger.error('[AlertEngine] Refill forensic RPC failed — alert not saved:', rpcErr);
                                 }
-                            });
+                            })();
                         }
                     }
                 }
@@ -620,7 +636,7 @@ export function useAlertEngine(
                             continue;
                         }
 
-                        const { data, error } = await supabase.rpc('upsert_alert_v2', {
+                        const { error } = await supabase.rpc('upsert_alert_v2', {
                             p_station_id: alert.station_id,
                             p_tank_id: alert.tank_id,
                             p_alert_type: alert.alert_type,
@@ -630,13 +646,8 @@ export function useAlertEngine(
                             p_metadata: alert.metadata || {}
                         });
                         if (error) throw error;
-
-                        // [NEW]: Capture the resolved ID and update any associated queue events
-                        const newAlertId = data?.[0]?.id || data?.id;
-                        if (newAlertId) {
-                            // The real-time subscription will handle updating the activeAlerts state,
-                            // but we can proactively ensure the Action Queue knows the ID for immediate resolution.
-                        }
+                        // MED-08 FIX: Removed empty dead-code if(newAlertId) block.
+                        // Real-time subscription handles activeAlerts state updates.
                     }
                 } catch (err) {
                     console.error('[useAlertEngine] Alert insertion failed:', err);
@@ -666,16 +677,17 @@ export function useAlertEngine(
 
                     // 2. Off-Platform SMTP Tactical Email & SMS
                     if (isCritical) {
-                        // Dead Stock SMS Trigger
-                        if (draft.type === 'dead_stock') {
+                        // HIGH-02 FIX: Dead Stock SMS — draft.type is 'anomaly', use metadata.subType
+                        if ((draft.metadata as any)?.subType === 'dead_stock') {
                             SmsDispatchService.sendSms({
+                                // @ts-ignore
                                 to: currentUser?.phoneNumber || '',
                                 message: `IoTank ALERT: Dead stock detected on ${draft.title}. Inventory has not moved in 72 hours.`
-                            });
+                            }).catch(err => logger.error('[AlertEngine] Dead Stock SMS dispatch failed:', err));
                         }
 
-                        // Blackout Email Trigger
-                        if (draft.type === 'telemetry_blackout') {
+                        // HIGH-03 FIX: Sensor Blackout Email — type is 'sensor-blackout' not 'telemetry_blackout'
+                        if (draft.type === 'sensor-blackout') {
                             EmailDispatchService.sendSecurityAlert({
                                 to: currentUser?.email || '',
                                 type: 'SYSTEM_CRITICAL',
@@ -684,7 +696,7 @@ export function useAlertEngine(
                                     timestamp: new Date().toISOString(),
                                     description: `CRITICAL: ${draft.message}. Please check sensor power and connectivity immediately.`
                                 }
-                            });
+                            }).catch(err => logger.error('[AlertEngine] Blackout Email dispatch failed:', err));
                         }
                     }
                     const meta = (draft.metadata as any);
@@ -718,7 +730,7 @@ export function useAlertEngine(
                                     lossVolume: meta?.volumeLost || meta?.volumeDelta || 0,
                                     description: draft.description
                                 }
-                            });
+                            }).catch(err => logger.error('[AlertEngine] Standard Alert Email dispatch failed:', err));
 
                             // [USER REQUEST]: Sensor Blackout for 3 days sends additional email to iotank.com@gmail.com
                             if (isSensorBlackout) {
@@ -730,7 +742,7 @@ export function useAlertEngine(
                                         timestamp: new Date().toISOString(),
                                         description: `CRITICAL SENSOR BLACKOUT: ${siteName} hardware has been unreachable for over 72 hours. Immediate technical intervention required.`
                                     }
-                                });
+                                }).catch(err => logger.error('[AlertEngine] Global Blackout Email dispatch failed:', err));
                             }
                         }
 
@@ -754,7 +766,7 @@ export function useAlertEngine(
                                 SmsDispatchService.sendSms({
                                     to: recipientPhone,
                                     message: smsBody
-                                });
+                                }).catch(err => logger.error('[AlertEngine] SMS dispatch failed:', err));
                             }
                         }
                         
@@ -822,7 +834,11 @@ export function useAlertEngine(
             isScanningRef.current = false;
             setIsScanning(false);
         }
-    }, [tanks, activeAlerts, stationId, thresholds, isScanning, shiftStatus, pushEvent]);
+    }, [tanks, activeAlerts, stationId, thresholds, shiftStatus, pushEvent]);
+
+    // CRIT-04 FIX: Always point runScanRef at the latest runScan so the 60s
+    // setInterval never holds a stale closure over activeAlerts.
+    useEffect(() => { runScanRef.current = runScan; });
 
     // ── On-load + 60s polling ────────────────────────────────────────────────
     useEffect(() => {
@@ -831,10 +847,11 @@ export function useAlertEngine(
         // On first mount after data load, check if we need an immediate scan
         const now = Date.now();
         if (now - lastScanTime >= SCAN_INTERVAL_MS) {
-            runScan();
+            runScanRef.current();
         }
 
-        const interval = setInterval(runScan, SCAN_INTERVAL_MS);
+        // Use a wrapper that always calls the latest runScan via the ref.
+        const interval = setInterval(() => runScanRef.current(), SCAN_INTERVAL_MS);
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tanks.length, stationId, hasLoadedAlerts]);

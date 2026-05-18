@@ -59,7 +59,8 @@ export function useOrders(stationId: string) {
                 { 
                     event: 'INSERT', 
                     schema: 'public', 
-                    table: 'unified_events'
+                    table: 'unified_events',
+                    filter: `station_id=eq.${stationId}`   // ← Scoped at DB level, not just client-side
                 },
                 (payload) => {
                     // Check if the event matches our station and category

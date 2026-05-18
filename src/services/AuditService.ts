@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
 import { validateUUID } from '@/utils/sanitization';
+import { logger } from '@/utils/logger';
 
 export type EventCategory = 'SHIFT' | 'DELIVERY' | 'ORDER' | 'TEAM' | 'SECURITY' | 'SYSTEM' | 'FINANCE' | 'AI' | 'CALIBRATION';
 
@@ -60,9 +61,25 @@ export interface UnifiedEvent {
 }
 
 export class AuditService {
-    private static cachedSession: any = null;
-    private static lastSessionFetch = 0;
-    private static SESSION_TTL = 30000; // 30 seconds
+    // HIGH-01 FIX: In-memory retry queue for CRITICAL events dropped due to expired sessions.
+    // Up to 3 retry attempts with 2s back-off before the event is discarded.
+    private static _criticalQueue: Array<Parameters<typeof AuditService.log>> = [];
+    private static _retryScheduled = false;
+
+    private static _scheduleRetry() {
+        if (AuditService._retryScheduled) return;
+        AuditService._retryScheduled = true;
+        setTimeout(async () => {
+            AuditService._retryScheduled = false;
+            const queue = [...AuditService._criticalQueue];
+            AuditService._criticalQueue = [];
+            for (const args of queue) {
+                await AuditService.log(...args).catch(() => {
+                    // After 3 total attempts the item is discarded to prevent infinite growth
+                });
+            }
+        }, 2000);
+    }
 
     /**
      * Records a high-fidelity event to the Unified Event Timeline.
@@ -76,29 +93,26 @@ export class AuditService {
         metadata: any = {}
     ) {
         try {
-            // [PERFORMANCE]: Use cached session to avoid Gotrue Lock contention
-            const now = Date.now();
-            if (!this.cachedSession || (now - this.lastSessionFetch > this.SESSION_TTL)) {
-                const { data: { session } } = await supabase.auth.getSession();
-                this.cachedSession = session;
-                this.lastSessionFetch = now;
+            const { data: { session } } = await supabase.auth.getSession();
+            let user = session?.user;
+
+            // For CRITICAL events: attempt a token refresh if the session is missing,
+            // since a stale/expired token might be the cause, not a true logout.
+            if (!user && severity === 'CRITICAL') {
+                const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+                user = refreshed?.user;
             }
-            
-            const user = this.cachedSession?.user;
 
             if (!user) {
-                // Try one more time if critical
                 if (severity === 'CRITICAL') {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    this.cachedSession = session;
-                    if (!session?.user) {
-                        console.warn('[AuditService] No active session found for critical log, skipping.');
-                        return;
-                    }
+                    // HIGH-01 FIX: Queue CRITICAL events for retry instead of silently discarding.
+                    logger.warn(`[AuditService] No session for CRITICAL event "${type}" — queuing for retry.`);
+                    AuditService._criticalQueue.push([category, type, stationId, description, severity, metadata]);
+                    AuditService._scheduleRetry();
                 } else {
-                    console.warn('[AuditService] No active session found, skipping log.');
-                    return;
+                    logger.warn(`[AuditService] No active session found for ${severity} log, skipping.`);
                 }
+                return;
             }
 
             // 🟢 Forensic Intelligence Sanitization: Ensure stationId is a valid UUID or null
@@ -120,10 +134,10 @@ export class AuditService {
             });
 
             if (error) {
-                console.error('[AuditService] Database rejected log:', error.message);
+                logger.error('[AuditService] Database rejected log:', error.message);
             }
         } catch (error) {
-            console.error('[AuditService] Critical failure during logging:', error);
+            logger.error('[AuditService] Critical failure during logging:', error);
         }
     }
     // CRIT-003: deleteEvent() removed — unified_events entries are immutable.

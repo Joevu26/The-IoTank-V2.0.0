@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -91,12 +91,12 @@ export function useEventLog(stationId: string) {
         fetchCounts();
     }, [stationId]);
 
-    const fetchTanks = async () => {
+    const fetchTanks = useCallback(async () => {
         const { data } = await supabase.from('tanks').select('id, tank_name').eq('station_id', stationId);
         if (data) setTanks(data.map(t => ({ id: t.id, name: t.tank_name })));
-    };
+    }, [stationId]);
 
-    const fetchEvents = async () => {
+    const fetchEvents = useCallback(async () => {
         setLoading(true);
         try {
             let query = supabase
@@ -176,7 +176,7 @@ export function useEventLog(stationId: string) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [stationId, filters, currentPage]);
 
     async function resolveEvent(eventId: string) {
         if (!eventId) return;

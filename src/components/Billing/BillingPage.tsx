@@ -129,6 +129,8 @@ export const BillingPage: React.FC = () => {
                                         attribution: 'BILLING_SENSE'
                                     }
                                 }));
+                                // Refresh list to show failure
+                                setTransactions(prev => [payload.new as Transaction, ...prev.filter(t => t.id !== payload.new.id)]);
                             }
                         })
                         .subscribe();
@@ -245,8 +247,8 @@ export const BillingPage: React.FC = () => {
             setPayFeedback('⚠️ Enter amount');
             return;
         }
-        // @ts-ignore
-        const PaystackPop = window.PaystackPop;
+        // CRIT-07 FIX: Removed @ts-ignore which could suppress legitimate type errors.
+        const PaystackPop = (window as any).PaystackPop;
         if (!PaystackPop) {
             setPayFeedback('❌ SDK not loaded');
             return;

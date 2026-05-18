@@ -73,8 +73,9 @@ export class DeviceCommandService {
      * Subscribes to commands for a specific station.
      */
     static subscribeToCommands(stationId: string, onUpdate: (payload: any) => void) {
+        const channelName = `device_commands_channel_${stationId}_${Date.now()}`;
         return supabase
-            .channel('device_commands_channel')
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 {

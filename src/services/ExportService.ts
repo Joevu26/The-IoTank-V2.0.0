@@ -451,19 +451,23 @@ export class ExportService {
         XLSX.utils.book_append_sheet(wb, summarySheet, 'Executive Summary');
 
         // --- TAB 2: DETAILED AUDIT LOG ---
-        const detailedData = deliveries.map(d => ({
-            'Date': format(new Date(d.created_at || d.timestamp), 'yyyy-MM-dd HH:mm'),
-            'Delivery ID': d.id,
-            'Tank': d.tank_name || 'All Tanks',
-            'Invoiced (L)': d.invoiceLiters || 0,
-            'Measured (L)': d.measuredStandardized || 0,
-            'Variance (L)': d.variance || 0,
-            'Temp (°C)': d.deliveryTemp || '',
-            'Dip (L)': d.physicalDip || '',
-            'Status': d.status,
-            'Supplier Status': d.supplierStatus,
-            'Notes': d.notes || d.explanation || ''
-        }));
+        const detailedData = deliveries.map(d => {
+            const rawDate = d.created_at || d.timestamp;
+            const isValidDate = rawDate && !isNaN(new Date(rawDate).getTime());
+            return {
+                'Date': isValidDate ? format(new Date(rawDate), 'yyyy-MM-dd HH:mm') : 'Unknown Time',
+                'Delivery ID': d.id,
+                'Tank': d.tank_name || 'All Tanks',
+                'Invoiced (L)': d.invoiceLiters || 0,
+                'Measured (L)': d.measuredStandardized || 0,
+                'Variance (L)': d.variance || 0,
+                'Temp (°C)': d.deliveryTemp || '',
+                'Dip (L)': d.physicalDip || '',
+                'Status': d.status,
+                'Supplier Status': d.supplierStatus,
+                'Notes': d.notes || d.explanation || ''
+            };
+        });
         const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
         
         // Add some basic styling to column widths

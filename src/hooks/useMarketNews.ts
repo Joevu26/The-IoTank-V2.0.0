@@ -27,7 +27,9 @@ const MAX_CACHE_DAYS = 14;                 // 14 days of signals kept locally (p
 const ACK_SIGNALS_KEY = 'mi:acknowledged_urls';
 export const VERIFIED_AI_SOURCES = ['EPRA', 'CBK', 'KPA', 'EIA', 'REUTERS', 'BD AFRICA'];
 
-const FALLBACK_DIRECTIVE: any = {
+// LOW-06 FIX: Typed as ArticleAIDirective instead of 'any' to ensure type safety
+// across all references to this fallback value.
+const FALLBACK_DIRECTIVE: ArticleAIDirective = {
     status: 'STABLE',
     recommendation: 'Market signals stable. Standard monitoring cycle (periodic data refresh and sentiment scan) active — no immediate tactical adjustment required for station inventory or pricing.',
     actionRequired: false,
@@ -200,7 +202,7 @@ function computeTopicTags(title: string, description: string): string[] {
     const tags: string[] = [];
     if (text.includes('epra') || text.includes('energy and petroleum regulatory') || text.includes('epra_kenya')) tags.push('EPRA');
     if (text.includes('price') || text.includes('pump price') || text.includes('petroleum price') || text.includes('retail price')) tags.push('PriceAlert');
-    if (text.includes('supply') || text.includes('shortage') || text.includes('shortage')) tags.push('SupplyChain');
+    if (text.includes('supply') || text.includes('shortage')) tags.push('SupplyChain'); // MED-04 FIX: removed duplicate 'shortage' check
     if (text.includes('forex') || text.includes('dollar') || text.includes('shilling') || text.includes('exchange rate')) tags.push('Forex');
     if (text.includes('crude') || text.includes('brent') || text.includes('wti')) tags.push('CrudeOil');
     if (text.includes('pipeline') || text.includes('kpc') || text.includes('logistics') || text.includes('port') || text.includes('terminal')) tags.push('Logistics');
@@ -542,6 +544,9 @@ export function useMarketNews(): UseMarketNewsReturn {
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const apiCooldowns = useRef<Record<string, number>>({}); // Tracks API -> expiration timestamp
     const initialFetchAttempted = useRef(false);
+    // HIGH-09 FIX: Stable singleton — prevents creating a new IntelligenceAIService (+ auth call)
+    // on every source fetch. One instance is shared across the entire lifecycle of this hook.
+    const aiServiceRef = useRef<IntelligenceAIService>(new IntelligenceAIService());
 
     // Adaptive backoff check
     const isApiAvailable = (api: string) => {
@@ -555,7 +560,8 @@ export function useMarketNews(): UseMarketNewsReturn {
     };
 
     const markApiLimited = (api: string) => {
-        console.warn(`[useMarketNews] API ${api} rate-limited. Backing off for 2 minutes.`);
+        // HIGH-06 FIX: Use structured logger instead of raw console.warn
+        logger.warn(`[useMarketNews] API ${api} rate-limited. Backing off for 2 minutes.`, null, 'MARKET_NEWS');
         apiCooldowns.current[api] = Date.now() + 120000; // 2 minute cooldown
     };
 
@@ -690,13 +696,16 @@ export function useMarketNews(): UseMarketNewsReturn {
                     collected.push(...articles);
                 }
             } catch (e) { 
-                console.error(`[useMarketNews] Parser failure for ${source.shortLabel}:`, e);
+                // HIGH-06 FIX: Use structured logger
+                logger.error(`[useMarketNews] Parser failure for ${source.shortLabel}`, e, 'MARKET_NEWS');
             }
         }
 
         if (collected.length > 0) {
             // [TankIQ ENRICHMENT]: Only for newly fetched high-relevance signals from VERIFIED sources
-            const aiService = new IntelligenceAIService();
+            // HIGH-09 FIX: Reuse a single IntelligenceAIService instance per fetch cycle instead of
+            // instantiating one per source (was creating up to 10 instances with 10 separate auth calls).
+            const aiService = aiServiceRef.current;
             const enriched = [];
             const isVerifiedSource = VERIFIED_AI_SOURCES.includes(source.shortLabel.toUpperCase());
             const existingHistory = readMasterHistory();
@@ -724,7 +733,8 @@ export function useMarketNews(): UseMarketNewsReturn {
                         // [Rate Limit Shield]: Increased stagger delay between source requests to prevent gateway 429s
                         await new Promise(resolve => setTimeout(resolve, 800));
                     } catch (e) {
-                        console.warn(`[useMarketNews] TankIQ failed for ${article.title}`, e);
+                        // HIGH-06 FIX: Use structured logger
+                        logger.warn(`[useMarketNews] TankIQ directive failed for "${article.title}"`, e, 'MARKET_NEWS');
                         enriched.push({ ...article, aiDirective: FALLBACK_DIRECTIVE });
                     }
                 } else if (relevance > 0.50) {
@@ -738,6 +748,24 @@ export function useMarketNews(): UseMarketNewsReturn {
             for (const article of enriched) {
                 if (article.aiDirective?.priceData && article.aiDirective.priceData.length > 0) {
                     for (const p of article.aiDirective.priceData) {
+                        // CRIT-06 GUARD: Only write EPRA prices extracted with high confidence (≥0.80)
+                        // and from an EPRA-tagged verified source to limit the blast radius of a
+                        // bad AI extraction. This does NOT fully replace server-side validation
+                        // (tracked as a future Edge Function migration) but reduces invalid writes.
+                        const isHighConfidenceEPRA =
+                            (p as any).confidence >= 0.80 &&
+                            article.topics?.includes('EPRA') &&
+                            p.price > 0 &&
+                            p.price < 500; // Sanity check: KES fuel prices are always < 500/L
+
+                        if (!isHighConfidenceEPRA) {
+                            logger.warn(
+                                `[useMarketNews] Skipping low-confidence price write for ${p.fuelType}: ${p.price} (confidence: ${(p as any).confidence ?? 'N/A'})`,
+                                null, 'MARKET_SENSE'
+                            );
+                            continue;
+                        }
+
                         try {
                             const effectiveDate = p.effectiveDate || new Date().toISOString().split('T')[0];
                             await supabase.from('market_prices').upsert({
@@ -771,7 +799,8 @@ export function useMarketNews(): UseMarketNewsReturn {
                             
                             logger.info(`[useMarketNews] Auto-updated price for ${p.fuelType}: ${p.price}`, null, 'MARKET_SENSE');
                         } catch (err) {
-                            console.error(`[useMarketNews] Failed to update price for ${p.fuelType}`, err);
+                            // HIGH-06 FIX: Use structured logger
+                            logger.error(`[useMarketNews] Failed to update price for ${p.fuelType}`, err, 'MARKET_SENSE');
                         }
                     }
                 }
@@ -805,7 +834,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                             p_severity: 'info',
                             p_metadata: { article_id: topSignal.id, source: 'EPRA' }
                         }).then(({ error }) => {
-                            if (error) console.error('[useMarketNews] Alert persistence failed:', error);
+                            if (error) logger.error('[useMarketNews] Alert persistence failed:', error, 'MARKET_NEWS'); // HIGH-06 FIX
                         });
                     }
                 }
@@ -831,9 +860,7 @@ export function useMarketNews(): UseMarketNewsReturn {
         }
 
         setIsRefreshing(true);
-        if (allArticles.length === 0) {
-            setStatus('loading');
-        }
+        setStatus(prev => (prev === 'ok' || prev === 'cached-stale') ? prev : 'loading');
 
         try {
             let anySuccess = false;
@@ -865,10 +892,17 @@ export function useMarketNews(): UseMarketNewsReturn {
                     else logger.info('[useMarketNews] Successfully purged database market signals older than 14 days.');
                 });
 
+            // MED-07 FIX: Prevent setting status to 'cached-stale' if the cache is actually fresh.
+            // Also prevent falsely updating `lastUpdated` timestamp if we didn't fetch new items.
+            const isCacheFresh = NEWS_SOURCES.some(src => Date.now() - getSyncTime(src.shortLabel) < (src.cacheTTL ?? CACHE_TTL_MS));
+
             if (anySuccess) {
                 setStatus('ok');
                 setLastUpdated(new Date());
                 setLastRefreshTime();
+            } else if (isCacheFresh && final.length > 0) {
+                setStatus('ok');
+                // Keep the existing lastUpdated date (from the actual last network sync)
             } else if (final.length > 0) {
                 setStatus('cached-stale');
             } else {
@@ -876,7 +910,7 @@ export function useMarketNews(): UseMarketNewsReturn {
             }
         } catch (e) {
             console.error('[useMarketNews] Fetch failure:', e);
-            setStatus(allArticles.length > 0 ? 'cached-stale' : 'no-signal');
+            setStatus(prev => (prev === 'ok' || prev === 'cached-stale') ? 'cached-stale' : 'no-signal');
         } finally {
             setIsRefreshing(false);
         }
@@ -900,7 +934,7 @@ export function useMarketNews(): UseMarketNewsReturn {
         return () => {
             if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
         };
-    }, [authLoading]);
+    }, [authLoading, fetchAll, startCooldown]);
 
     const refresh = useCallback(async (tanks?: Tank[]) => {
         if (!canRefresh) return;

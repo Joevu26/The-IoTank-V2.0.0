@@ -27,7 +27,19 @@ export function calculateExpectedVolume(
     currentTempC: number,
     fuelType: FuelType = 'diesel'
 ): number {
-    const alpha = EXPANSION_COEFFICIENTS[fuelType] || EXPANSION_COEFFICIENTS['diesel'];
+    // Resolve common fuel type aliases to canonical coefficient keys
+    const FUEL_ALIASES: Record<string, FuelType> = {
+        'pms':       'petrol',
+        'super':     'petrol',
+        'gasoline':  'petrol',
+        'ago':       'diesel',
+        'biodiesel': 'diesel',
+        'jet-fuel':  'jet_fuel',  // hyphenated UI form → underscore key
+        'jet fuel':  'jet_fuel',
+    };
+    const canonicalType: FuelType = FUEL_ALIASES[fuelType.toLowerCase() as string] ?? fuelType;
+
+    const alpha = EXPANSION_COEFFICIENTS[canonicalType] || EXPANSION_COEFFICIENTS['diesel'];
     const deltaT = currentTempC - REF_TEMP_C;
     const factor = 1 + (alpha * deltaT);
     return Number((standardVolume * factor).toFixed(2));

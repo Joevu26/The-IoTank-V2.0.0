@@ -1,5 +1,5 @@
 /**
- * AlertDetectionEngine — Client-side alert detection for IoTank (Supabase/Postgres).
+ * AlertDetectionEngine â€” Client-side alert detection for IoTank (Supabase/Postgres).
  *
  * Runs entirely in the browser using:
  *  - Tank data + latest readings from Supabase Realtime
@@ -53,7 +53,7 @@ export interface DraftAlert {
 
 /**
  * Run all detection checks for a single tank and return draft alerts.
- * Does NOT write to Supabase — that is the caller's responsibility.
+ * Does NOT write to Supabase â€” that is the caller's responsibility.
  */
 export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
     const { tank, latestReading } = ctx;
@@ -78,12 +78,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         return raw;
     })();
 
-    // ── 1. CRITICAL LEVEL BREACH (5%) ──────────────────────────────────────────
+    // â”€â”€ 1. CRITICAL LEVEL BREACH (5%) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (fuelLevel !== undefined && fuelLevel <= THRESHOLDS.LEVEL.CRITICAL_LOW) {
         const { score, label } = scoreByType('low_level_critical', 0.95);
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: 'low_level',
             title: `CRITICAL LOW: ${tank.name} (Dead Stock Breach)`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Pump protection activated at ${THRESHOLDS.LEVEL.CRITICAL_LOW}%. Shutdown imminent.`,
@@ -99,7 +99,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             rootCauseLink: { type: 'tank', id: tank.id, label: tank.name },
         });
     }
-    // ── 2. LOW LEVEL WARNING (20%) ─────────────────────────────────────────────
+    // â”€â”€ 2. LOW LEVEL WARNING (20%) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     else if (
         fuelLevel !== undefined &&
         fuelLevel > THRESHOLDS.LEVEL.CRITICAL_LOW &&
@@ -108,7 +108,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const { score, label } = scoreByType('low_level_warning', 0.80);
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: 'low_level',
             title: `LOW LEVEL: ${tank.name} Reorder Point`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Recommend reordering fuel to maintain operations. Threshold: ${THRESHOLDS.LEVEL.WARNING_LOW}%.`,
@@ -125,12 +125,12 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         });
     }
 
-    // ── 2.6 HIGH LEVEL & OVERFILL (95% / 98%) ──────────────────────────────────
+    // â”€â”€ 2.6 HIGH LEVEL & OVERFILL (95% / 98%) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (fuelLevel !== undefined && fuelLevel >= THRESHOLDS.LEVEL.CRITICAL_HIGH) {
         const { score, label } = scoreByType('composite_supply_risk', 0.98);
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: 'overfill',
             title: `CRITICAL OVERFILL: ${tank.name}`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Immediate spill risk. Halt all delivery operations. Threshold: ${THRESHOLDS.LEVEL.CRITICAL_HIGH}%.`,
@@ -149,7 +149,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const { score, label } = scoreByType('composite_supply_risk', 0.85);
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: 'warning_high',
             title: `HIGH LEVEL: ${tank.name}`,
             description: `Level at ${fuelLevel.toFixed(1)}%. Monitoring required. Threshold: ${THRESHOLDS.LEVEL.WARNING_HIGH}%.`,
@@ -166,7 +166,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         });
     }
 
-    // ── 3. CONNECTIVITY LOST ─────────────────────────────────────────────────────
+    // â”€â”€ 3. CONNECTIVITY LOST â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const readingTimestamp = typeof latestReading.timestamp === 'string' 
         ? new Date(latestReading.timestamp).getTime() 
         : latestReading.timestamp;
@@ -181,7 +181,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: isBlackout ? 'sensor-blackout' : 'connectivity-lost',
             title: isBlackout ? `SENSOR BLACKOUT: ${tank.name}` : (isCritical ? `CRITICAL OFFLINE: ${tank.name}` : `Offline: ${tank.name}`),
             description: isBlackout 
@@ -206,7 +206,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         });
     }
 
-    // ── 4. SENSOR FAILURE ─────────────────────────────────────────────────────
+    // â”€â”€ 4. SENSOR FAILURE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const isQualityFailing = (quality: string | number) => {
         if (typeof quality === 'number') return quality < 30;
         return quality === 'Weak' || quality === 'Unusable' || quality === 'Offline';
@@ -216,7 +216,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         const { score, label } = scoreByType('sensor_failure', 0.78);
         drafts.push({
             tankId: tank.id,
-            siteId: tank.siteId,
+            siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
             type: 'sensor_failure',
             title: `Sensor degradation on ${tank.name}`,
             description: `Signal quality at ${latestReading.signalQuality}%. Readings may be unreliable.`,
@@ -233,7 +233,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         });
     }
 
-    // ── 5. SHIFT-AWARE ANOMALIES (THEFT, LEAK, PARALLEL PULL) ──────────────────
+    // â”€â”€ 5. SHIFT-AWARE ANOMALIES (THEFT, LEAK, PARALLEL PULL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const { isShiftOpen = false, previousReading } = ctx;
 
     if (latestReading && previousReading) {
@@ -253,14 +253,14 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         // [FIX]: Enforce a minimum time delta (5 minutes) for extrapolation to prevent 
         // mathematically explosive L/hr rates (e.g. 282,000 L/hr) caused by sensor jitter 
         // delivering two packets with a very small time gap.
-        const rawTelemetryGapHr = (currTime - prevTime) / (1000 * 60 * 60);
+        const rawTelemetryGapHr = Math.abs(currTime - prevTime) / (1000 * 60 * 60);
         const effectiveGapHr = Math.max(rawTelemetryGapHr, 5 / 60); // Minimum 5 min denominator
         
         const dropRate = volumeDrop > 0 ? (volumeDrop / effectiveGapHr) : 0; 
         // [PHASE 3]: Backfill Anomaly Guard
         // If the gap between readings is too large (e.g., > 2 hours), the dropRate calculation 
         // for "Rapid Drawdown" is unreliable. We skip theft detection to avoid false positives.
-        const telemetryGapHr = (currTime - prevTime) / (1000 * 60 * 60);
+        const telemetryGapHr = Math.abs(currTime - prevTime) / (1000 * 60 * 60);
         const isBackfilledBatch = telemetryGapHr > 2.0; 
 
         // Heuristics
@@ -275,7 +275,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                 const { score, label } = scoreByType('composite_supply_risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
-                    siteId: tank.siteId,
+                    siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
                     type: 'theft_detected',
                     title: `THEFT DETECTED: ${tank.name}`,
                     description: `Unauthorized rapid drop of ${volumeDrop.toFixed(1)}L while shift is CLOSED. Intensity: ${dropRate.toFixed(0)} L/hr.`,
@@ -295,7 +295,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                 const { score, label } = scoreByType('leak_detected', 0.85);
                 drafts.push({
                     tankId: tank.id,
-                    siteId: tank.siteId,
+                    siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
                     type: 'leak_detected',
                     title: `LEAK SUSPICION: ${tank.name}`,
                     description: `Persistent volume decline of ${dropRate.toFixed(2)} L/hr during 'Quiet Hours' (Closed Shift). Possible infrastructure failure.`,
@@ -318,7 +318,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                 const { score, label } = scoreByType('composite_supply_risk', 0.95);
                 drafts.push({
                     tankId: tank.id,
-                    siteId: tank.siteId,
+                    siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
                     type: 'theft_detected',
                     title: `PARALLEL PULL THEFT: ${tank.name}`,
                     description: `Anomalous discharge of ${dropRate.toFixed(0)} L/hr detected. This exceeds the maximum physical capacity of the terminal pumps (${maxPumpFlow} L/hr). Siphoning suspected during operations.`,
@@ -337,17 +337,17 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             }
         }
 
-        // ── 6. REFILL DETECTION (Automated Delivery Sensing) ───────────────────────
+        // â”€â”€ 6. REFILL DETECTION (Automated Delivery Sensing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         //
-        // ⚠️  OWNERSHIP NOTE
-        // All volume-increase events — whether authorized (open shift) or
-        // unauthorized (closed shift) — are exclusively tracked and finalized
+        // âš ï¸  OWNERSHIP NOTE
+        // All volume-increase events â€” whether authorized (open shift) or
+        // unauthorized (closed shift) â€” are exclusively tracked and finalized
         // by the STATEFUL engine in useAlertEngine.ts.
         //
         // That engine:
-        //   • applies multi-cycle confirmation (eliminates sensor noise)
-        //   • captures accurate start/end volumes across the delivery window
-        //   • writes the single, definitive alert to the database
+        //   â€¢ applies multi-cycle confirmation (eliminates sensor noise)
+        //   â€¢ captures accurate start/end volumes across the delivery window
+        //   â€¢ writes the single, definitive alert to the database
         //
         // This stateless engine must NOT emit 'unauthorized_refill' or normal
         // 'refill_detected' drafts for volume increases, as doing so creates
@@ -374,7 +374,7 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
                 const { score, label } = scoreByType('composite_supply_risk', 0.98);
                 drafts.push({
                     tankId: tank.id,
-                    siteId: tank.siteId,
+                    siteId: tank.siteId || '', // MED-02: siteId may be undefined; fallback to empty string
                     type: 'anomaly',
                     title: `INTEGRITY BREACH: Over-Capacity on ${tank.name}`,
                     description: `Critical integrity error: Tank level (${currVol.toFixed(1)}L) exceeds physical capacity (${tank.capacity}L). This indicates severe calibration drift or sensor malfunction.`,
@@ -404,13 +404,13 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
         }
     }
 
-    // ──────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Final output filter
-    // ──────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Suppress any draft types that are exclusively owned by the stateful
     // engine in useAlertEngine.ts to guarantee zero duplicate alerts:
-    //   - 'refill_detected'   → handled by stateful tracker
-    //   - 'unauthorized_refill' → handled by stateful tracker
+    //   - 'refill_detected'   â†’ handled by stateful tracker
+    //   - 'unauthorized_refill' â†’ handled by stateful tracker
     // 'anomaly' type for over-capacity is the ONLY exception and is kept.
     return drafts.filter(d => d.type !== 'refill_detected' && d.type !== 'unauthorized_refill');
 }
@@ -446,17 +446,66 @@ export function formatForensicDuration(minutes: number): string {
  */
 export function filterDuplicates(drafts: DraftAlert[], activeAlerts: Alert[]): DraftAlert[] {
     return drafts.filter(draft => {
-        return !activeAlerts.some(active => 
-            active.tankId === draft.tankId && 
-            active.type === draft.type && 
-            !active.resolved
-        );
+        return !activeAlerts.some(active => {
+            // Defensive: handle both raw DB rows (alert_type) and mapped Alert objects (type)
+            const activeType = (active as any).alert_type ?? active.type;
+            return (
+                active.tankId === draft.tankId &&
+                activeType === draft.type &&
+                !active.resolved
+            );
+        });
     });
 }
 
+
 /**
- * Group or correlate alerts if needed.
+ * MED-09 FIX: Implemented correlation logic — groups co-occurring alerts (3+) for the
+ * same tank into a composite 'correlated' alert with the highest severity and score.
+ * Previously this was an identity no-op function (return alerts) that added overhead
+ * on every render without any benefit.
+ *
+ * Tanks with fewer than 3 alerts pass through unchanged.
  */
 export function correlateAlerts(alerts: Alert[]): Alert[] {
-    return alerts;
+    // Group by tank
+    const byTank = new Map<string, Alert[]>();
+    const noTank: Alert[] = [];
+
+    for (const alert of alerts) {
+        if (!alert.tankId) { noTank.push(alert); continue; }
+        const group = byTank.get(alert.tankId) || [];
+        group.push(alert);
+        byTank.set(alert.tankId, group);
+    }
+
+    const result: Alert[] = [...noTank];
+
+    for (const [tankId, group] of byTank.entries()) {
+        if (group.length < 3) {
+            // Not enough alerts to correlate — pass through unchanged
+            result.push(...group);
+        } else {
+            // Build a single composite alert from the group
+            const topAlert = group.reduce((a, b) => ((b.score ?? 0) > (a.score ?? 0) ? b : a));
+            const composite: Alert = {
+                ...topAlert,
+                id: `correlated:${tankId}`,
+                type: 'correlated' as any,
+                title: `${group.length} Active Alerts — ${topAlert.title}`,
+                message: group.map(a => a.title).join(' · '),
+                score: Math.min(100, (topAlert.score ?? 0) + group.length * 2),
+                metadata: {
+                    ...topAlert.metadata,
+                    correlatedCount: group.length,
+                    correlatedIds: group.map(a => a.id).filter(Boolean),
+                    correlatedTypes: group.map(a => a.type)
+                }
+            };
+            result.push(composite);
+        }
+    }
+
+    // Re-sort by score descending
+    return result.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }

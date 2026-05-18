@@ -2,6 +2,26 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
 import { DeliveryDocument } from '@/types';
 import { validateUUID } from '@/utils/sanitization';
+import { EXPANSION_COEFFICIENTS, REF_TEMP_C } from '@/utils/thermalCorrection';
+
+// Fuel type alias resolver for thermal correction
+const FUEL_ALIASES: Record<string, keyof typeof EXPANSION_COEFFICIENTS> = {
+    pms: 'petrol', super: 'petrol', gasoline: 'petrol',
+    ago: 'diesel', biodiesel: 'diesel',
+    ik: 'kerosene', kerosene: 'kerosene',
+};
+
+/**
+ * Standardize an observed volume to the 15°C reference using the inverse thermal formula.
+ * V_std = V_observed / (1 + alpha * (T_delivery - T_ref))
+ */
+function standardizeToRef(observedLiters: number, deliveryTempC: number, fuelTypeRaw: string): number {
+    const key = FUEL_ALIASES[fuelTypeRaw.toLowerCase()] ?? 'diesel';
+    const alpha = EXPANSION_COEFFICIENTS[key];
+    const deltaT = deliveryTempC - REF_TEMP_C;
+    const factor = 1 + alpha * deltaT;
+    return factor > 0 ? parseFloat((observedLiters / factor).toFixed(2)) : observedLiters;
+}
 
 interface UseDeliveriesOptions {
     startDate?: string;
@@ -55,6 +75,11 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
                 const beforeVol = Number(row.tank_before_volume || 0);
                 const afterVol  = Number(row.tank_after_volume || 0);
                 const capacity  = Number(row.tanks?.capacity || row.capacity || 1);
+                const tempC     = Number(row.temperature_c || REF_TEMP_C);
+                const fuelTypeRaw = row.tanks?.fuel_type || row.product || 'AGO';
+
+                // Standardize observed volume to 15°C reference for forensic comparison
+                const standardLiters = standardizeToRef(actualReceivedVol, tempC, fuelTypeRaw);
 
                 // Normalize DB status to DeliveryDocument union
                 const rawStatus = (row.verification_status || row.status || '').toUpperCase();
@@ -77,9 +102,9 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
                     // Full measured shape as required by DeliveryDocument
                     measured: {
                         observedLiters: actualReceivedVol,
-                        standardizedLiters: actualReceivedVol, // Thermal correction not yet applied at this layer
-                        tempC: Number(row.temperature_c || 20),
-                        refTempC: 15
+                        standardizedLiters: standardLiters,  // Thermal correction applied: V_std at 15°C
+                        tempC,
+                        refTempC: REF_TEMP_C
                     },
                     // Full before/after shape as required by DeliveryDocument
                     before: {
@@ -96,9 +121,16 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
                     },
                     status,
                     verified: row.is_accepted === true,
-                    createdBy: typeof row.created_by === 'string'
-                        ? JSON.parse(row.created_by)
-                        : (row.created_by || { kind: 'system', authUserId: '', display: 'System' }),
+                    createdBy: (() => {
+                        if (typeof row.created_by === 'string') {
+                            try {
+                                return JSON.parse(row.created_by);
+                            } catch {
+                                return { kind: 'system', authUserId: '', display: row.created_by || 'System' };
+                            }
+                        }
+                        return row.created_by || { kind: 'system', authUserId: '', display: 'System' };
+                    })(),
                     createdAt: row.created_at,
                     notes: row.dispute_notes || row.notes,
                     bolPhotoUrl: row.bol_photo_url
@@ -117,9 +149,14 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
 
     useEffect(() => {
         fetchDeliveries();
+    }, [fetchDeliveries]);
 
-        // Real-time subscription: listen for INSERT and UPDATE (status changes)
-        const channelId = `deliveries-all-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    // Stable Realtime subscription — keyed only on stationId so filter changes
+    // do not spawn duplicate channels that leak Supabase connection slots.
+    useEffect(() => {
+        if (!stationId) return;
+
+        const channelId = `deliveries-all-${stationId}`;
         const channel = supabase
             .channel(channelId)
             .on(
@@ -137,7 +174,7 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [fetchDeliveries, stationId]);
+    }, [stationId, fetchDeliveries]);
 
     return { deliveries, loading, error, refresh: fetchDeliveries };
 }

@@ -101,7 +101,7 @@ export const useMarketIntelligence = (stationId: string) => {
                 const mappedPricesValue = (priceData || []).map((p: any) => ({
                     id: p.id,
                     fuelType: p.fuel_type.toUpperCase(),
-                    pricePerLiter: Number(p.price_per_liter),
+                    pricePerLiter: Number(p.price || p.price_per_liter),
                     currency: p.currency,
                     timestamp: new Date(p.effective_date).getTime(),
                     source: p.source as any
@@ -303,7 +303,7 @@ export const useMarketIntelligence = (stationId: string) => {
         fetchData();
 
         const timer = setTimeout(() => {
-            if (isMounted && loading) {
+            if (isMounted) {
                 setLoading(false);
             }
         }, 5000);

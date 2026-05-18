@@ -13,6 +13,15 @@ export interface TacticalDirective {
  * and prices to generate exact, actionable business decision recommendations.
  */
 export function generateTacticalDirective(article: any, tanks: Tank[]): TacticalDirective {
+    if (!article) {
+        return {
+            status: 'STABLE',
+            recommendation: 'Market movements are standard. Continue normal operations and routine inventory audits.',
+            actionDetails: 'Maintain standard operational hours and baseline retail pricing parameters.',
+            colorClass: 'mi-directive--stable'
+        };
+    }
+
     if (article.aiDirective && article.aiDirective.recommendation) {
         const status = (article.aiDirective.status || 'STABLE').toUpperCase() as 'CRITICAL' | 'CAUTION' | 'STABLE';
         return {

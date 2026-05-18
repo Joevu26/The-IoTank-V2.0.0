@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { supabase } from '@/config/supabase';
 
 export interface ClientBillingSummary {
   station: {
@@ -47,13 +47,15 @@ export const billingService = {
   },
 
   /**
-   * Fetches the full billing record for the current user
+   * Fetches the full billing record for a specific station
    */
-  async getClientBilling() {
+  async getClientBilling(stationId: string) {
     try {
+      if (!stationId) return null;
       const { data, error } = await supabase
         .from('fuel_stations')
         .select('*')
+        .eq('id', stationId)   // fuel_stations PK is 'id', not 'station_id'
         .single();
         
       if (error) {
@@ -68,13 +70,15 @@ export const billingService = {
   },
   
   /**
-   * Fetches recent transactions for the current user
+   * Fetches recent transactions for a specific station
    */
-  async getTransactions(limit = 10) {
+  async getTransactions(stationId: string, limit = 10) {
     try {
+      if (!stationId) return [];
       const { data, error } = await supabase
-        .from('transactions')
+        .from('fuel_transactions') // HIGH-08 FIX: was 'transactions' — must match actual table name
         .select('*')
+        .eq('station_id', stationId)
         .order('created_at', { ascending: false })
         .limit(limit);
         
@@ -85,7 +89,7 @@ export const billingService = {
       return data;
     } catch (error) {
       console.error('Error fetching transactions:', error);
-      return null;
+      return [];
     }
   }
 };

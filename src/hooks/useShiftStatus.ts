@@ -26,8 +26,10 @@ export const useShiftStatus = () => {
         if (confirmed === 'open' || confirmed === 'closed') {
             localStorage.setItem('iotank_shift_status', confirmed);
         }
-        if (activeShift.updated_at) {
-            localStorage.setItem('iotank_shift_start_time', activeShift.updated_at);
+        // Persist the confirmed shift OPEN timestamp (not updated_at which changes on any edit)
+        const shiftStart = activeShift.opened_at || activeShift.created_at;
+        if (shiftStart) {
+            localStorage.setItem('iotank_shift_start_time', shiftStart);
         }
     }, [activeShift, shiftError, isLoading]);
 
@@ -65,7 +67,7 @@ export const useShiftStatus = () => {
             if (localStart) return new Date(localStart).getTime();
             return null;
         }
-        const time = activeShift.updated_at ? new Date(activeShift.updated_at).getTime() : null;
+        const time = activeShift.created_at ? new Date(activeShift.created_at).getTime() : null;
 
         if (status === 'OPEN') {
             return time;

@@ -36,7 +36,7 @@ class RateLimiter {
     const entry = this.attempts.get(identifier);
 
     if (!entry) {
-      return { allowed: true, remainingAttempts: this.maxAttempts - 1, resetTime: null };
+      return { allowed: true, remainingAttempts: this.maxAttempts, resetTime: null };
     }
 
     // Reset window if expired
@@ -82,8 +82,8 @@ class RateLimiter {
     entry.count++;
     entry.lastAttempt = now;
 
-    // If max attempts reached, extend reset time to block duration
-    if (entry.count >= this.maxAttempts) {
+    // If max attempts just reached, set block duration ONCE — do not extend on repeated attempts
+    if (entry.count === this.maxAttempts) {
       entry.resetTime = now + this.blockDurationMs;
     }
   }

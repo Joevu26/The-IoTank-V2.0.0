@@ -35,10 +35,6 @@ export class IntelligenceAIService {
         // AI proxy securely handles configuration now
     }
 
-    private static cachedSession: any = null;
-    private static lastSessionFetch = 0;
-    private static SESSION_TTL = 30000; // 30 seconds
-
     private async getSafeAuthHeaders(): Promise<Record<string, string>> {
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         const headers: Record<string, string> = { 
@@ -47,15 +43,8 @@ export class IntelligenceAIService {
         };
 
         try {
-            const now = Date.now();
-            if (!IntelligenceAIService.cachedSession || (now - IntelligenceAIService.lastSessionFetch > IntelligenceAIService.SESSION_TTL)) {
-                const { data: { session }, error } = await supabase.auth.getSession();
-                if (error) throw error;
-                IntelligenceAIService.cachedSession = session;
-                IntelligenceAIService.lastSessionFetch = now;
-            }
-            
-            const session = IntelligenceAIService.cachedSession;
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
             
             if (!session?.access_token) {
                 throw new Error('TankIQ intelligence requires an active authenticated session.');

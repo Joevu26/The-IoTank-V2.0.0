@@ -50,6 +50,20 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
         fetchHistoricalAverage();
     }, [tank?.id]);
 
+    // [BUG 4 FIX]: Cleanup stale shift start volume from localStorage when shift closes.
+    // Without this, the object grows unbounded and subsequent shifts inherit the wrong start volume.
+    useEffect(() => {
+        if (shiftStatus === 'closed' && tank?.id) {
+            try {
+                const volumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
+                if (volumes[tank.id] !== undefined) {
+                    delete volumes[tank.id];
+                    localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(volumes));
+                }
+            } catch { /* non-critical, ignore parse errors */ }
+        }
+    }, [shiftStatus, tank?.id]);
+
     const analytics = useMemo(() => {
         try {
             if (!tank || !tank.capacity) {

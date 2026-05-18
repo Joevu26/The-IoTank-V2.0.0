@@ -26,9 +26,16 @@ export interface AggregatedMetrics {
  * @param volume Raw volume reading
  * @param temperature Temperature in Celsius
  */
+/**
+ * @deprecated DO NOT USE for live sensor readings.
+ * The ESP32 hardware already delivers volumes pre-standardized to 15°C.
+ * Applying this function to sensor readings will DOUBLE-CORRECT volumes,
+ * corrupting forensic audit reports. This function is retained only as a
+ * reference formula; use thermalCorrection.ts for delivery modal variance display.
+ */
 export function calculateVCF(volume: number, temperature: number): number {
     const baselineTemp = 15;
-    const expansionCoeff = 0.00084; // Typical for fuel
+    const expansionCoeff = 0.00084; // Typical for diesel only
     return volume * (1 - (temperature - baselineTemp) * expansionCoeff);
 }
 
@@ -103,14 +110,10 @@ export async function scanStationHistory(
             const openingRaw = dayReadings.length > 0 ? dayReadings[0].volume : 0;
             const closingRaw = dayReadings.length > 0 ? dayReadings[dayReadings.length - 1].volume : 0;
             
-            // Forensic VCF (Volume Correction Factor)
-            // If temp is available, we simulate the 'Standardized' volume at 15°C
-            // Typical expansion is 0.00084 per °C for diesel
-            const startTemp = dayReadings.length > 0 ? (dayReadings[0].temperature || 15) : 15;
-            const endTemp = dayReadings.length > 0 ? (dayReadings[dayReadings.length - 1].temperature || 15) : 15;
-            
-            const opening = calculateVCF(openingRaw, startTemp);
-            const closing = calculateVCF(closingRaw, endTemp);
+            // NOTE: ESP32 hardware delivers volumes pre-standardized to 15°C.
+            // Do NOT apply VCF here — that would double-correct the readings.
+            const opening = openingRaw;
+            const closing = closingRaw;
 
             const deliveries = dayTx
                 .filter(tx => tx.type === 'delivery')

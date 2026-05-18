@@ -31,9 +31,10 @@ export function useSensorHealth(stationId: string, tanks: Tank[]) {
     const healthData = useMemo(() => {
         return tanks.map(tank => {
             const reading = readings[tank.id];
-            const lastSeen = reading?.captured_at || null;
-            const lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : 0;
+            // 'timestamp' is the normalized field from mapReading() — raw 'captured_at' does not exist on the mapped object
+            const lastSeenTime = reading?.timestamp || 0;
             const latencyMs = lastSeenTime ? now - lastSeenTime : Infinity;
+            const lastSeen = lastSeenTime ? new Date(lastSeenTime).toISOString() : null;
 
             let status: 'HEALTHY' | 'DELAYED' | 'OFFLINE' = 'OFFLINE';
             if (latencyMs < 5 * 60 * 1000) status = 'HEALTHY';
