@@ -3,8 +3,8 @@ import { supabase } from '@/config/supabase';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type EventCategory = 'telemetry' | 'operational' | 'system' | 'ai';
-export type EventSeverity = 'info' | 'warning' | 'critical';
+export type EventCategory = 'SHIFT' | 'DELIVERY' | 'ORDER' | 'TEAM' | 'SECURITY' | 'SYSTEM' | 'FINANCE' | 'AI' | 'CALIBRATION';
+export type EventSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 export type EventIntegrity = 'verified' | 'system_generated' | 'manual_override';
 export type EventTriggeredBy = 'system' | 'user' | 'ai';
 export type EventSource = 'ESP32' | 'Manual' | 'AI' | 'System';
@@ -60,14 +60,36 @@ export function useEventLog(stationId: string) {
     const [filters, setFilters] = useState<EventLogFilters>(DEFAULT_FILTERS);
     const [currentPage, setCurrentPage] = useState(1);
     const [tanks, setTanks] = useState<{id: string, name: string}[]>([]);
+    const [counts, setCounts] = useState<Record<string, number>>({});
 
     useEffect(() => {
+        if (!stationId) return;
         fetchTanks();
     }, [stationId]);
 
     useEffect(() => {
+        if (!stationId) return;
         fetchEvents();
     }, [stationId, filters, currentPage]);
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            if (!stationId) return;
+            const cats: EventCategory[] = ['SHIFT', 'DELIVERY', 'SECURITY', 'SYSTEM', 'AI', 'CALIBRATION'];
+            const newCounts: Record<string, number> = {};
+            
+            await Promise.all(cats.map(async cat => {
+                const { count } = await supabase
+                    .from('unified_events')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('station_id', stationId)
+                    .eq('event_category', cat);
+                newCounts[cat.toLowerCase()] = count || 0;
+            }));
+            setCounts(newCounts);
+        };
+        fetchCounts();
+    }, [stationId]);
 
     const fetchTanks = async () => {
         const { data } = await supabase.from('tanks').select('id, tank_name').eq('station_id', stationId);
@@ -103,28 +125,44 @@ export function useEventLog(stationId: string) {
                 query = query.or(`event_type.ilike.%${filters.search}%,description.ilike.%${filters.search}%,actor_email.ilike.%${filters.search}%`);
             }
 
+            // [SECURITY/NOISE]: Silence technical audit noise at the DB level
+            query = query
+                .not('description', 'ilike', '%detected on alerts%')
+                .not('description', 'ilike', '%detected on tanks%')
+                .not('description', 'ilike', '%detected on sensor_readings%');
+
+            if (filters.tankId && filters.tankId !== 'all' && filters.tankId !== '') {
+                query = query.eq('metadata->>tankId', filters.tankId);
+            }
+
+            if (filters.triggeredBy && filters.triggeredBy !== 'all') {
+                if (filters.triggeredBy === 'system') {
+                    query = query.ilike('metadata->>actor_name', '%system%');
+                } else if (filters.triggeredBy === 'user') {
+                    query = query.not('metadata->>actor_name', 'ilike', '%system%');
+                }
+            }
+
             const { data, count, error } = await query
                 .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
-            if (error) throw error;
-            
-            const filteredData = (data || []).filter(log => {
-                const desc = log.description || '';
-                return !desc.includes('detected on alerts') && 
-                       !desc.includes('detected on tanks') && 
-                       !desc.includes('detected on sensor_readings');
-            });
+            if (error) {
+                console.error(`[useEventLog] Fetch failed for station ${stationId}:`, error);
+                throw error;
+            }
 
-            const mapped: EventLogEntry[] = filteredData.map(log => ({
+            console.log(`[useEventLog] Fetched ${data?.length || 0} events for station ${stationId} (Total in DB: ${count})`);
+
+            const mapped: EventLogEntry[] = (data || []).map(log => ({
                 id: log.id,
-                category: log.event_category.toLowerCase() as EventCategory,
+                category: (log.event_category || 'SYSTEM') as EventCategory,
                 type: log.event_type,
                 title: log.event_type.replace(/_/g, ' '),
                 description: log.description,
                 timestamp: new Date(log.created_at).getTime(),
                 triggeredBy: (log.metadata?.actor_name || '').toLowerCase().includes('system') ? 'system' : 'user',
                 triggeredByName: log.metadata?.actor_name || log.actor_email || 'System',
-                severity: (log.severity || 'info').toLowerCase() as EventSeverity,
+                severity: (log.severity || log.metadata?.severity || 'INFO') as EventSeverity,
                 integrity: 'verified',
                 beforeValue: log.metadata?.before ? JSON.stringify(log.metadata.before, null, 2) : undefined,
                 afterValue: log.metadata?.after ? JSON.stringify(log.metadata.after, null, 2) : undefined,
@@ -152,11 +190,22 @@ export function useEventLog(stationId: string) {
     }
 
     async function acknowledgeAll() {
-        if (!stationId) return;
+        if (!stationId) {
+            console.warn('[useEventLog] Cannot acknowledge: No stationId provided.');
+            return;
+        }
         try {
-            const { error } = await supabase.rpc('resolve_all_station_events', { p_station_id: stationId });
+            // Try both parameter patterns to overcome 400 errors
+            let res = await supabase.rpc('resolve_all_station_events', { p_station_id: stationId });
             
-            if (error) throw error;
+            if (res.error && res.error.message?.includes('parameter')) {
+                console.log('[useEventLog] retrying acknowledgeAll with alternative parameter name...');
+                res = await supabase.rpc('resolve_all_station_events', { station_id: stationId });
+            }
+            
+            if (res.error) throw res.error;
+            
+            console.log('[useEventLog] All events acknowledged for station:', stationId);
             fetchEvents();
         } catch (err) {
             console.error('Error acknowledging all events:', err);
@@ -175,28 +224,65 @@ export function useEventLog(stationId: string) {
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-    function exportCSV() {
-        const headers = ['EventID', 'Type', 'Severity', 'Description', 'Timestamp', 'TriggeredBy', 'Before', 'After'];
-        const rows = events.map(ev => [
-            ev.id,
-            ev.type,
-            ev.severity,
-            `"${ev.description}"`,
-            new Date(ev.timestamp).toISOString(),
-            ev.triggeredByName,
-            `"${ev.beforeValue || ''}"`,
-            `"${ev.afterValue || ''}"`
-        ].join(','));
+    async function exportCSV() {
+        if (!stationId) return;
+        
+        try {
+            console.log('[useEventLog] Starting full dataset export...');
+            // Fetch up to 1000 records for the current filters (bypassing pagination)
+            let query = supabase
+                .from('unified_events')
+                .select('*')
+                .eq('station_id', stationId)
+                .order('created_at', { ascending: false })
+                .limit(1000);
 
-        const csv = [headers.join(','), ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `event-log-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+            // Apply same filters as fetchEvents
+            const now = new Date();
+            if (filters.timeRange !== 'custom') {
+                const ms = filters.timeRange === '24h' ? 86400000 : filters.timeRange === '7d' ? 604800000 : 2592000000;
+                query = query.gte('created_at', new Date(now.getTime() - ms).toISOString());
+            }
+            if (filters.category !== 'all') query = query.eq('event_category', filters.category.toUpperCase());
+            if (filters.severity !== 'all') query = query.eq('severity', filters.severity.toUpperCase());
+            if (filters.search) query = query.or(`event_type.ilike.%${filters.search}%,description.ilike.%${filters.search}%,actor_email.ilike.%${filters.search}%`);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                console.warn('[useEventLog] No events found for export.');
+                return;
+            }
+
+            const headers = ['EventID', 'Category', 'Type', 'Severity', 'Description', 'Timestamp', 'Actor'];
+            const rows = data.map(log => [
+                log.id,
+                log.event_category,
+                log.event_type,
+                log.severity || log.metadata?.severity || 'INFO',
+                `"${(log.description || '').replace(/"/g, '""')}"`,
+                log.created_at,
+                log.actor_email || log.metadata?.actor_name || 'System'
+            ].join(','));
+
+            const csvContent = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `iotank-forensic-audit-${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            console.log(`[useEventLog] Exported ${data.length} events to CSV.`);
+        } catch (err) {
+            console.error('[useEventLog] CSV Export failed:', err);
+        }
     }
+
 
     return {
         events,
@@ -210,12 +296,7 @@ export function useEventLog(stationId: string) {
         resetFilters,
         resolveEvent,
         acknowledgeAll,
-        categoryCounts: { 
-            telemetry: events.filter(e => e.category === 'telemetry').length, 
-            operational: events.filter(e => e.category === 'operational').length, 
-            system: events.filter(e => e.category === 'system').length, 
-            ai: events.filter(e => e.category === 'ai').length 
-        }, 
+        categoryCounts: counts,
         tanks,
         exportCSV,
     };

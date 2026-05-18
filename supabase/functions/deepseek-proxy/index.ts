@@ -3,7 +3,7 @@
 
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { enforceDurableRateLimit, requireProxyScope } from '../_shared/auth.ts'
-import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt, sanitizeContextForAI } from '../_shared/prompts.ts'
+import { CHAT_PROJECT_CONTEXT, buildIntelligencePrompt, sanitizeContextForAI, buildDirectivePrompt } from '../_shared/prompts.ts'
 declare const Deno: any;
 
 const MAX_PER_WINDOW = 15;
@@ -36,12 +36,12 @@ Deno.serve(async (req) => {
        const safeNotices = (context?.notices || []).map((n: any) => sanitizeContextForAI(JSON.stringify(n)));
        const safeInventory = (context?.inventory || []);
 
-       // Support for 'directive' style single-signal analysis
-       if (context?.signal && safeSignals.length === 0) {
-         safeSignals.push(sanitizeContextForAI(JSON.stringify(context.signal)));
+       let systemPrompt;
+       if (context?.signal) {
+         systemPrompt = buildDirectivePrompt(context.signal, safeInventory);
+       } else {
+         systemPrompt = buildIntelligencePrompt(safeSignals, safeRisks, safeNotices, safeInventory);
        }
-
-       const systemPrompt = buildIntelligencePrompt(safeSignals, safeRisks, safeNotices, safeInventory);
        body.messages = [{ role: 'user', content: systemPrompt }];
     } else {
        return new Response(JSON.stringify({ error: 'Valid action (chat or intelligence) is required' }), {

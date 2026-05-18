@@ -52,7 +52,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
 
     const analytics = useMemo(() => {
         try {
-            if (readings.length < 2 || !tank || !tank.capacity) {
+            if (!tank || !tank.capacity) {
                 return {
                     defillRate: 0,
                     ete: 'Calculating...',
@@ -68,7 +68,8 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
 
             const sorted = [...readings].sort((a, b) => b.timestamp - a.timestamp);
             const latest = sorted[0];
-            const latestVolume = latest.volumeCorrected ?? latest.volume ?? 0;
+            const latestVolume = latest ? (latest.volumeCorrected ?? latest.volume ?? 0) : (tank.currentVolume ?? 0);
+            const latestTimestamp = latest ? latest.timestamp : Date.now();
 
             // 1. Current Shift Dispense Rate (Rate of Change) using unified math
             let currentShiftRate = 0;
@@ -83,7 +84,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
                 const relevant = sorted.filter(r => r.timestamp >= twoHoursAgo);
                 if (relevant.length >= 2) {
                     const oldestInWindow = relevant[relevant.length - 1];
-                    const hrs = Math.max(0.1, (latest.timestamp - oldestInWindow.timestamp) / (1000 * 60 * 60));
+                    const hrs = Math.max(0.1, (latestTimestamp - oldestInWindow.timestamp) / (1000 * 60 * 60));
                     currentShiftRate = calculateRate((oldestInWindow.volumeCorrected || oldestInWindow.volume || 0), latestVolume, hrs);
                 }
             }
@@ -107,7 +108,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
             let predictedRefillDate: number | null = null;
 
             if (hoursLeft !== null && hoursLeft > 0) {
-                predictedRefillDate = latest.timestamp + (hoursLeft * 60 * 60 * 1000);
+                predictedRefillDate = latestTimestamp + (hoursLeft * 60 * 60 * 1000);
                 
                 // [PRACTICAL CAP]: If ETE is > 30 days, show as "Stable" to avoid noise
                 if (hoursLeft > 30 * 24) {
@@ -124,12 +125,12 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
             // Real trend detection using raw rate
             const trend = currentShiftRate > 0.5 ? 'decreasing' : currentShiftRate < -0.5 ? 'increasing' : 'stable';
 
-            // [SMART REPLENISHMENT]: Lead Time Buffer (Default 48h)
-            // Time to Order = ETE - Lead Time
-            const leadTimeHrs = 48; 
-            const timeToOrderHrs = (hoursLeft !== null) ? (hoursLeft - leadTimeHrs) : null;
-            const predictedOrderDate = (timeToOrderHrs !== null && hoursLeft !== null) 
-                ? (latest.timestamp + (timeToOrderHrs * 60 * 60 * 1000)) 
+            // [REORDER POINT]: Reorder must be made when volume reaches 20% of capacity
+            // So reorder point defines the days/hours remaining to hit 20% capacity.
+            const reorderVolume = tank.capacity * 0.20;
+            const timeToOrderHrs = (effectiveRate > 0.05) ? ((latestVolume - reorderVolume) / effectiveRate) : null;
+            const predictedOrderDate = (timeToOrderHrs !== null) 
+                ? (latestTimestamp + (timeToOrderHrs * 60 * 60 * 1000)) 
                 : null;
 
             return {

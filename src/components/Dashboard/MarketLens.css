@@ -213,3 +213,99 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #cbd5e1;
 }
+
+/* Premium TankIQ Recommendation box in Dashboard MarketLens */
+.market-lens-recommendation-box {
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+.market-lens-recommendation-box--critical {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(239, 68, 68, 0.02));
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
+}
+
+.market-lens-recommendation-box--caution {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05), rgba(245, 158, 11, 0.02));
+    border: 1px solid rgba(245, 158, 11, 0.1);
+    border-left: 3px solid #f59e0b;
+}
+
+.market-lens-recommendation-box--stable {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.02));
+    border: 1px solid rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+}
+
+.market-lens-rec-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.375rem;
+}
+
+.rec-badge {
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    color: #1e1b4b;
+    text-transform: uppercase;
+}
+
+.status-badge {
+    font-size: 8px;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.status-badge--critical {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.status-badge--caution {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.status-badge--stable {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.rec-text {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.4;
+    margin: 0 0 0.25rem 0;
+}
+
+.rec-action {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #1e293b;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.market-item-source-title {
+    margin: 0.5rem 0;
+}
+
+.source-label {
+    font-size: 8px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.125rem;
+}
+

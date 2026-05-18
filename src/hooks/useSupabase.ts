@@ -3,11 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/config/supabase';
 import { TankReading, Tank, Alert, User, ShiftDocument, Site } from '@/types';
-import { downsampleLTTB, pruneSlidingWindow } from '@/utils/performance';
+import { downsampleLTTB } from '@/utils/performance';
 import { AuditService } from '@/services/AuditService';
 import { logger } from '@/utils/logger';
 import { validateUUID } from '@/utils/sanitization';
-import { getSmoothedVolume } from '@/utils/sensorFilter';
 
 
 /**
@@ -143,14 +142,12 @@ const mapAlert = (row: any): Alert => ({
     detectionMethod: 'deterministic',
     metadata: row.metadata || {}
 });
-
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 /**
  * Professional Supabase-based Hook for Real-time Tank list
  */
 export function useTanks(stationId: string) {
-    const queryClient = useQueryClient();
     const [isOffline, setIsOffline] = useState(false);
 
     const query = useQuery({
@@ -183,24 +180,10 @@ export function useTanks(stationId: string) {
         },
         enabled: true,
         staleTime: 5 * 60 * 1000,
+        refetchInterval: 30000, // Realtime channel handles instant updates; 30s is the safety fallback
+        retry: 1,
+        retryDelay: 10000, // Back off 10s before retry to avoid hammering a paused DB
     });
-
-    useEffect(() => {
-        if (!stationId) return;
-
-        const channelFilter = stationId !== 'SYSTEM_GOVERNANCE' ? `station_id=eq.${stationId}` : undefined;
-        const channelId = `tanks-realtime:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tanks', filter: channelFilter }, () => {
-                queryClient.invalidateQueries({ queryKey: ['tanks', stationId] });
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, queryClient]);
 
     return { 
         tanks: query.data || [], 
@@ -214,8 +197,6 @@ export function useTanks(stationId: string) {
  * Professional Supabase-based Hook for Latest Reading
  */
 export function useLatestReading(_stationId: string, tankId: string, enabled: boolean = true) {
-    const queryClient = useQueryClient();
-
     const query = useQuery({
         queryKey: ['latest_reading', tankId],
         queryFn: async () => {
@@ -234,49 +215,8 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
         },
         enabled: !!tankId && enabled,
         staleTime: 0, // Telemetry is always moving
+        refetchInterval: enabled ? 2000 : false, // 2-second real-time polling
     });
-
-    useEffect(() => {
-        if (!tankId || !enabled) return;
-
-        const channelId = `reading-realtime:${tankId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on('postgres_changes', { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'sensor_readings',
-                filter: `tank_id=eq.${tankId}` 
-            }, (payload) => {
-                let newReading = mapReading(payload.new);
-                
-                // Update history with sliding window (30 mins)
-                queryClient.setQueryData(['history', tankId], (oldData: any) => {
-                    const history = oldData ? [...oldData, newReading] : [newReading];
-                    const pruned = pruneSlidingWindow(history, 30 * 60 * 1000);
-                    
-                    // Apply smoothing to the latest reading based on recent history
-                    const recentVols = pruned.slice(-3).map(r => r.volume);
-                    const recentVolsCorrected = pruned.slice(-3).map(r => r.volumeCorrected);
-                    
-                    newReading = {
-                        ...newReading,
-                        volume: getSmoothedVolume(recentVols),
-                        volumeCorrected: getSmoothedVolume(recentVolsCorrected)
-                    };
-
-                    return pruned.map((r, i) => i === pruned.length - 1 ? newReading : r);
-                });
-
-                // Update specific latest_reading with smoothed values
-                queryClient.setQueryData(['latest_reading', tankId], newReading);
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [tankId, enabled, queryClient]);
 
     const reading = query.data || null;
     let freshness: 'fresh' | 'stale' | 'offline' = 'offline';
@@ -293,7 +233,6 @@ export function useLatestReading(_stationId: string, tankId: string, enabled: bo
  * Optimized for "Live SaaS" requirements with 1s update frequency support
  */
 export function useAllLatestReadings(stationId: string | undefined, tankIds: string[], enabled: boolean = true) {
-    const queryClient = useQueryClient();
     const stabilizedTankIds = React.useMemo(() => JSON.stringify([...tankIds].sort()), [tankIds]);
     const cacheKey = `latest_readings_${stationId}_${stabilizedTankIds}`;
     const [isOffline, setIsOffline] = useState(false);
@@ -334,58 +273,9 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
             }
         },
         enabled: enabled && !!stationId && tankIds.length > 0,
-        staleTime: 10000, 
+        staleTime: 10000,
+        refetchInterval: enabled ? 3000 : false, // 3-second real-time fleet polling
     });
-
-    useEffect(() => {
-        if (!stationId || !enabled || tankIds.length === 0) return;
-
-        const channelId = `station-telemetry:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'sensor_readings',
-                    filter: `station_id=eq.${stationId}`
-                },
-                (payload) => {
-                    let newReading = mapReading(payload.new);
-                    if (tankIds.includes(newReading.tankId)) {
-                        // We need the history for this specific tank to smooth
-                        const historyKey = ['history', newReading.tankId];
-                        const history = queryClient.getQueryData<TankReading[]>(historyKey) || [];
-                        const updatedHistory = [...history, newReading].slice(-10); // Keep small buffer for smoothing
-                        
-                        const recentVols = updatedHistory.slice(-3).map(r => r.volume);
-                        const recentVolsCorrected = updatedHistory.slice(-3).map(r => r.volumeCorrected);
-                        
-                        newReading = {
-                            ...newReading,
-                            volume: getSmoothedVolume(recentVols),
-                            volumeCorrected: getSmoothedVolume(recentVolsCorrected)
-                        };
-
-                        queryClient.setQueryData(['all_latest_readings', stationId, stabilizedTankIds], (old: any) => {
-                            const updated = { ...old, [newReading.tankId]: newReading };
-                            if (stationId) cacheHelper.set(cacheKey, updated);
-                            return updated;
-                        });
-                        queryClient.setQueryData(['latest_reading', newReading.tankId], newReading);
-                        
-                        // Sync back to history if enabled
-                        queryClient.setQueryData(historyKey, updatedHistory);
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, enabled, stabilizedTankIds, queryClient, cacheKey]);
 
     return { 
         readings: query.data || {}, 
@@ -399,8 +289,6 @@ export function useAllLatestReadings(stationId: string | undefined, tankIds: str
  * Professional Supabase-based Hook for Alerts
  */
 export function useAlerts(stationId?: string, resolved: boolean = false) {
-    const queryClient = useQueryClient();
-
     const query = useQuery({
         queryKey: ['alerts', stationId, resolved],
         initialData: () => {
@@ -420,22 +308,10 @@ export function useAlerts(stationId?: string, resolved: boolean = false) {
         },
         enabled: true,
         staleTime: 10 * 1000,
+        refetchInterval: 30000, // Realtime channel pushes inserts live; 30s is the safety fallback
+        retry: 1,
+        retryDelay: 10000,
     });
-
-    useEffect(() => {
-        const channelFilter = (stationId && stationId !== 'SYSTEM_GOVERNANCE') ? `station_id=eq.${stationId}` : undefined;
-        const channelId = `alerts-realtime:${stationId || 'all'}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'alerts', filter: channelFilter }, () => {
-                queryClient.invalidateQueries({ queryKey: ['alerts', stationId, resolved] });
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, resolved, queryClient]);
 
     return { alerts: query.data || [], loading: query.isLoading, error: query.error as Error | null, refetch: query.refetch };
 }
@@ -762,6 +638,8 @@ export function useProfile(authUserId: string | undefined) {
 
         fetchProfile();
 
+        if (import.meta.env.VITE_DISABLE_REALTIME === 'true') return;
+
         const channelId = `profile:${authUserId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
             .channel(channelId)
@@ -788,14 +666,13 @@ export { useShifts } from './useShifts';
  * Create Shift Record (Unified Forensic Logging)
  */
 export async function createShift(stationId: string, shiftData: Omit<ShiftDocument, 'id'> & { operation_type?: 'OPEN' | 'CLOSE', action_label?: string }) {
-    // Map ShiftDocument to snake_case table columns
     const dbShift = {
-        station_id: stationId, 
-        site_id: (shiftData.siteId && validateUUID(shiftData.siteId)) ? shiftData.siteId : null,
-        tank_id: (shiftData.tankId && validateUUID(shiftData.tankId)) ? shiftData.tankId : null,
+        station_id: stationId,
         opened_at: shiftData.openedAt,
-        closed_at: shiftData.closedAt,
+        closed_at: shiftData.closedAt || shiftData.openedAt,
         duration_min: shiftData.durationMin,
+        site_id: shiftData.siteId,
+        tank_id: shiftData.tankId,
         pump_readings: shiftData.pumpReadings,
         volume_sold_liters: shiftData.volumeSoldLiters,
         expected_collections: shiftData.expected,
@@ -805,9 +682,13 @@ export async function createShift(stationId: string, shiftData: Omit<ShiftDocume
             closing_volume: shiftData.closingVolume
         },
         variance_data: shiftData.variance,
-        status: shiftData.status,
+        status: (shiftData.status as string) === 'OPEN' ? 'NEEDS_REVIEW' : shiftData.status,
         review_state: shiftData.reviewState,
-        auth_user_id: shiftData.closedBy.authUserId || 'SYSTEM_AUTO', 
+        auth_user_id: (shiftData.closedBy?.authUserId && validateUUID(shiftData.closedBy.authUserId)) 
+            ? shiftData.closedBy.authUserId 
+            : ((shiftData.openedBy?.authUserId && validateUUID(shiftData.openedBy.authUserId)) 
+                ? shiftData.openedBy.authUserId 
+                : null),
         supervisor_notes: shiftData.notes,
         operation_type: shiftData.operation_type || 'CLOSE',
         action_label: shiftData.action_label || (shiftData.operation_type === 'OPEN' ? 'Shift Initialized' : 'Reconciliation Finalized')

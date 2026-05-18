@@ -16,7 +16,7 @@ export const THRESHOLDS = {
     FORENSICS: {
         MIN_THEFT_VOLUME_L: 2.0,
         RAPID_DEFILL_LHR: 50.0,
-        LEAK_DETECTION_LHR: 2.0,
+        LEAK_DETECTION_LHR: 0.7,
         MAX_PUMP_FLOW_LPM: 80.0, // Used for Parallel Pull detection
         DELIVERY_VARIANCE_TOLERANCE_L: 15.0, // Benchmark for disputed status
     }

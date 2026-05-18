@@ -124,12 +124,12 @@ export const TodayVarianceReviewPanel: React.FC<TodayVarianceReviewPanelProps> =
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Loss Radar Intelligence</p>
                     </div>
                     <button 
-                        className="close-btn p-2 hover:bg-slate-100 rounded-full transition-colors" 
+                        className="close-btn" 
                         type="button" 
                         onClick={onClose}
                         title="Close Analysis Panel"
                     >
-                        <FiX size={20} className="text-slate-400" />
+                        <FiX />
                     </button>
                 </div>
 

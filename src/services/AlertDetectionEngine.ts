@@ -19,7 +19,6 @@
 import type { Tank, TankReading, Alert } from '@/types';
 import { THRESHOLDS } from '@/constants/forensicThresholds';
 import { scoreByType } from './AlertScoringEngine';
-import { calculateTimeBasedSlope } from './algorithms';
 
 export interface DetectionContext {
     tank: Tank;
@@ -249,14 +248,15 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             ? new Date(latestReading.timestamp).getTime() 
             : latestReading.timestamp;
 
-        const points = [
-            { x: prevTime, y: prevVol },
-            { x: currTime, y: currVol }
-        ];
-        
         const volumeDrop = prevVol - currVol; // Positive if consuming
-        const dropRate = -calculateTimeBasedSlope(points); // Slope is negative for drop, we want positive L/hr
         
+        // [FIX]: Enforce a minimum time delta (5 minutes) for extrapolation to prevent 
+        // mathematically explosive L/hr rates (e.g. 282,000 L/hr) caused by sensor jitter 
+        // delivering two packets with a very small time gap.
+        const rawTelemetryGapHr = (currTime - prevTime) / (1000 * 60 * 60);
+        const effectiveGapHr = Math.max(rawTelemetryGapHr, 5 / 60); // Minimum 5 min denominator
+        
+        const dropRate = volumeDrop > 0 ? (volumeDrop / effectiveGapHr) : 0; 
         // [PHASE 3]: Backfill Anomaly Guard
         // If the gap between readings is too large (e.g., > 2 hours), the dropRate calculation 
         // for "Rapid Drawdown" is unreliable. We skip theft detection to avoid false positives.

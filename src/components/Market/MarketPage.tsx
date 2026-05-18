@@ -21,7 +21,7 @@ import {
     FiInfo,
 } from 'react-icons/fi';
 import { useAuth } from '@/hooks/useAuth';
-import { useTanks } from '@/hooks/useSupabase';
+import { useTanks, updateTank } from '@/hooks/useSupabase';
 import { useMarketIntelligence } from '@/hooks/useMarketIntelligence';
 import { useGeminiInsights } from '@/hooks/useGeminiInsights';
 import { useMarketNews, NewsArticle } from '@/hooks/useMarketNews';
@@ -34,6 +34,7 @@ import './MarketPage.css';
 import officialBadge from '../../assets/images/official-badge.png';
 import { FiCpu } from 'react-icons/fi';
 import { NotificationService } from '@/services/NotificationService';
+import { generateTacticalDirective } from '@/utils/directiveEngine';
 
 /**
  * Clean up HTML entities like &nbsp; or &amp; from RSS strings safely
@@ -196,50 +197,21 @@ const NewsCard: React.FC<{
                             </div>
                             
                             {(() => {
-                                // TankIQ AI Directive
-                                if (article.aiDirective) {
-                                    const status = article.aiDirective.status;
-                                    const colorClass = status === 'CRITICAL' ? 'mi-directive--critical' : status === 'CAUTION' ? 'mi-directive--caution' : 'mi-directive--stable';
-                                    const icon = status === 'CRITICAL' ? <FiAlertCircle /> : status === 'CAUTION' ? <FiAlertTriangle /> : <FiCheckCircle />;
-                                    
-                                    return (
-                                        <div className={`mi-directive-content ${colorClass}`}>
-                                            <div className="mi-directive-status-row">
-                                                <span className="mi-directive-icon">{icon}</span>
-                                                <span className="mi-directive-status-label">DIRECTIVE: {status}</span>
-                                            </div>
-                                            <p className="mi-directive-body">{article.aiDirective.recommendation}</p>
-                                            {article.aiDirective.actionDetails && (
-                                                <div className="mi-directive-action">
-                                                    <span className="font-black mr-2">ACTION:</span> {article.aiDirective.actionDetails}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                }
-
-                                // Rule-based Fallback
-                                const fuelTypes = article.topicTags.map(t => t.toLowerCase());
-                                const relevantTanks = (tanks || []).filter(t => fuelTypes.includes(t.fuelType.toLowerCase()) || fuelTypes.includes('all') || article.implicationCategory === 'Price');
+                                const directive = generateTacticalDirective(article, tanks || []);
+                                const status = directive.status;
+                                const colorClass = directive.colorClass;
+                                const icon = status === 'CRITICAL' ? <FiAlertCircle /> : status === 'CAUTION' ? <FiAlertTriangle /> : <FiCheckCircle />;
                                 
-                                let directive = { status: 'STABLE', icon: <FiCheckCircle />, color: 'mi-directive--stable', text: 'Market signals stable. Standard monitoring cycle active — no immediate tactical adjustment required.' };
-                                
-                                if (relevantTanks && relevantTanks.length > 0) {
-                                    const lowestTank = relevantTanks.reduce((prev, curr) => (prev.currentLevel < curr.currentLevel ? prev : curr), relevantTanks[0]);
-                                    if (article.implicationCategory === 'Price' && lowestTank.currentLevel < 35) {
-                                        directive = { status: 'CRITICAL', icon: <FiAlertCircle />, color: 'mi-directive--critical', text: `Inventory Alert: ${lowestTank.fuelType} level is low (${lowestTank.currentLevel}%). Procurement advised before predicted price adjustment.` };
-                                    } else if (article.implicationCategory === 'Supply') {
-                                        directive = { status: 'CAUTION', icon: <FiAlertTriangle />, color: 'mi-directive--caution', text: `Supply chain disruption detected. Monitor replenishment lead times and maintain safety stock.` };
-                                    }
-                                }
-
                                 return (
-                                    <div className={`mi-directive-content ${directive.color}`}>
+                                    <div className={`mi-directive-content ${colorClass}`}>
                                         <div className="mi-directive-status-row">
-                                            <span className="mi-directive-icon">{directive.icon}</span>
-                                            <span className="mi-directive-status-label">DIRECTIVE: {directive.status}</span>
+                                            <span className="mi-directive-icon">{icon}</span>
+                                            <span className="mi-directive-status-label">DIRECTIVE: {status}</span>
                                         </div>
-                                        <p className="mi-directive-body">{directive.text}</p>
+                                        <p className="mi-directive-body">{directive.recommendation}</p>
+                                        <div className="mi-directive-action">
+                                            <span className="font-black mr-2">ACTION:</span> {directive.actionDetails}
+                                        </div>
                                     </div>
                                 );
                             })()}
@@ -325,29 +297,56 @@ const StatusBanner: React.FC<{
     type: 'no-signal' | 'cached-stale' | 'source-unavailable';
     onRetry?: () => void;
     onDismiss: () => void;
-}> = ({ type, onRetry, onDismiss }) => {
+    isSyncing?: boolean;
+}> = ({ type, onRetry, onDismiss, isSyncing }) => {
     if (type === 'no-signal') return (
         <div className="mi-banner mi-banner--error">
-            <FiWifiOff size={14} />
-            <span><strong>No signal.</strong> All news sources are unreachable. Showing fallback data.</span>
-            {onRetry && <button className="mi-banner-btn" onClick={onRetry} title="Attempt to reconnect to market news sources">Retry</button>}
+            <div className="flex items-center gap-2 flex-1">
+                <FiWifiOff size={14} className={isSyncing ? "animate-pulse text-[#FF4560]" : ""} />
+                <span><strong>No signal.</strong> All news sources are unreachable. Showing fallback data.</span>
+            </div>
+            {onRetry && (
+                <button 
+                    className="mi-banner-btn flex items-center gap-1.5" 
+                    onClick={onRetry} 
+                    disabled={isSyncing}
+                    title="Attempt to reconnect to market news sources"
+                >
+                    <FiRefreshCw size={12} className={isSyncing ? "animate-spin" : ""} />
+                    {isSyncing ? 'Scanning...' : 'Retry'}
+                </button>
+            )}
             <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss this connectivity warning"><FiX size={12} /></button>
         </div>
     );
     if (type === 'cached-stale') {
         return (
             <div className="mi-banner mi-banner--warn">
-                <FiClock size={14} />
-                <span><strong>Sync Mode: Offline-First.</strong> Showing persisted intelligence data.</span>
-                {onRetry && <button className="mi-banner-btn" onClick={onRetry} title="Force refresh from source news feeds">Refresh</button>}
+                <div className="flex items-center gap-2 flex-1">
+                    <FiClock size={14} className={isSyncing ? "animate-pulse text-[#FEB019]" : ""} />
+                    <span><strong>Sync Mode: Offline-First.</strong> Showing persisted intelligence data.</span>
+                </div>
+                {onRetry && (
+                    <button 
+                        className="mi-banner-btn flex items-center gap-1.5" 
+                        onClick={onRetry} 
+                        disabled={isSyncing}
+                        title="Force refresh from source news feeds"
+                    >
+                        <FiRefreshCw size={12} className={isSyncing ? "animate-spin" : ""} />
+                        {isSyncing ? 'Scanning...' : 'Sync Now'}
+                    </button>
+                )}
                 <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss stale cache warning"><FiX size={12} /></button>
             </div>
         );
     }
     return (
         <div className="mi-banner mi-banner--warn">
-            <FiAlertCircle size={14} />
-            <span><strong>One or more sources unavailable.</strong> Displaying partial results.</span>
+            <div className="flex items-center gap-2 flex-1">
+                <FiAlertCircle size={14} />
+                <span><strong>One or more sources unavailable.</strong> Displaying partial results.</span>
+            </div>
             <button className="mi-banner-dismiss" onClick={onDismiss} title="Dismiss partial source warning"><FiX size={12} /></button>
         </div>
     );
@@ -382,6 +381,7 @@ export const MarketPage: React.FC = () => {
 
 
     const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [confirmingAction, setConfirmingAction] = useState<any>(null);
 
     // [INTELLIGENCE SYNC NOTIFICATION]: Promote stale cache warning to global toast + browser notification
     useEffect(() => {
@@ -415,7 +415,7 @@ export const MarketPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'news' | 'outlook' | 'archive'>('news');
 
     // Thresholds
-    const LIFESPAN_DAYS = 14;
+    const LIFESPAN_DAYS = 7;
     const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const ARCHIVE_THRESHOLD = LIFESPAN_DAYS * MS_PER_DAY;
 
@@ -532,14 +532,17 @@ export const MarketPage: React.FC = () => {
             return true;
         });
 
-        // Split by 14 days and verification status
+        // Split by 7 days to archive and 14 days to purge
         const verified: NewsArticle[] = [];
         const unverified: NewsArticle[] = [];
         const archived: NewsArticle[] = [];
+        const PURGE_THRESHOLD = 14 * MS_PER_DAY;
 
         processed.forEach(a => {
             const age = now - a.timestamp;
-            if (age > ARCHIVE_THRESHOLD) {
+            if (age > PURGE_THRESHOLD) {
+                // Purged after 14 days: exclude entirely from display
+            } else if (age > ARCHIVE_THRESHOLD) {
                 archived.push(a);
             } else {
                 const isUnverified = a.verificationStatus === 'flagged' || !a.isCorroborated;
@@ -616,18 +619,7 @@ export const MarketPage: React.FC = () => {
                         </div>
 
                         <div className="flex flex-wrap gap-3 items-center">
-                            <button
-                                className={`mi-refresh-btn-premium ${!canRefresh || isRefreshing || marketLoading ? 'mi-refresh-btn-premium--disabled' : ''}`}
-                                title="Scanner for the latest market intelligence signals"
-                                onClick={() => { refresh(tanks); refetch(); }}
-                                disabled={!canRefresh || isRefreshing || marketLoading}
-                            >
-                                <FiRefreshCw size={14} className={(isRefreshing || marketLoading) ? 'animate-spin' : ''} />
-                                {(isRefreshing || marketLoading) ? 'Scanning...' : 'Refresh intel'}
-                            </button>
-                            <button className="mi-export-btn-premium" title="Export Market Intelligence Report PDF">
-                                <FiTrendingUp size={14} /> Export
-                            </button>
+                            {/* SCANNING and EXPORT buttons removed. Manual sync available inside the status banner popup. */}
                         </div>
                     </div>
 
@@ -757,7 +749,7 @@ export const MarketPage: React.FC = () => {
                                     </p>
                                     <div className="flex gap-2">
                                         <button 
-                                            onClick={() => completeAction(action.id)}
+                                            onClick={() => setConfirmingAction(action)}
                                             className="mi-action-btn-premium text-[10px] py-2 flex-1 justify-center"
                                         >
                                             Confirm Adjustment
@@ -786,8 +778,9 @@ export const MarketPage: React.FC = () => {
                         {showBanner && activeTab === 'news' && (
                             <StatusBanner
                                 type={newsStatus as any}
-                                onRetry={canRefresh ? refresh : undefined}
+                                onRetry={canRefresh ? () => { refresh(tanks); refetch(); } : undefined}
                                 onDismiss={() => setBannerDismissed(true)}
+                                isSyncing={isRefreshing || marketLoading}
                             />
                         )}
 
@@ -1130,6 +1123,154 @@ export const MarketPage: React.FC = () => {
                 )}
 
             </div>
+
+            {confirmingAction && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="ds-card w-full max-w-lg p-6 bg-white/95 border border-white/20 shadow-2xl rounded-2xl animate-in zoom-in-95 duration-300 relative overflow-hidden">
+                        {/* Top gradient glowing strap */}
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#00D4FF] via-[#06b6d4] to-blue-600" />
+                        
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                                <FiCpu className="text-[#00D4FF] animate-pulse" size={20} />
+                                <h3 className="text-base font-black text-[#323264] uppercase tracking-wider">
+                                    Auto-Update Retail Price?
+                                </h3>
+                            </div>
+                            <button 
+                                onClick={() => setConfirmingAction(null)}
+                                className="text-[#7A7A95] hover:text-[#323264] transition-colors p-1 rounded-full hover:bg-gray-100"
+                            >
+                                <FiX size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 mb-6">
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50/50 to-[#00D4FF]/5 border border-blue-100/50">
+                                <p className="text-xs text-[#4A4A65] leading-relaxed">
+                                    EPRA has revised <span className="font-bold text-[#323264]">{confirmingAction.fuelType}</span> regulated rates to <span className="font-bold text-[#323264]">KES {confirmingAction.newPrice.toFixed(2)}/L</span>.
+                                </p>
+                                <p className="text-[11px] text-[#7A7A95] mt-2">
+                                    Do you want to automatically adjust the retail price for all <span className="font-semibold">{confirmingAction.fuelType}</span> tanks at your station to match this rate?
+                                </p>
+                            </div>
+
+                            <div className="text-[11px] text-[#7A7A95] border-t border-gray-100 pt-3">
+                                <span className="font-bold text-[#323264] block mb-1">Affected Tanks:</span>
+                                {tanks.filter((t: any) => {
+                                    const tType = t.fuelType?.toUpperCase();
+                                    const aType = confirmingAction.fuelType?.toUpperCase();
+                                    return tType === aType || 
+                                           (tType === 'PETROL' && aType === 'PMS') || 
+                                           (tType === 'DIESEL' && aType === 'AGO') || 
+                                           (tType === 'KEROSENE' && aType === 'IK');
+                                }).length > 0 ? (
+                                    <div className="grid grid-cols-2 gap-2 mt-1">
+                                        {tanks.filter((t: any) => {
+                                            const tType = t.fuelType?.toUpperCase();
+                                            const aType = confirmingAction.fuelType?.toUpperCase();
+                                            return tType === aType || 
+                                                   (tType === 'PETROL' && aType === 'PMS') || 
+                                                   (tType === 'DIESEL' && aType === 'AGO') || 
+                                                   (tType === 'KEROSENE' && aType === 'IK');
+                                        }).map((t: any) => (
+                                            <div key={t.id} className="flex justify-between items-center bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                                <span className="font-bold text-[#323264] truncate max-w-[80px]">{t.name}</span>
+                                                <span className="text-gray-400">
+                                                    {t.metadata?.retailPrice ? `KES ${t.metadata.retailPrice}` : 'Not set'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <span className="italic text-amber-600 block bg-amber-50 px-3 py-1.5 rounded-lg mt-1">
+                                        No tanks configured for this fuel type.
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const targetTanks = tanks.filter((t: any) => {
+                                            const tType = t.fuelType?.toUpperCase();
+                                            const aType = confirmingAction.fuelType?.toUpperCase();
+                                            return tType === aType || 
+                                                   (tType === 'PETROL' && aType === 'PMS') || 
+                                                   (tType === 'DIESEL' && aType === 'AGO') || 
+                                                   (tType === 'KEROSENE' && aType === 'IK');
+                                        });
+
+                                        if (targetTanks.length > 0) {
+                                            for (const t of targetTanks) {
+                                                const currentMetadata = t.metadata || {};
+                                                await updateTank(t.id, {
+                                                    metadata: {
+                                                        ...currentMetadata,
+                                                        retailPrice: confirmingAction.newPrice
+                                                    }
+                                                });
+                                            }
+                                            
+                                            window.dispatchEvent(new CustomEvent('system-toast', {
+                                                detail: {
+                                                    title: 'Retail Prices Updated',
+                                                    message: `Successfully adjusted retail prices for all ${confirmingAction.fuelType} tanks to KES ${confirmingAction.newPrice.toFixed(2)}/L.`,
+                                                    type: 'success'
+                                                }
+                                            }));
+
+                                            const { AuditService } = await import('@/services/AuditService');
+                                            await AuditService.log(
+                                                'FINANCE',
+                                                'PRICE_UPDATE',
+                                                stationId,
+                                                `Forensic Price Adjustment: Auto-updated retail prices for ${confirmingAction.fuelType} to KES ${confirmingAction.newPrice.toFixed(2)}`,
+                                                'INFO',
+                                                { fuelType: confirmingAction.fuelType, price: confirmingAction.newPrice, tanksCount: targetTanks.length }
+                                            );
+                                        }
+
+                                        await completeAction(confirmingAction.id);
+                                    } catch (err) {
+                                        console.error('[MarketPage] Retail update failed:', err);
+                                        window.dispatchEvent(new CustomEvent('system-toast', {
+                                            detail: {
+                                                title: 'Update Failed',
+                                                message: 'Could not apply automatic retail price updates to tanks.',
+                                                type: 'error'
+                                            }
+                                        }));
+                                    } finally {
+                                        setConfirmingAction(null);
+                                    }
+                                }}
+                                className="mi-action-btn-premium py-2.5 px-4 font-black justify-center flex-1"
+                            >
+                                Update Retail Price
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await completeAction(confirmingAction.id);
+                                    setConfirmingAction(null);
+                                    window.dispatchEvent(new CustomEvent('system-toast', {
+                                        detail: {
+                                            title: 'Adjustment Resolved',
+                                            message: 'Reference prices updated, retail prices kept unchanged.',
+                                            type: 'success'
+                                        }
+                                    }));
+                                }}
+                                className="bg-gray-100 hover:bg-gray-200 text-[#323264] border border-gray-200 font-bold text-xs py-2.5 px-4 rounded-xl transition-all duration-300 flex-1 justify-center flex items-center"
+                            >
+                                Keep Current Prices
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </TelemetryErrorBoundary>
     );
 };

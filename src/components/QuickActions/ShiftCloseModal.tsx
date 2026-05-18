@@ -33,6 +33,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
     const [isManualOverride, setIsManualOverride] = useState(false);
     const [manualClosingVolumes, setManualClosingVolumes] = useState<Record<string, string>>({});
     const [criticalVarianceThreshold, setCriticalVarianceThreshold] = useState(500);
+    const [unitCostMap, setUnitCostMap] = useState<Record<string, number>>({});
 
     // Read opening state from DB on mount/open
     useEffect(() => {
@@ -78,8 +79,27 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             }
         };
 
+        const fetchDeliveryCosts = async () => {
+            const { data } = await supabase
+                .from('deliveries')
+                .select('tank_id, metadata')
+                .eq('station_id', stationId)
+                .order('delivery_date', { ascending: false });
+            
+            if (data) {
+                const costs: Record<string, number> = {};
+                for (const d of data) {
+                    if (!costs[d.tank_id] && d.metadata?.unit_price) {
+                        costs[d.tank_id] = d.metadata.unit_price;
+                    }
+                }
+                setUnitCostMap(costs);
+            }
+        };
+
         fetchActiveShift();
         fetchSettings();
+        fetchDeliveryCosts();
     }, [isOpen, stationId]);
 
     // Legacy fallback (maintained for zero-downtime transition)
@@ -136,6 +156,14 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
         return acc + (vol * price);
     }, 0);
 
+    const totalUnitCost = tanks.reduce((acc: number, tank: Tank) => {
+        const vol = volumesDispensed[tank.id] || 0;
+        const cost = unitCostMap[tank.id] || 0;
+        return acc + (vol * cost);
+    }, 0);
+
+    const projectedProfit = totalVolumetricSold - totalUnitCost;
+
     const totalDispensedLiters = Object.values(volumesDispensed).reduce((a, b) => a + b, 0);
     const totalCollected = Object.values(financials).reduce((sum, tankFin) => {
         return sum + (tankFin.cash || 0) + (tankFin.mpesa || 0) + (tankFin.card || 0) + (tankFin.other || 0);
@@ -158,55 +186,6 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
         const nowString = new Date().toISOString();
         setIsClosing(true);
         try {
-            await AuditService.log(
-                'SHIFT',
-                isCollusionSuspected ? 'SECURITY_COLLUSION_ALERT' : 'SHIFT_CLOSED',
-                stationId,
-                isCollusionSuspected 
-                    ? `FORENSIC ALERT: Discrepancy detected. Variance: Ksh ${deficit.toFixed(2)}. Threshold exceeded.`
-                    : `Shift Closed: Variance balanced at Ksh ${deficit.toFixed(2)}. Operations archived.`,
-                isCollusionSuspected ? 'CRITICAL' : 'INFO',
-                { 
-                    variance: deficit, 
-                    isCollusionSuspected, 
-                    totalCollected, 
-                    totalVolumetricSold, 
-                    totalDispensedLiters, 
-                    closedBy: currentUser?.email,
-                    timestamp: nowString 
-                }
-            );
-
-            NotificationService.show(
-                isCollusionSuspected ? '⚠️ COLLUSION DETECTED' : '🛡️ Shift Closed',
-                { body: `Variance: Ksh ${deficit.toFixed(2)}`, tag: 'shift-close' }
-            );
-
-            if (isCollusionSuspected) {
-                const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
-                const shouldSendAlertEmail = currentUser?.authUserId
-                    ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'alerts')
-                    : false;
-
-                if (emailRecipient && shouldSendAlertEmail) {
-                    await EmailDispatchService.sendSecurityAlert({
-                        to: emailRecipient,
-                        type: 'COLLUSION',
-                        siteName: currentUser?.companyName || 'Fuel Station',
-                        details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Significant discrepancy detected.' }
-                    });
-                } else if (emailRecipient && !shouldSendAlertEmail) {
-                    await AuditService.log(
-                        'SYSTEM',
-                        'EMAIL_SUPPRESSED',
-                        stationId,
-                        'Collusion alert email suppressed by user notification preferences.',
-                        'INFO',
-                        { userId: currentUser?.authUserId, flow: 'shift_close_collusion' }
-                    );
-                }
-            }
-
             const pumpReadings: Record<string, any> = {};
             tanks.forEach((t: Tank) => {
                 const manualVol = manualClosingVolumes[t.id] ? Number(manualClosingVolumes[t.id]) : null;
@@ -221,6 +200,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 };
             });
 
+            // 1. Create Shift record in DB
             await createShift(stationId, {
                 openedAt: startTimeStr || nowString,
                 closedAt: nowString,
@@ -247,7 +227,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 action_label: isManualOverride ? 'Reconciliation Finalized (Manual)' : 'Reconciliation Finalized (Telemetric)'
             } as any);
 
-            // [SYNC]: Update the stateless tracker to CLOSED state with full metadata
+            // 2. Update stateless shift tracker to CLOSED state in DB
             await supabase
                 .from('current_station_shifts')
                 .upsert({
@@ -264,59 +244,13 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                     }
                 });
 
-            if (isManualOverride) {
-                await AuditService.log(
-                    'SECURITY',
-                    'MANUAL_OVERRIDE',
-                    stationId,
-                    `OPERATIONAL ALERT: Shift closed via manual volume bypass by ${currentUser?.email}. Forensic sync offline.`,
-                    'WARNING',
-                    { manualClosingVolumes, deficit }
-                );
-            }
-            
-            // [FORENSIC UPGRADE]: Automated Shift Summary Email to Station Admin
-            const durationMs = startTimeStr ? (Date.now() - new Date(startTimeStr).getTime()) : 0;
-            const hrs = Math.floor(durationMs / 3600000);
-            const mins = Math.floor((durationMs % 3600000) / 60000);
-            const durationStr = `${hrs}h ${mins}m`;
-
-            const summaryRecipient = currentUser?.stationEmail || currentUser?.email || 'admin@iotank.com';
-            const shouldSendSummaryEmail = currentUser?.authUserId
-                ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
-                : false;
-
-            if (summaryRecipient && shouldSendSummaryEmail) {
-                EmailDispatchService.sendSecurityAlert({
-                    to: summaryRecipient,
-                    type: 'SHIFT_REPORT',
-                    siteName: currentUser?.companyName || 'Fuel Station',
-                    details: {
-                        timestamp: nowString,
-                        description: `Shift Summary for ${currentUser?.companyName}. Operator: ${currentUser?.displayName || currentUser?.email}.`,
-                        totalSales: totalCollected + spending,
-                        totalLiters: totalDispensedLiters,
-                        varianceValue: deficit,
-                        duration: durationStr,
-                        operator: currentUser?.displayName || currentUser?.email || 'Unknown'
-                    }
-                });
-            } else if (summaryRecipient && !shouldSendSummaryEmail) {
-                await AuditService.log(
-                    'SYSTEM',
-                    'EMAIL_SUPPRESSED',
-                    stationId,
-                    'Shift summary email suppressed by user notification preferences.',
-                    'INFO',
-                    { userId: currentUser?.authUserId, flow: 'shift_close_summary' }
-                );
-            }
-
+            // 3. Clean up local state
             localStorage.removeItem('iotank_shift_start_time');
             localStorage.removeItem('iotank_shift_start_volumes');
             localStorage.removeItem('iotank_shift_opened_by');
             localStorage.setItem('iotank_shift_status', 'closed');
 
+            // 4. Trigger UI notification
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Shift Archived',
@@ -326,8 +260,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 }
             }));
 
-            // [SYNC]: Instant UI Update (Bypass real-time lag)
-            // Optimistically update the active_shift query to show the CLOSED state IMMEDIATELY
+            // 5. Update UI state instantly
             queryClient.setQueryData(['active_shift', stationId], {
                 status: 'CLOSED',
                 updated_at: nowString,
@@ -343,7 +276,229 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
             queryClient.invalidateQueries({ queryKey: ['active_shift', stationId] });
             queryClient.invalidateQueries({ queryKey: ['shifts', stationId] });
 
+            // Dismiss modal instantly
             onClose();
+
+            // 6. Run slow tasks asynchronously in background async block
+            (async () => {
+                try {
+                    // Audit log shift closing
+                    await AuditService.log(
+                        'SHIFT',
+                        isCollusionSuspected ? 'SECURITY_COLLUSION_ALERT' : 'SHIFT_CLOSED',
+                        stationId,
+                        isCollusionSuspected 
+                            ? `FORENSIC ALERT: Discrepancy detected. Variance: Ksh ${deficit.toFixed(2)}. Threshold exceeded.`
+                            : `Shift Closed: Variance balanced at Ksh ${deficit.toFixed(2)}. Operations archived.`,
+                        isCollusionSuspected ? 'CRITICAL' : 'INFO',
+                        { 
+                            variance: deficit, 
+                            isCollusionSuspected, 
+                            totalCollected, 
+                            totalVolumetricSold, 
+                            totalDispensedLiters, 
+                            closedBy: currentUser?.email,
+                            timestamp: nowString 
+                        }
+                    );
+
+                    // Browser native notification
+                    NotificationService.show(
+                        isCollusionSuspected ? '⚠️ COLLUSION DETECTED' : '🛡️ Shift Closed',
+                        { body: `Variance: Ksh ${deficit.toFixed(2)}`, tag: 'shift-close' }
+                    );
+
+                    // Audit manual override if active
+                    if (isManualOverride) {
+                        await AuditService.log(
+                            'SECURITY',
+                            'MANUAL_OVERRIDE',
+                            stationId,
+                            `OPERATIONAL ALERT: Shift closed via manual volume bypass by ${currentUser?.email}. Forensic sync offline.`,
+                            'WARNING',
+                            { manualClosingVolumes, deficit }
+                        );
+                    }
+
+                    // Collusion Alert Email
+                    if (isCollusionSuspected) {
+                        const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
+                        const shouldSendAlertEmail = currentUser?.authUserId
+                            ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'alerts')
+                            : false;
+
+                        if (emailRecipient && shouldSendAlertEmail) {
+                            await EmailDispatchService.sendSecurityAlert({
+                                to: emailRecipient,
+                                type: 'COLLUSION',
+                                siteName: currentUser?.companyName || 'Fuel Station',
+                                details: { timestamp: nowString, varianceValue: deficit, operator: currentUser?.email || 'Unknown', description: 'Significant discrepancy detected.' }
+                            });
+                        } else if (emailRecipient && !shouldSendAlertEmail) {
+                            await AuditService.log(
+                                'SYSTEM',
+                                'EMAIL_SUPPRESSED',
+                                stationId,
+                                'Collusion alert email suppressed by user notification preferences.',
+                                'INFO',
+                                { userId: currentUser?.authUserId, flow: 'shift_close_collusion' }
+                            );
+                        }
+                    }
+
+                    // Forensic shift summary email
+                    const durationMs = startTimeStr ? (Date.now() - new Date(startTimeStr).getTime()) : 0;
+                    const hrs = Math.floor(durationMs / 3600000);
+                    const mins = Math.floor((durationMs % 3600000) / 60000);
+                    const durationStr = `${hrs}h ${mins}m`;
+
+                    const summaryRecipient = currentUser?.stationEmail || currentUser?.email || 'admin@iotank.com';
+                    const shouldSendSummaryEmail = currentUser?.authUserId
+                        ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
+                        : false;
+
+                    if (summaryRecipient && shouldSendSummaryEmail) {
+                        await EmailDispatchService.sendSecurityAlert({
+                            to: summaryRecipient,
+                            type: 'SHIFT_REPORT',
+                            siteName: currentUser?.companyName || 'Fuel Station',
+                            details: {
+                                timestamp: nowString,
+                                description: `Shift Summary for ${currentUser?.companyName}. Operator: ${currentUser?.displayName || currentUser?.email}.`,
+                                totalSales: totalCollected + spending,
+                                totalLiters: totalDispensedLiters,
+                                varianceValue: deficit,
+                                duration: durationStr,
+                                operator: currentUser?.displayName || currentUser?.email || 'Unknown'
+                            }
+                        });
+                    } else if (summaryRecipient && !shouldSendSummaryEmail) {
+                        await AuditService.log(
+                            'SYSTEM',
+                            'EMAIL_SUPPRESSED',
+                            stationId,
+                            'Shift summary email suppressed by user notification preferences.',
+                            'INFO',
+                            { userId: currentUser?.authUserId, flow: 'shift_close_summary' }
+                        );
+                    }
+
+                    // ── [REORDER POINT NOTIFICATION CORE] ───────────────────────
+                    // Scans all tanks at shift closure to verify days remaining to hit 20% capacity.
+                    // Generates native browser notifications & inserts persistent DB alerts if < 7 days.
+                    for (const tank of tanks) {
+                        try {
+                            const currentReading = readings[tank.id];
+                            const startVol = startVolumes[tank.id] || tank.currentVolume || 0; 
+                            
+                            // Use manual override volume if provided, else use live telemetry
+                            const manualVolStr = manualClosingVolumes[tank.id];
+                            const manualVol = manualVolStr ? Number(manualVolStr) : null;
+                            const currentVol = isManualOverride && manualVol !== null 
+                                ? manualVol 
+                                : (currentReading?.volumeCorrected || currentReading?.volume || tank.currentVolume || 0);
+
+                            const capacity = tank.capacity || 10000;
+                            const reorderVol = capacity * 0.20;
+
+                            // Calculate current shift drawdown rate (L/hr)
+                            const durationHrs = startTimeStr 
+                                ? Math.max(0.5, (Date.now() - new Date(startTimeStr).getTime()) / 3600000) 
+                                : 1;
+                            const dispensed = startVol - currentVol;
+                            const currentShiftRate = dispensed > 0 ? (dispensed / durationHrs) : 0;
+
+                            // Query last 7 closures for robust blended consumption average
+                            let avgRateLhr = currentShiftRate > 0.05 ? currentShiftRate : 10;
+                            const { data: closures } = await supabase
+                                .from('shift_closures')
+                                .select('volume_sold_liters, opened_at, closed_at')
+                                .eq('tank_id', tank.id)
+                                .order('closed_at', { ascending: false })
+                                .limit(7);
+
+                            if (closures && closures.length > 0) {
+                                const rates = closures.map(c => {
+                                    const duration = Math.max(0.5, (new Date(c.closed_at).getTime() - new Date(c.opened_at).getTime()) / 3600000);
+                                    return (Number(c.volume_sold_liters) || 0) / duration;
+                                });
+                                const historicalAvg = rates.reduce((a, b) => a + b, 0) / rates.length;
+                                if (historicalAvg > 0.05) {
+                                    avgRateLhr = historicalAvg;
+                                }
+                            }
+                            // Clamp to at least 1L/hr to prevent division by zero / negative rates due to refilling
+                            avgRateLhr = Math.max(1.0, avgRateLhr);
+
+                            const dailyRate = avgRateLhr * 24;
+                            const daysRemaining = (currentVol - reorderVol) / dailyRate;
+
+                            // Give notifications when days remaining is less than a week (7 days)
+                            if (daysRemaining < 7) {
+                                const targetDate = new Date(Date.now() + Math.max(0, daysRemaining) * 24 * 60 * 60 * 1000);
+                                const formatTargetDay = (date: Date) => {
+                                    const today = new Date();
+                                    const tomorrow = new Date();
+                                    tomorrow.setDate(today.getDate() + 1);
+                                    if (date.toDateString() === today.toDateString()) return 'Today';
+                                    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+                                    return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+                                };
+                                const targetDayStr = formatTargetDay(targetDate);
+
+                                const isOverdue = daysRemaining < 0;
+                                const title = isOverdue 
+                                    ? `🚨 CRITICAL: Reorder Overdue (${tank.name})` 
+                                    : `⚠️ Reorder Warning: ${tank.name}`;
+                                
+                                const body = isOverdue
+                                    ? `Tank ${tank.name} is past the 20% reorder point by ${Math.abs(daysRemaining).toFixed(1)} days. Fuel will arrive late!`
+                                    : `Tank ${tank.name} will hit the 20% reorder point in ${daysRemaining.toFixed(1)} days (on ${targetDayStr}). Please order now!`;
+
+                                // 1. Browser Native Notification
+                                NotificationService.show(title, {
+                                    body,
+                                    tag: `reorder-point-${tank.id}`,
+                                    requireInteraction: true
+                                });
+
+                                // 2. Insert Persistent Alert to Database (using RPC upsert_alert_v2 or upsert)
+                                await supabase.from('alerts').upsert({
+                                    station_id: stationId,
+                                    tank_id: tank.id,
+                                    alert_type: 'reorder_point',
+                                    severity: isOverdue ? 'critical' : 'warning',
+                                    title,
+                                    message: body,
+                                    alert_data: { score: isOverdue ? 95 : 65 },
+                                    is_resolved: false,
+                                    metadata: {
+                                        daysRemaining,
+                                        targetDay: targetDayStr,
+                                        currentVolume: currentVol,
+                                        reorderVolume: reorderVol,
+                                        dispenseRateLhr: avgRateLhr
+                                    }
+                                }, { onConflict: 'station_id,tank_id,alert_type' });
+
+                                // 3. Log to forensic audit trail
+                                await AuditService.log(
+                                    'SYSTEM',
+                                    'DEVICE_COMMAND',
+                                    stationId,
+                                    `Reorder point notification fired: ${body}`,
+                                    isOverdue ? 'CRITICAL' : 'WARNING',
+                                    { tankId: tank.id, daysRemaining, targetDayStr }
+                                );
+                            }
+                        } catch (tankErr) {
+                            console.error(`[ShiftClose] Reorder scan failed for ${tank.name}:`, tankErr);
+                        }
+                    }
+                } catch (bgErr) {
+                    console.error('[ShiftClose] Background worker error:', bgErr);
+                }
+            })();
         } catch (err) {
             logger.error('Shift close error', err, 'SHIFT_CLOSE');
             window.dispatchEvent(new CustomEvent('system-toast', {
@@ -563,6 +718,15 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                             </span>
                             <div className={`tm-chip-status ${deficit > 0 ? 'critical' : 'ok'}`}>
                                 {deficit > 0 ? 'Shortfall Detected' : 'Balanced / Surplus'}
+                            </div>
+                        </div>
+                        <div className="tm-disclosure-chip forensic accent col-span-full">
+                            <span className="tm-chip-label">Delivery vs Retail Profitability</span>
+                            <span className={`tm-chip-value ${projectedProfit > 0 ? 'text-emerald-700' : 'text-slate-500'}`}>
+                                Ksh {Math.round(projectedProfit).toLocaleString()}
+                            </span>
+                            <div className={`tm-chip-status ${projectedProfit > 0 ? 'ok' : 'warning'}`}>
+                                {projectedProfit > 0 ? 'Projected Gross Margin (Estimated)' : 'Profit Data Unavailable'}
                             </div>
                         </div>
                     </div>

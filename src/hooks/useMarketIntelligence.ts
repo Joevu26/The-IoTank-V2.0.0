@@ -9,11 +9,11 @@ export const useMarketIntelligence = (stationId: string) => {
     const MI_CACHE_KEY_SIGNALS = 'mi_cache_signals';
     
     const VERIFIED_BASE_PRICES: MarketData[] = [
-        { id: 'init-pms', fuelType: 'PMS', region: 'Kenya', pricePerLiter: 206.97, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
-        { id: 'init-ago', fuelType: 'AGO', region: 'Kenya', pricePerLiter: 206.84, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
-        { id: 'init-ik', fuelType: 'IK', region: 'Kenya', pricePerLiter: 152.78, currency: 'KES', timestamp: 1715500000000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
-        { id: 'init-brent', fuelType: 'BRENT', region: 'Global', pricePerLiter: 83.45, currency: 'USD', timestamp: 1715500000000, source: 'api' },
-        { id: 'init-fx', fuelType: 'FX', region: 'Kenya', pricePerLiter: 132.50, currency: 'KES', timestamp: 1715500000000, source: 'api' },
+        { id: 'init-pms', fuelType: 'PMS', region: 'Kenya', pricePerLiter: 214.25, currency: 'KES', timestamp: 1778803200000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-ago', fuelType: 'AGO', region: 'Kenya', pricePerLiter: 242.92, currency: 'KES', timestamp: 1778803200000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-ik', fuelType: 'IK', region: 'Kenya', pricePerLiter: 152.78, currency: 'KES', timestamp: 1778803200000, source: 'epra', metadata: { isOfficial: true, sourceDetail: 'User Verified' } as any },
+        { id: 'init-brent', fuelType: 'BRENT', region: 'Global', pricePerLiter: 83.45, currency: 'USD', timestamp: 1778803200000, source: 'api' },
+        { id: 'init-fx', fuelType: 'FX', region: 'Kenya', pricePerLiter: 132.50, currency: 'KES', timestamp: 1778803200000, source: 'api' },
     ];
 
     const [signals, setSignals] = useState<MarketSignal[]>(() => {
@@ -157,9 +157,18 @@ export const useMarketIntelligence = (stationId: string) => {
                     .slice(0, 30);
 
                 // ─── Forensic Extraction Logic ───
+                const basePricesMap = prices.reduce((acc, p) => {
+                    let key = p.fuelType;
+                    if (key === 'PMS') key = 'Petrol';
+                    else if (key === 'AGO') key = 'Diesel';
+                    else if (key === 'IK') key = 'Kerosene';
+                    acc[key] = p.pricePerLiter;
+                    return acc;
+                }, {} as Record<string, number>);
+
                 const extractedPrices: MarketData[] = [];
                 mergedSignals.forEach(signal => {
-                    const detections = extractPricesFromText(signal.title + ' ' + signal.summary);
+                    const detections = extractPricesFromText(signal.title + ' ' + signal.summary, basePricesMap);
                     const topicTags = (signal as any).topicTags || [];
                     const isEPRA = topicTags.includes('EPRA') || signal.source?.includes('EPRA') || signal.attribution?.includes('EPRA');
                     
@@ -173,6 +182,30 @@ export const useMarketIntelligence = (stationId: string) => {
                             if (fuelType === 'PETROL') fuelType = 'PMS';
                             else if (fuelType === 'DIESEL') fuelType = 'AGO';
                             else if (fuelType === 'KEROSENE') fuelType = 'IK';
+
+                            // Synchronize variance to the database table market_prices and trigger action queue alerts
+                            const currentDbPrice = basePricesMap[det.commodity];
+                            if (currentDbPrice !== det.value) {
+                                supabase.rpc('forensic_update_market_price', {
+                                    p_fuel_type: fuelType,
+                                    p_new_price: det.value,
+                                    p_effective_date: new Date(signal.timestamp).toISOString(),
+                                    p_source_url: (signal as any).url || null,
+                                    p_is_official: isEPRA,
+                                    p_signal_id: signal.id || null
+                                }).then(
+                                    ({ error }) => {
+                                        if (error) {
+                                            console.error(`[useMarketIntelligence] Sync extracted price failed for ${fuelType}:`, error.message);
+                                        } else {
+                                            console.log(`[useMarketIntelligence] Forensic update success for ${fuelType} to KES ${det.value}`);
+                                        }
+                                    },
+                                    (err: any) => {
+                                        console.error(`[useMarketIntelligence] Sync error for ${fuelType}:`, err);
+                                    }
+                                );
+                            }
 
                             extractedPrices.push({
                                 id: `extraction-${fuelType}-${signal.id}`,

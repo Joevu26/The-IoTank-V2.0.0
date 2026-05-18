@@ -1,6 +1,10 @@
 import { FiExternalLink, FiClock, FiRss, FiCheck } from 'react-icons/fi';
 import React, { useMemo } from 'react';
 import { useMarketNews, VERIFIED_AI_SOURCES } from '@/hooks/useMarketNews';
+import { useAuth } from '@/hooks/useAuth';
+import { useTanks } from '@/hooks/useSupabase';
+import { generateTacticalDirective } from '@/utils/directiveEngine';
+import { useNavigate } from 'react-router-dom';
 import '../Common/DesignSystemCards.css';
 import './MarketLens.css';
 
@@ -9,8 +13,16 @@ interface MarketLensProps {
 }
 
 export const MarketLens: React.FC<MarketLensProps> = () => {
+    const { currentUser } = useAuth();
+    const stationId = currentUser?.stationId || '00000000-0000-0000-0000-000000000000';
+    const { tanks } = useTanks(stationId);
     const { filteredArticles, status, acknowledgeArticle } = useMarketNews();
     const loading = status === 'loading';
+    const navigate = useNavigate();
+
+    const handleCardClick = () => {
+        navigate('/market?tab=news');
+    };
 
     // Safe URL parsing to prevent component crashes on malformed links
     const getSafeHostname = (url: string | undefined) => {
@@ -70,56 +82,77 @@ export const MarketLens: React.FC<MarketLensProps> = () => {
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Scanning Markets...</span>
                     </div>
                 ) : displayedArticles.length > 0 ? (
-                    displayedArticles.map((signal, idx) => (
-                        <div key={signal.id || idx} className="market-item animate-in fade-in slide-in-from-right duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                            <div className="market-item-main">
-                                <div className="market-item-header">
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative w-3.5 h-3.5 flex items-center justify-center">
-                                            <img 
-                                                src={`https://www.google.com/s2/favicons?domain=${getSafeHostname(signal.url)}&sz=32`} 
-                                                alt="" 
-                                                className="w-full h-full rounded-sm grayscale group-hover:grayscale-0 transition-all object-contain"
-                                                onError={(e) => { 
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.style.display = 'none';
-                                                    const fallback = target.nextElementSibling as HTMLElement;
-                                                    if (fallback) fallback.style.display = 'flex';
-                                                }}
-                                            />
-                                            <div className="hidden absolute inset-0 items-center justify-center text-slate-400">
-                                                <FiRss size={12} />
+                    displayedArticles.map((signal, idx) => {
+                        const directive = generateTacticalDirective(signal, tanks);
+                        return (
+                            <div 
+                                key={signal.id || idx} 
+                                className="market-item animate-in fade-in slide-in-from-right duration-500 cursor-pointer hover:border-accent/30 transition-all" 
+                                style={{ animationDelay: `${idx * 100}ms` }}
+                                onClick={handleCardClick}
+                            >
+                                <div className="market-item-main">
+                                    <div className="market-item-header">
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                                                <img 
+                                                    src={`https://www.google.com/s2/favicons?domain=${getSafeHostname(signal.url)}&sz=32`} 
+                                                    alt="" 
+                                                    className="w-full h-full rounded-sm grayscale group-hover:grayscale-0 transition-all object-contain"
+                                                    onError={(e) => { 
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.style.display = 'none';
+                                                        const fallback = target.nextElementSibling as HTMLElement;
+                                                        if (fallback) fallback.style.display = 'flex';
+                                                    }}
+                                                />
                                             </div>
+                                            <span className="market-item-source">{signal.attribution || signal.source}</span>
                                         </div>
-                                        <span className="market-item-source">{signal.attribution || signal.source}</span>
+                                        <div className="market-item-time">
+                                            <FiClock size={10} />
+                                            {new Date(signal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </div>
-                                    <div className="market-item-time">
-                                        <FiClock size={10} />
-                                        {new Date(signal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+                                    {/* Premium TankIQ Recommendation Stamping */}
+                                    <div className={`market-lens-recommendation-box market-lens-recommendation-box--${directive.status.toLowerCase()}`}>
+                                        <div className="market-lens-rec-header">
+                                            <span className="rec-badge">TANKIQ RECOMMENDATION</span>
+                                            <span className={`status-badge status-badge--${directive.status.toLowerCase()}`}>
+                                                {directive.status}
+                                            </span>
+                                        </div>
+                                        <p className="rec-text">{directive.recommendation}</p>
+                                        <p className="rec-action"><strong>ACTION:</strong> {directive.actionDetails}</p>
                                     </div>
-                                </div>
-                                <h4 className="market-item-title">{signal.title}</h4>
-                                <p className="market-item-summary">{signal.summary?.substring(0, 120)}...</p>
-                                <div className="market-item-footer">
-                                    <a 
-                                        href={signal.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="market-item-link"
-                                    >
-                                        Source Report <FiExternalLink size={10} />
-                                    </a>
-                                    <button 
-                                        onClick={(e) => handleAcknowledge(signal.url, e)}
-                                        className="market-item-ack-btn group"
-                                        title="Dismiss Intelligence"
-                                    >
-                                        <FiCheck size={14} className="group-hover:text-green-500 transition-colors" />
-                                    </button>
+
+                                    <div className="market-item-source-title">
+                                        <span className="source-label">SOURCE NEWS</span>
+                                        <h4 className="market-item-title">{signal.title}</h4>
+                                    </div>
+
+                                    <div className="market-item-footer" onClick={(e) => e.stopPropagation()}>
+                                        <a 
+                                            href={signal.url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer" 
+                                            className="market-item-link"
+                                        >
+                                            Source Report <FiExternalLink size={10} />
+                                        </a>
+                                        <button 
+                                            onClick={(e) => handleAcknowledge(signal.url, e)}
+                                            className="market-item-ack-btn group"
+                                            title="Dismiss Intelligence"
+                                        >
+                                            <FiCheck size={14} className="group-hover:text-green-500 transition-colors" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center px-8 py-10 animate-fade-in">
                         <div className="relative mb-8">

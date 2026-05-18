@@ -33,7 +33,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
 
     const { verifySettingsPassword } = useAuth();
     
-    // Accurate Real-Time Formatting
+    // Accurate Real-Time Formatting for Offline Detection & Status Badges
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
         const interval = setInterval(() => setNow(Date.now()), 15000);
@@ -44,7 +44,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
         const diff = now - timestamp;
         const minutes = Math.floor(diff / 60000);
 
-        if (minutes < 1) return `Just now`;
+        if (minutes <= 5) return `Live Sync`;
         if (minutes < 60) return `${minutes}m ago`;
         
         const hours = Math.floor(minutes / 60);
@@ -283,17 +283,41 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                     </div>
 
                     <div className="metrics-grid">
-                        <div className="metric-box">
+                        <div className={`metric-box ${
+                            isGhost ? '' :
+                            analytics.timeToOrderHrs === null ? '' :
+                            (analytics.timeToOrderHrs < 0 ? 'metric-critical border-red-500 bg-red-50/10' :
+                             analytics.timeToOrderHrs <= 24 ? 'metric-warning' : '')
+                        }`}>
                             <div className="flex items-center gap-1.5">
-                                <FiActivity className="text-secondary text-[10px]" />
-                                <span className="metric-label">Mode / State</span>
+                                <FiShoppingCart className={`text-secondary text-[10px] ${(!isGhost && analytics.timeToOrderHrs !== null && analytics.timeToOrderHrs <= 24) ? 'animate-pulse text-amber-500' : ''}`} />
+                                <span className="metric-label">Reorder Point</span>
                             </div>
-                            <span className={`metric-value ${tank.currentState === 'leak_suspicion' ? 'text-danger' :
-                                tank.currentState === 'delivery' ? 'text-success' :
-                                    tank.currentState === 'dispensing' ? 'text-indigo-600' : 'text-slate-600'
-                                }`}>
-                                {isGhost ? 'OFFLINE' : (tank.currentState ? tank.currentState.replace('_', ' ').toUpperCase() : (reading && (now - reading.timestamp) < 300000 ? 'STABLE' : 'IDLE'))}
-                            </span>
+                            {(() => {
+                                if (isGhost || analytics.timeToOrderHrs === null) {
+                                    return <span className="metric-value text-slate-400">Stable</span>;
+                                }
+                                const daysRemaining = analytics.timeToOrderHrs / 24;
+                                if (daysRemaining < 0) {
+                                    const absDays = Math.abs(daysRemaining);
+                                    const displayValue = absDays < 0.1 ? 'Overdue' : `${absDays.toFixed(1)} Days`;
+                                    return (
+                                        <div className="flex flex-col">
+                                            <span className="metric-value text-rose-600 font-extrabold flex items-center gap-1">
+                                                {displayValue}
+                                            </span>
+                                            <span className="text-[7.5px] font-black text-rose-500 uppercase tracking-tight leading-none mt-0.5 animate-pulse">
+                                                Late! Fuel will arrive late
+                                            </span>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <span className={`metric-value ${daysRemaining <= 1 ? 'text-amber-500 font-bold' : 'text-slate-600'}`}>
+                                        {daysRemaining.toFixed(1)} Days
+                                    </span>
+                                );
+                            })()}
                         </div>
                         <div className="metric-box">
                             <div className="flex items-center gap-1.5">
@@ -339,27 +363,6 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                                 {isGhost ? '0.0 L/hr' : `${analytics.defillRate.toFixed(1)} L/hr`}
                             </span>
                         </div>
-                        {/* [SMART REPLENISHMENT] */}
-                        {!isGhost && analytics.timeToOrderHrs !== null && (
-                            <div className={`metric-box ${
-                                analytics.timeToOrderHrs <= 0 ? 'metric-critical' : 
-                                analytics.timeToOrderHrs <= 24 ? 'metric-warning' : ''
-                            }`}>
-                                <div className="flex items-center gap-1.5">
-                                    <FiShoppingCart className={`text-secondary text-[10px] ${analytics.timeToOrderHrs <= 24 ? 'animate-pulse' : ''}`} />
-                                    <span className="metric-label">Time to Order</span>
-                                </div>
-                                <span className={`metric-value ${
-                                    analytics.timeToOrderHrs <= 0 ? 'text-danger font-black animate-pulse' : 
-                                    analytics.timeToOrderHrs <= 24 ? 'text-warning' : 'text-success'
-                                }`}>
-                                    {analytics.timeToOrderHrs <= 0 ? 'ORDER NOW!' : 
-                                     analytics.timeToOrderHrs > 240 ? '> 10 Days' :
-                                     analytics.timeToOrderHrs > 24 ? `${Math.floor(analytics.timeToOrderHrs / 24)}d ${Math.floor(analytics.timeToOrderHrs % 24)}h` :
-                                     `${Math.floor(analytics.timeToOrderHrs)}h left`}
-                                </span>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -367,10 +370,15 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
                     <div className="last-update">
                         <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Sensor Connection</span>
                         <div className="flex items-center gap-2 mt-1">
-                            <FiClock className="text-secondary" />
-                            <span className="last-update-tag">
-                                {reading ? formatTime(reading.timestamp) : (tank.lastReading ? formatTime(tank.lastReading) : (isGhost ? 'Waiting...' : 'Never'))}
-                            </span>
+                            {(() => {
+                                const timeStr = reading ? formatTime(reading.timestamp) : (tank.lastReading ? formatTime(tank.lastReading) : (isGhost ? 'Waiting...' : 'Never'));
+                                const isLive = timeStr === 'Live Sync';
+                                return (
+                                    <span className={`last-update-tag ${isLive ? 'text-emerald-400 font-bold' : ''}`}>
+                                        {timeStr}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     </div>
 

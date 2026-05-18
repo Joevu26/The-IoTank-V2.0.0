@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useTanks, useLatestReading, resolveAlert } from '@/hooks/useSupabase';
+import { useTanks, useLatestReading, resolveAlert, updateTank } from '@/hooks/useSupabase';
 import { useAuth } from '@/hooks/useAuth';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
@@ -9,6 +9,7 @@ import { FiX, FiInfo, FiDroplet, FiCheckCircle, FiFileText, FiActivity, FiUpload
 import '../Inventory/AddTankModal.css'; // Inheriting the premium layout and purple palette
 import './QuickActions.css';
 import { NotificationService } from '@/services/NotificationService';
+import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { SignaturePad } from '../Common/SignaturePad';
 import { useModals } from '@/contexts/ModalContext';
 
@@ -41,7 +42,9 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
         waterContaminationType: 'height' as 'percentage' | 'height',
         waterContaminationValue: '',
         density: '',
-        existingTemp: ''
+        existingTemp: '',
+        deliveryPrice: '',
+        deliveryPriceType: 'total' as 'per_litre' | 'total'
     });
     const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
     const [uploadingInvoice, setUploadingInvoice] = useState(false);
@@ -59,16 +62,18 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 timestamp: new Date().toISOString().slice(0, 16)
             }));
 
-            // [FORENSIC AUTO-FILL]: If opened via refill verification, populate from metadata
             if (activeModal === 'refill_verification' && modalData) {
                 const metadata = modalData.metadata || {};
+                const alertStartTime = metadata.startTime || modalData.created_at;
+
                 setFormData(prev => ({
                     ...prev,
                     tankId: modalData.tank_id || prev.tankId,
                     existingVolume: String(metadata.startVolume || ''),
                     totalVolume: String(metadata.endVolume || ''),
                     expectedVolume: String(metadata.deliveredVolume || ''),
-                    varianceReason: 'System automated detection'
+                    varianceReason: 'System automated detection',
+                    timestamp: alertStartTime ? new Date(alertStartTime).toISOString().slice(0, 16) : prev.timestamp
                 }));
             }
         } else {
@@ -84,9 +89,9 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
         }
     }, [latestReading, formData.tankId]);
 
-    // Temp Gradient Calculation
-    const tempGradient = (formData.temperature && formData.existingTemp)
-        ? (Number(formData.temperature) - Number(formData.existingTemp)).toFixed(2)
+    // Temp Gradient Calculation (Against EPRA 15°C Standard)
+    const tempGradient = formData.temperature 
+        ? (Number(formData.temperature) - 15).toFixed(2)
         : '0.00';
 
     if (!isOpen) return null;
@@ -126,8 +131,14 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 setUploadingInvoice(false);
             }
 
+            // Calculate final price per litre based on selection
+            const enteredPriceVal = Number(formData.deliveryPrice) || 0;
+            const finalPricePerLitre = formData.deliveryPriceType === 'total'
+                ? (Number(formData.expectedVolume) > 0 ? (enteredPriceVal / Number(formData.expectedVolume)) : 0)
+                : enteredPriceVal;
+
             const actualVolumeMeasured = Number(formData.totalVolume) - Number(formData.existingVolume);
-            
+
             const payload = {
                 station_id: currentUser.stationId,
                 tank_id: formData.tankId,
@@ -156,12 +167,26 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                     temp_gradient: tempGradient,
                     existing_temp_at_delivery: formData.existingTemp,
                     witness_signature: signature || null,
-                    witness_name: currentUser.displayName || currentUser.email
+                    witness_name: currentUser.displayName || currentUser.email,
+                    delivery_price: finalPricePerLitre,
+                    delivery_price_type: formData.deliveryPriceType,
+                    entered_delivery_price: enteredPriceVal
                 }
             };
 
             const { data: deliveryData, error } = await supabase.from('deliveries').insert([payload]).select().single();
             if (error) throw error;
+
+            // Sync delivery price to tank metadata dynamically
+            if (selectedTank) {
+                const currentMetadata = selectedTank.metadata || {};
+                await updateTank(formData.tankId, {
+                    metadata: {
+                        ...currentMetadata,
+                        deliveryPrice: finalPricePerLitre.toFixed(2)
+                    }
+                } as any);
+            }
 
             // 1. Success Notification & Toast (Local)
             NotificationService.show('Delivery Successfully Recorded', {
@@ -224,6 +249,20 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                         capturedBy: currentUser?.email 
                     }
                 );
+
+                // Dispatch Automated Verification Email
+                EmailDispatchService.sendSecurityAlert({
+                    to: currentUser.email,
+                    type: 'REFILL',
+                    siteName: 'IoTank Platform',
+                    details: {
+                        timestamp: new Date().toISOString(),
+                        description: `Delivery Verification Confirmed: ${formData.expectedVolume}L of ${selectedTank?.fuelType || 'Fuel'} from ${formData.supplier} added to Tank ${selectedTank?.name}. Waybill: ${formData.invoiceNumber}. Variance Check: ${variance}L. Thermal Gradient: ${tempGradient}°C.`,
+                        operator: currentUser.displayName || currentUser.email,
+                        varianceValue: variance
+                    }
+                }).catch(err => console.warn('[DeliveryModal] Failed to dispatch delivery email:', err));
+
             } catch (auxErr) {
                 console.warn('[DeliveryModal] Background reporting delay:', auxErr);
             }
@@ -364,6 +403,34 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                                     <div className="form-group">
                                         <label>Expected Volume (from BOL) (L)</label>
                                         <input required type="number" placeholder="10000" value={formData.expectedVolume} onChange={e => setFormData({ ...formData, expectedVolume: e.target.value })} />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>Price of Stock Received</label>
+                                        <div className="flex relative">
+                                            <input
+                                                required
+                                                type="number"
+                                                step="0.01"
+                                                className="flex-1 rounded-r-none border-r-0"
+                                                placeholder={formData.deliveryPriceType === 'total' ? "e.g. 1750000" : "e.g. 175.50"}
+                                                value={formData.deliveryPrice}
+                                                onChange={e => setFormData({ ...formData, deliveryPrice: e.target.value })}
+                                            />
+                                            <select
+                                                title="Price Input Type"
+                                                aria-label="Price Input Type"
+                                                className="w-28 rounded-l-none bg-slate-50 border-l border-slate-200 appearance-none pr-8 text-xs font-semibold text-slate-600"
+                                                value={formData.deliveryPriceType}
+                                                onChange={e => setFormData({ ...formData, deliveryPriceType: e.target.value as any })}
+                                            >
+                                                <option value="per_litre">Ksh/Litre</option>
+                                                <option value="total">Stock Value</option>
+                                            </select>
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                                <FiChevronDown size={14} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

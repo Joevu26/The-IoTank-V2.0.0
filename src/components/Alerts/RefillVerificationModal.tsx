@@ -55,7 +55,7 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
     const [invoiceVolume, setInvoiceVolume] = useState<number>(atgDeliveredVolume);
     const [supplier, setSupplier]           = useState('');
     const [bolNumber, setBolNumber]         = useState('');
-    const [unitPrice, setUnitPrice]         = useState(184.50);
+    const [totalCost, setTotalCost]         = useState<number | ''>('');
     const [notes, setNotes]                 = useState('');
     const [processing, setProcessing]       = useState(false);
 
@@ -64,7 +64,7 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
     const variancePcnt = atgDeliveredVolume > 0 ? (variance / atgDeliveredVolume) * 100 : 0;
     const isVarianceHigh = Math.abs(variance) > 50;
 
-    const totalCost = invoiceVolume * unitPrice;
+    const unitPrice = (invoiceVolume > 0 && typeof totalCost === 'number') ? (totalCost / invoiceVolume) : 0;
 
     const formatTs = (ts: number | null) => ts
         ? new Date(ts).toLocaleString('en-KE', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
@@ -279,25 +279,28 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Unit Price (KES)</label>
+                                    <label>Total Cost / Stock Value (KES)</label>
                                     <div className="rv-input-with-prefix">
                                         <span className="rv-prefix-badge">KSh</span>
                                         <input
                                             type="number"
-                                            value={unitPrice}
-                                            onChange={e => setUnitPrice(Number(e.target.value))}
+                                            value={totalCost}
+                                            onChange={e => setTotalCost(e.target.value ? Number(e.target.value) : '')}
+                                            required
+                                            min="1"
                                             step="0.01"
-                                            className="!pl-14"
+                                            placeholder="Total Invoice Amount"
+                                            className="!pl-14 !font-black text-emerald-700"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Total Cost (KES)</label>
+                                    <label>Derived Unit Price (KES/L)</label>
                                     <input
                                         readOnly
-                                        value={`KSh ${totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-                                        className="bg-slate-50 font-black text-emerald-700 !border-emerald-200 cursor-default"
+                                        value={`KSh ${unitPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                                        className="bg-slate-50 font-black text-slate-500 !border-slate-200 cursor-default"
                                     />
                                 </div>
                             </div>

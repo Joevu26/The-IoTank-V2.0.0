@@ -17,12 +17,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { logger } from '@/utils/logger';
 import { supabase } from '@/config/supabase';
 import { IntelligenceAIService, ArticleAIDirective } from '@/services/IntelligenceAIService';
+import { AuditService } from '@/services/AuditService';
 
 const CACHE_TTL_MS = 15 * 60 * 1000;       // 15 minutes — standard news sources
 const CACHE_TTL_SLOW_MS = 60 * 60 * 1000;  // 60 minutes — regulatory/forex (low frequency)
 const REFRESH_COOLDOWN_MS = 30 * 1000;     // 30 seconds
 const PERSISTENT_CACHE_KEY = 'mi:persistent_signals';
-const MAX_CACHE_DAYS = 30;                 // 30 days of signals kept locally
+const MAX_CACHE_DAYS = 14;                 // 14 days of signals kept locally (purged after 14 days)
 const ACK_SIGNALS_KEY = 'mi:acknowledged_urls';
 export const VERIFIED_AI_SOURCES = ['EPRA', 'CBK', 'KPA', 'EIA', 'REUTERS', 'BD AFRICA'];
 
@@ -253,20 +254,17 @@ export interface PriceDetection {
     currency: string;
 }
 
-export function extractPricesFromText(text: string): PriceDetection[] {
+export function extractPricesFromText(text: string, basePrices?: Record<string, number>): PriceDetection[] {
     const results: PriceDetection[] = [];
     
-    // 1. Kenya Pump Prices (Ksh)
-    // Strong patterns for official notices: "set at Ksh", "retail at Ksh", "price of Ksh", "KSh 206.97"
-    // 1. Kenya Pump Prices (Ksh)
-    // patterns: "set at Ksh 193.84", "retail at 193.84", "price of 193.84", "KSh 206.97", "to 193.84"
-    const kshRegex = /(?:set at|retail at|price of|to ksh|ksh|shillings|sh|ksh\.|kshs|kshs\.|to)\s*(\d{2,3}(?:\.\d{2})?)/gi;
+    // 1. Kenya Pump Prices (Ksh - absolute)
+    // Enhanced regex to catch standard news formatting like "petrol at 214.25", "PMS: 214.25", etc.
+    const kshRegex = /(?:set at|retail at|price of|to ksh|ksh|shillings|sh|ksh\.|kshs|kshs\.|to|at|:\s*|of\s*|up to\s*)\s*(?:ksh|sh|shs|sh\.)?\s*(\d{2,3}(?:\.\d{2})?)/gi;
     let match;
     
     while ((match = kshRegex.exec(text)) !== null) {
         const val = parseFloat(match[1]);
-        // Valid EPRA prices in Kenya are typically 150-250 KES. 
-        // We use a slightly wider window (100-300) to allow for future inflation/deflation.
+        // Valid EPRA prices in Kenya are typically 150-300 KES. 
         if (val < 100 || val > 300) continue; 
         
         const snippet = text.substring(Math.max(0, match.index - 80), Math.min(text.length, match.index + 80)).toLowerCase();
@@ -277,7 +275,7 @@ export function extractPricesFromText(text: string): PriceDetection[] {
         else if (snippet.includes('kerosene') || snippet.includes('ik')) commodity = 'Kerosene';
         
         // Boost confidence if specific regulatory keywords or "Nairobi" (default pricing zone) are nearby
-        const isOfficialPhrasing = snippet.includes('set at') || snippet.includes('retail at') || snippet.includes('regulated') || snippet.includes('epra') || snippet.includes('nairobi');
+        const isOfficialPhrasing = snippet.includes('set at') || snippet.includes('retail at') || snippet.includes('regulated') || snippet.includes('epra') || snippet.includes('nairobi') || snippet.includes('at');
         if (commodity !== 'General' || isOfficialPhrasing) {
             // Deduplicate: If we found multiple mentions of the same price for the same commodity, keep only one
             if (!results.some(r => r.commodity === commodity && r.value === val)) {
@@ -286,7 +284,59 @@ export function extractPricesFromText(text: string): PriceDetection[] {
         }
     }
 
-    // 2. Global Brent ($)
+    // 2. Relative Change Parser (e.g. "petrol increased by sh 10")
+    const lowerText = text.toLowerCase();
+    const commodities = [
+        { name: 'Petrol' as const, aliases: ['petrol', 'super', 'pms'] },
+        { name: 'Diesel' as const, aliases: ['diesel', 'ago'] },
+        { name: 'Kerosene' as const, aliases: ['kerosene', 'ik'] }
+    ];
+
+    const resolvedBase = {
+        Petrol: basePrices?.Petrol || basePrices?.pms || basePrices?.PMS || 206.97,
+        Diesel: basePrices?.Diesel || basePrices?.ago || basePrices?.AGO || 206.84,
+        Kerosene: basePrices?.Kerosene || basePrices?.ik || basePrices?.IK || 152.78
+    };
+
+    const sentences = lowerText.split(/[.!?;\n]+/);
+    sentences.forEach(sentence => {
+        commodities.forEach(comm => {
+            const hasComm = comm.aliases.some(alias => sentence.includes(alias));
+            if (!hasComm) return;
+
+            // Regex to find: direction word + optional "by/of" + optional "sh/ksh" + number (1 to 2 digits, optional decimal)
+            const relativeRegex = /(?:increase|reduction|decrease|hike|rise|drop|slash|cut|slashed|reduced|increased|up|down|grows|falls|grew|fell)\s+(?:by|of)?\s*(?:ksh|sh|shs|shillings|sh\.|ksh\.)?\s*(\d{1,2}(?:\.\d{2})?)/gi;
+            
+            let relMatch;
+            while ((relMatch = relativeRegex.exec(sentence)) !== null) {
+                const changeVal = parseFloat(relMatch[1]);
+                if (changeVal <= 0 || changeVal > 50) continue; 
+
+                const snippet = sentence.substring(Math.max(0, relMatch.index - 30), Math.min(sentence.length, relMatch.index + 30));
+                const isDown = snippet.includes('reduce') || snippet.includes('decrease') || snippet.includes('drop') || snippet.includes('slash') || snippet.includes('cut') || snippet.includes('slashed') || snippet.includes('reduced') || snippet.includes('down') || snippet.includes('fell') || snippet.includes('fall');
+                const isUp = snippet.includes('increase') || snippet.includes('hike') || snippet.includes('rise') || snippet.includes('increased') || snippet.includes('up') || snippet.includes('grows') || snippet.includes('grew') || snippet.includes('raise');
+
+                if (isDown || isUp) {
+                    const directionMultiplier = isDown ? -1 : 1;
+                    const basePrice = resolvedBase[comm.name];
+                    const computedPrice = basePrice + (changeVal * directionMultiplier);
+                    
+                    if (computedPrice >= 100 && computedPrice <= 300) {
+                        const existingIdx = results.findIndex(r => r.commodity === comm.name);
+                        if (existingIdx === -1) {
+                            results.push({ 
+                                commodity: comm.name, 
+                                value: parseFloat(computedPrice.toFixed(2)), 
+                                currency: 'KES' 
+                            });
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // 3. Global Brent ($)
     const brentRegex = /(?:brent|crude|oil).*?(\$?\d{1,3}(?:\.\d{2})?)/gi;
     while ((match = brentRegex.exec(text)) !== null) {
         const valStr = match[1].replace('$', '');
@@ -649,8 +699,18 @@ export function useMarketNews(): UseMarketNewsReturn {
             const aiService = new IntelligenceAIService();
             const enriched = [];
             const isVerifiedSource = VERIFIED_AI_SOURCES.includes(source.shortLabel.toUpperCase());
+            const existingHistory = readMasterHistory();
 
             for (const article of collected) {
+                // Deduplication & Cache Check: Check if article has already been processed with an AI directive
+                const cachedArticle = existingHistory.find(
+                    a => a.url === article.url || (a.title === article.title && a.feedSource === article.feedSource)
+                );
+                if (cachedArticle && cachedArticle.aiDirective) {
+                    enriched.push({ ...article, aiDirective: cachedArticle.aiDirective });
+                    continue;
+                }
+
                 const relevance = article.relevanceScore ?? 0;
                 const isKenyanNews = article.region === 'Kenya' && (article.feedSource === 'BD Africa' || article.feedSource === 'Nation' || article.feedSource === 'Standard');
                 
@@ -693,6 +753,20 @@ export function useMarketNews(): UseMarketNewsReturn {
                                     extracted_at: new Date().toISOString()
                                 }
                             }, { onConflict: 'fuel_type,source,region,effective_date' });
+                            
+                            // Premium Global Notification for Price Shift
+                            window.dispatchEvent(new CustomEvent('system-toast', {
+                                detail: {
+                                    title: `EPRA Price Shift: ${p.fuelType}`,
+                                    message: `New regulated price detected: ${p.currency || 'KES'} ${p.price}/L. Market intelligence has updated your local reference.`,
+                                    type: 'warning',
+                                    attribution: 'MARKET_SENSE'
+                                }
+                            }));
+
+                            const stationIdVal = (Array.isArray(tanks) && tanks.length > 0) ? (tanks[0] as any).station_id || (tanks[0] as any).stationId : null;
+                            await AuditService.log('FINANCE', 'PRICE_UPDATE', stationIdVal || 'SYSTEM', `EPRA Auto-Sync: ${p.fuelType} price adjusted to ${p.price} ${p.currency || 'KES'}`, 'INFO', { fuelType: p.fuelType, price: p.price });
+                            
                             logger.info(`[useMarketNews] Auto-updated price for ${p.fuelType}: ${p.price}`, null, 'MARKET_SENSE');
                         } catch (err) {
                             console.error(`[useMarketNews] Failed to update price for ${p.fuelType}`, err);
@@ -707,6 +781,8 @@ export function useMarketNews(): UseMarketNewsReturn {
             // [MARKET INTELLIGENCE]: Notify user of High-Relevance EPRA shifts
             if (source.shortLabel === 'EPRA') {
                 const topSignal = enriched.find(a => (a.relevanceScore ?? 0) >= 0.90);
+                const stationIdVal = (Array.isArray(tanks) && tanks.length > 0) ? (tanks[0] as any).station_id || (tanks[0] as any).stationId : null;
+                
                 if (topSignal) {
                     window.dispatchEvent(new CustomEvent('system-toast', {
                         detail: {
@@ -717,10 +793,9 @@ export function useMarketNews(): UseMarketNewsReturn {
                         }
                     }));
                     // [FORENSIC PERSISTENCE]: Register as formal station alert
-                    const stationId = (Array.isArray(tanks) && tanks.length > 0) ? (tanks[0] as any).station_id || (tanks[0] as any).stationId : null;
-                    if (stationId) {
+                    if (stationIdVal) {
                         supabase.rpc('upsert_alert_v2', {
-                            p_station_id: stationId,
+                            p_station_id: stationIdVal,
                             p_tank_id: (Array.isArray(tanks) && tanks.length > 0) ? tanks[0].id : null,
                             p_alert_type: 'regulatory_update',
                             p_title: 'EPRA Regulatory Signal',
@@ -778,6 +853,16 @@ export function useMarketNews(): UseMarketNewsReturn {
             const final = readMasterHistory();
             setAllArticles(final);
             
+            // Database-level Purge: Automatically clean up Supabase signals older than 14 days
+            const purgeThreshold = Date.now() - (14 * 24 * 60 * 60 * 1000);
+            supabase.from('market_signals')
+                .delete()
+                .lt('timestamp', purgeThreshold)
+                .then(({ error }) => {
+                    if (error) console.error('[useMarketNews] Database signals purge failed:', error);
+                    else logger.info('[useMarketNews] Successfully purged database market signals older than 14 days.');
+                });
+
             if (anySuccess) {
                 setStatus('ok');
                 setLastUpdated(new Date());

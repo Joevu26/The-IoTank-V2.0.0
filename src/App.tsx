@@ -50,6 +50,7 @@ export const ShiftManagementPageFactory = () => import('@/components/Shifts/Shif
 const ShiftManagementPage = lazy(ShiftManagementPageFactory);
 const NetworkPulsePage = lazy(() => import('@/components/Governance/NetworkPulsePage').then(module => ({ default: module.NetworkPulsePage })));
 const InadequateClearancePage = lazy(() => import('@/components/Auth/InadequateClearancePage').then(module => ({ default: module.InadequateClearancePage })));
+const AcceptableUsePolicy = lazy(() => import('@/components/Landing/AcceptableUsePolicy').then(module => ({ default: module.default })));
 
 // PAYSTACK MODULES
 // Consolidated into BillingPage
@@ -109,6 +110,7 @@ function App() {
                                     <Route path="/login" element={<Suspense fallback={<PublicLoader />}><LoginForm /></Suspense>} />
                                     <Route path="/forgot-password" element={<Suspense fallback={<PublicLoader />}><ForgotPasswordForm /></Suspense>} />
                                     <Route path="/reset-password" element={<Suspense fallback={<PublicLoader />}><ResetPasswordForm /></Suspense>} />
+                                    <Route path="/aup" element={<Suspense fallback={<PublicLoader />}><AcceptableUsePolicy /></Suspense>} />
 
                                     {/* Protected Application Routes - Level 8 (Minimum for all) */}
                                     <Route element={<ProtectedRoute requiredLevel={8}><MainLayout /></ProtectedRoute>}>
@@ -119,6 +121,7 @@ function App() {
                                         <Route path="alerts" element={<Suspense fallback={<PublicLoader />}><AlertsCenter /></Suspense>} />
                                         <Route path="help" element={<Suspense fallback={<PublicLoader />}><HelpPage /></Suspense>} />
                                         <Route path="bottom-link" element={<Suspense fallback={<PublicLoader />}><HelpPage /></Suspense>} />
+                                        <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                     </Route>
 
                                     {/* Protected Application Routes - Level 6 (Supervisor) */}
@@ -135,7 +138,6 @@ function App() {
                                     <Route element={<ProtectedRoute requiredLevel={5}><MainLayout /></ProtectedRoute>}>
                                         <Route path="billing" element={<Suspense fallback={<PublicLoader />}><BillingPage /></Suspense>} />
                                         <Route path="users" element={<Suspense fallback={<PublicLoader />}><TeamManagement /></Suspense>} />
-                                        <Route path="settings" element={<Suspense fallback={<PublicLoader />}><SettingsPage /></Suspense>} />
                                     </Route>
                                     
                                     {/* Protected Application Routes - Level 4 (Governance/Super Admin) */}

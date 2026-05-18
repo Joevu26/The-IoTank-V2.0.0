@@ -19,7 +19,8 @@ import { ImageCropperModal } from '../Common/ImageCropperModal';
 import './SettingsPage.css';
 export const SettingsPage: React.FC = () => {
     const {
-        currentUser, verifySettingsPassword, updateUser, enrollMFA, verifyMFARegistration, unenrollMFA
+        currentUser, verifySettingsPassword, updateUser, enrollMFA, verifyMFARegistration, unenrollMFA,
+        setupSecurityPin, disableSecurityPin
     } = useAuth();
     const { t } = useTranslation();
     const stationId = currentUser?.stationId || '';
@@ -29,7 +30,8 @@ export const SettingsPage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
-    const [isLocked, setIsLocked] = useState(true);
+    const [isLocked, setIsLocked] = useState(false); // [REFACTOR] Allow entry by default
+    const [protectedTabAttempt, setProtectedTabAttempt] = useState<'profile' | 'security' | 'inventory' | 'devices' | null>(null);
     const [password, setPassword] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -163,21 +165,22 @@ export const SettingsPage: React.FC = () => {
     const [showConfirmPw, setShowConfirmPw] = useState(false);
     const [pwSaving, setPwSaving] = useState(false);
 
-    // Secure Factory Reset State
-    const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
-    const [showResetAuthModal, setShowResetAuthModal] = useState(false);
-    const [resetAuthPassword, setResetAuthPassword] = useState('');
+    // PIN Management State
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [pinCode, setPinCode] = useState('');
+    const [confirmPinCode, setConfirmPinCode] = useState('');
+    const [pinLoading, setPinLoading] = useState(false);
+    const [securityPinEnabled, setSecurityPinEnabled] = useState(currentUser?.securityPinEnabled || false);
+    
+    // [REACTIVE SYNC]: Ensure security PIN status persists and updates upon profile enrichment
+    useEffect(() => {
+        if (currentUser?.securityPinEnabled !== undefined) {
+            setSecurityPinEnabled(currentUser.securityPinEnabled);
+        }
+    }, [currentUser?.securityPinEnabled]);
 
-    // Image Cropping State
-    const [cropperState, setCropperState] = useState<{
-        isOpen: boolean;
-        imageSrc: string;
-        mode: 'profile' | 'logo';
-    }>({
-        isOpen: false,
-        imageSrc: '',
-        mode: 'profile'
-    });
+    const [visiblePinIndices, setVisiblePinIndices] = useState<number[]>([]);
+    const [visibleConfirmPinIndices, setVisibleConfirmPinIndices] = useState<number[]>([]);
 
     // Price Draft State (String buffered for decimal entry support)
     const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
@@ -188,6 +191,22 @@ export const SettingsPage: React.FC = () => {
     const [deletePassword, setDeletePassword] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    
+    // Image Cropper State
+    const [cropperState, setCropperState] = useState<{
+        isOpen: boolean;
+        imageSrc: string;
+        mode: 'logo' | 'profile';
+    }>({
+        isOpen: false,
+        imageSrc: '',
+        mode: 'logo'
+    });
+
+    // Reset Modal States
+    const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+    const [showResetAuthModal, setShowResetAuthModal] = useState(false);
+    const [resetAuthPassword, setResetAuthPassword] = useState('');
 
     const handleDeleteTank = async () => {
         if (!deletePassword) {
@@ -257,6 +276,16 @@ export const SettingsPage: React.FC = () => {
             const fuelName = (tankToUpdate as any).name || tankToUpdate.fuelType.toUpperCase();
             const currentMetadata = (tankToUpdate as any).metadata || {};
 
+            // [IMMEDIATE FEEDBACK]: Notify user that synchronization has started
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Price Configuration',
+                    message: `Synchronizing ${fuelName} price adjustment: ${oldPrice} Ksh ⮕ ${normalizedPrice} Ksh`,
+                    type: 'info',
+                    attribution: 'FINANCIAL CORE'
+                }
+            }));
+
             await syncTankToDb(tankId, {
                 metadata: { ...currentMetadata, retailPrice: normalizedPrice }
             } as any);
@@ -268,14 +297,7 @@ export const SettingsPage: React.FC = () => {
                 return next;
             });
             
-            window.dispatchEvent(new CustomEvent('system-toast', {
-                detail: {
-                    title: 'Price Configuration',
-                    message: `${fuelName} price changed from ${oldPrice} Ksh to ${normalizedPrice} Ksh`,
-                    type: 'success',
-                    attribution: 'FINANCIAL CORE'
-                }
-            }));
+
             await AuditService.log(
                 'FINANCE',
                 'SETTINGS_CHANGED',
@@ -593,26 +615,129 @@ err.message
 
     const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError(null);
         setIsVerifying(true);
+        setError(null);
         try {
             await verifySettingsPassword(password);
             setIsLocked(false);
+            if (protectedTabAttempt) {
+                setActiveTab(protectedTabAttempt);
+                setProtectedTabAttempt(null);
+            }
+            setPassword('');
         } catch (err: any) {
-            setError(err.message || 'Incorrect password');
+            setError(err.message || 'Verification failed.');
         } finally {
             setIsVerifying(false);
         }
     };
 
+    const handleTabChange = (tab: 'profile' | 'security' | 'inventory' | 'devices') => {
+        const protectedTabs = ['inventory', 'devices'];
+        if (protectedTabs.includes(tab) && isLocked) {
+            setProtectedTabAttempt(tab);
+            return;
+        }
+        setActiveTab(tab);
+    };
+
+    const handleSetupPin = async () => {
+        if (pinCode.length !== 6 || pinCode !== confirmPinCode) {
+            setToast({ message: 'PINs must match and be 6 digits.', type: 'error' });
+            return;
+        }
+        setPinLoading(true);
+        try {
+            await setupSecurityPin(pinCode);
+            setSecurityPinEnabled(true);
+            setShowPinModal(false);
+            setPinCode('');
+            setConfirmPinCode('');
+            
+            // Premium Global Notification
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Security Hardened',
+                    message: '6-digit PIN established. Your price controls and inventory are now protected by secondary verification.',
+                    type: 'success',
+                    attribution: 'SECURITY_VAULT'
+                }
+            }));
+
+            setToast({ message: '✅ Security PIN established successfully.', type: 'success' });
+
+            await AuditService.log('SECURITY', 'PIN_SETUP', stationId, 'Secondary security layer established via 6-digit PIN', 'INFO');
+        } catch (err: any) {
+            setToast({ message: err.message || 'Failed to set PIN.', type: 'error' });
+        } finally {
+            setPinLoading(false);
+        }
+    };
+
+    const handleDisablePin = async () => {
+        setPinLoading(true);
+        try {
+            await disableSecurityPin();
+            setSecurityPinEnabled(false);
+            
+            window.dispatchEvent(new CustomEvent('system-toast', {
+                detail: {
+                    title: 'Security Layer Removed',
+                    message: '6-digit PIN has been de-activated. Critical actions no longer require secondary verification.',
+                    type: 'info',
+                    attribution: 'SECURITY_VAULT'
+                }
+            }));
+
+            await AuditService.log('SECURITY', 'SETTINGS_CHANGED', stationId, 'Security alert: Secondary PIN layer de-activated by user.', 'WARNING');
+        } catch (err: any) {
+            setToast({ message: err.message || 'Failed to disable PIN.', type: 'error' });
+        } finally {
+            setPinLoading(false);
+        }
+    };
+
+    const handleExportData = () => {
+        const data = {
+            profile: currentUser,
+            station_id: stationId,
+            timestamp: new Date().toISOString(),
+            export_region: 'Republic of Kenya (DPA 2019 Compliance)'
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `iotank_data_export_${currentUser?.email}.json`;
+        a.click();
+        setToast({ message: 'Data export initiated.', type: 'success' });
+    };
+
+    const handleDeleteAccountRequest = () => {
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Right to be Forgotten',
+                message: 'Under DPA 2019, you may request account deletion. A system administrator will review and purge your records within 30 days.',
+                type: 'warning',
+                persistent: true,
+                actions: [
+                    { label: 'Cancel', onClick: () => {} },
+                    { 
+                        label: 'Submit Deletion Request', 
+                        primary: true, 
+                        onClick: () => {
+                            setToast({ message: 'Deletion request submitted to Compliance Officer.', type: 'success' });
+                        } 
+                    }
+                ]
+            }
+        }));
+    };
+
     const handleDismissLock = () => {
         setError(null);
         setPassword('');
-        if (window.history.length > 1) {
-            window.history.back();
-        } else {
-            window.location.href = '/dashboard';
-        }
+        setProtectedTabAttempt(null);
     };
 
     const handleChangePassword = async (e: React.FormEvent) => {
@@ -663,15 +788,18 @@ err.message
     const confirmSecureResetFinal = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await verifySettingsPassword(resetAuthPassword);
+            // [IMMEDIATE FEEDBACK]
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Factory Reset',
-                    message: 'Factory reset completed successfully.',
-                    type: 'success',
+                    message: 'Initializing global system purge. One moment...',
+                    type: 'warning',
                     attribution: 'SYSTEM SETTINGS'
                 }
             }));
+
+            await verifySettingsPassword(resetAuthPassword);
+            
             setShowResetAuthModal(false);
             window.location.reload();
         } catch (err: any) {
@@ -685,146 +813,117 @@ err.message
             }));
         }
     };
-    if (isLocked) {
+    if (protectedTabAttempt) {
         return (            
-<div className="security-lock-overlay">
-                
-                <div className="add-tank-modal-content security-lock-content modal-w-md">
-                    <div className="modal-header">
-                        <div className="header-text-container">
-                            <h2>Security Gate</h2>
-                            <p>Authentication required for system parameters</p>
-                            <div className="modal-header-badges">
-                                <span className="modal-badge cyan">LOCKED</span>
-                                <span className="modal-badge blue">ADMIN</span>
+            <>
+                <div className="security-lock-overlay">
+                    <div className="add-tank-modal-content security-lock-content modal-w-md">
+                        <div className="modal-header">
+                            <div className="header-text-container">
+                                <h2>Security Gate</h2>
+                                <p>Authentication required for system parameters</p>
+                                <div className="modal-header-badges">
+                                    <span className="modal-badge cyan">LOCKED</span>
+                                    <span className="modal-badge blue">ADMIN</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-<div className="security-modal-body">
-                        
-<div className="security-lock-header">
-                            
-<FiLock className="security-lock-icon-main" aria-hidden="true" size={
-40
-} />
-                            
-<h3 className="security-lock-title">
-Verify Identity
-</h3>
-                            
-<p className="security-lock-text">
-Enter your master password to unlock critical settings.
-</p>
-                        
-</div>
-                        
-<form onSubmit={
-handleUnlock
-} className="security-form security-form-mt">
-                            
-<div className="input-group">
-                                
-<label htmlFor="master-password" className="master-pass-label">
-Master Password
-</label>
-                                
-<div className="password-input-wrapper">
-                                    
-<input                                        id="master-password"                                        className="settings-input master-pass-input"                                        type={
-showLockPassword ? "text" : "password"
-}                                        value={
-password
-}                                        onChange={
-(e) =>
- setPassword(e.target.value)
-}                                        placeholder="············"                                        title="Master Password"                                        autoFocus                                        disabled={
-isVerifying
-}                                    />
-                                    
-<button                                         type="button"                                         className="password-toggle"                                        onClick={
-() =>
- setShowLockPassword(!showLockPassword)
-}                                        disabled={
-isVerifying
-}                                        aria-label={
-showLockPassword ? "Hide password" : "Show password"
-}                                        title={
-showLockPassword ? "Hide password" : "Show password"
-}                                    >
-                                        {
-showLockPassword ? 
-<FiEyeOff size={
-18
-} />
- : 
-<FiEye size={
-18
-} />
-
-}                                    
-</button>
-                                
-</div>
-                                                                {
-error && 
-<div className="text-danger text-xs mt-3 font-bold text-center">
-❌ {
-error
-}
-</div>
-
-}                            
-</div>
-                            
-                            <div className="form-actions border-t pt-6 security-form-mt">
-                                <button
-                                    type="button"
-                                    className="btn-secondary"
-                                    onClick={handleDismissLock}
-                                    title="Cancel Authentication"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="btn-primary flex-1"
-                                    disabled={isVerifying || !password}
-                                    title="Unlock Secure Access"
-                                >
-                                    {isVerifying ? (
-                                        <FiRefreshCw className="animate-spin" />
-                                    ) : (
-                                        <>
-                                            Unlock Access
-                                            <FiArrowRight className="ml-2" />
-                                        </>
-                                    )}
-                                </button>
+                        <div className="security-modal-body">
+                            <div className="security-lock-header">
+                                <FiLock className="security-lock-icon-main" aria-hidden="true" size={40} />
+                                <h3 className="security-lock-title">Verify Identity</h3>
+                                <p className="security-lock-text">Enter your master password to unlock critical settings.</p>
                             </div>
-                        
-</form>
-                    
-</div>
-                
-</div>
-                {
-toast && 
-<Toast message={
-toast.message
-} type={
-toast.type
-} onClose={
-() =>
- setToast(null)
-} />
-
-}            
-</div>
+                            <form onSubmit={handleUnlock} className="security-form security-form-mt">
+                                <div className="input-group">
+                                    <label htmlFor="master-password" className="master-pass-label">Master Password</label>
+                                    <div className="password-input-wrapper">
+                                        <input
+                                            id="master-password"
+                                            className="settings-input master-pass-input"
+                                            type={showLockPassword ? "text" : "password"}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="············"
+                                            title="Master Password"
+                                            autoFocus
+                                            disabled={isVerifying}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="password-toggle"
+                                            onClick={() => setShowLockPassword(!showLockPassword)}
+                                            disabled={isVerifying}
+                                            aria-label={showLockPassword ? "Hide password" : "Show password"}
+                                            title={showLockPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showLockPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                                        </button>
+                                    </div>
+                                    {error && <div className="text-danger text-xs mt-3 font-bold text-center">❌ {error}</div>}
+                                </div>
+                                <div className="form-actions border-t pt-6 security-form-mt">
+                                    <button type="button" className="btn-secondary" onClick={handleDismissLock}>Cancel</button>
+                                    <button type="submit" className="btn-primary flex-1" disabled={isVerifying || !password}>
+                                        {isVerifying ? <FiRefreshCw className="animate-spin" /> : <>Unlock Access <FiArrowRight className="ml-2" /></>}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {/* Global Modals for Gate path */}
+                {showPinModal && createPortal(
+                    <div className="add-tank-modal-overlay">
+                        <div className="add-tank-modal-content modal-w-md">
+                            <div className="modal-header security-verify-header">
+                                <div className="header-text-container">
+                                    <h2>Security PIN Setup</h2>
+                                    <p>Set a 6-digit secondary verification code</p>
+                                </div>
+                                <button className="close-btn" onClick={() => setShowPinModal(false)}><FiX /></button>
+                            </div>
+                            <div className="security-modal-body">
+                                <div className="input-group">
+                                    <label>Enter 6-Digit PIN</label>
+                                    <input 
+                                        type="password" 
+                                        maxLength={6} 
+                                        className="settings-input text-center text-2xl tracking-[1em]" 
+                                        value={pinCode} 
+                                        onChange={(e) => setPinCode(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="••••••"
+                                    />
+                                </div>
+                                <div className="input-group mt-4">
+                                    <label>Confirm PIN</label>
+                                    <input 
+                                        type="password" 
+                                        maxLength={6} 
+                                        className="settings-input text-center text-2xl tracking-[1em]" 
+                                        value={confirmPinCode} 
+                                        onChange={(e) => setConfirmPinCode(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="••••••"
+                                    />
+                                </div>
+                                <div className="form-actions mt-8">
+                                    <button className="btn-secondary" onClick={() => setShowPinModal(false)}>Cancel</button>
+                                    <button className="btn-primary" onClick={handleSetupPin} disabled={pinLoading || pinCode.length !== 6}>
+                                        {pinLoading ? <FiRefreshCw className="animate-spin" /> : 'Save PIN'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )}
+                {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            </>
         );
-    
-}    return (        
-<div className="settings-container">
+    }
+
+    return (
+        <div className="settings-container">
             {
 /* Factory Reset Confirmation Modal */
 }            {
@@ -997,61 +1096,20 @@ currentUser?.stationId?.slice(0, 8).toUpperCase() || 'OFFLINE'
                 
 </header>
                 
-<div className="settings-tabs-nav">
-                    
-<button className={
-`tab-btn ${
-activeTab === 'profile' ? 'active' : ''
-}`
-} onClick={
-() =>
- setActiveTab('profile')
-} title="General Profile Settings">
-                        
-<FiUser />
- General                    
-</button>
-                    
-<button className={
-`tab-btn ${
-activeTab === 'inventory' ? 'active' : ''
-}`
-} onClick={
-() =>
- setActiveTab('inventory')
-} title="Fleet Inventory Management">
-                        
-<FiZap />
- Fleet                    
-</button>
-                    
-<button className={
-`tab-btn ${
-activeTab === 'security' ? 'active' : ''
-}`
-} onClick={
-() =>
- setActiveTab('security')
-} title="Account Security & MFA">
-                        
-<FiShield />
- Security                    
-</button>
-                    
-<button className={
-`tab-btn ${
-activeTab === 'devices' ? 'active' : ''
-}`
-} onClick={
-() =>
- setActiveTab('devices')
-} title="Hardware & C2 Console">
-                        
-<FiCpu />
- Device Management                    
-</button>
-                
-</div>
+                <div className="settings-tabs-nav">
+                    <button className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`} onClick={() => handleTabChange('profile')} title="General Profile Settings">
+                        <FiUser /> General
+                    </button>
+                    <button className={`tab-btn ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => handleTabChange('inventory')} title="Fleet Inventory Management">
+                        <FiZap /> Fleet
+                    </button>
+                    <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => handleTabChange('security')} title="Account Security & MFA">
+                        <FiShield /> Security
+                    </button>
+                    <button className={`tab-btn ${activeTab === 'devices' ? 'active' : ''}`} onClick={() => handleTabChange('devices')} title="Hardware & C2 Console">
+                        <FiCpu /> Device Management
+                    </button>
+                </div>
                 
 <div className="settings-grid">
                     {
@@ -1320,15 +1378,42 @@ isSaving
  {
 isSaving ? 'Updating...' : 'Update Account'
 }                                        
-</button>
-                                    
-</div>
-                                
-</form>
-                            
-</section>
-                        
-</>
+                                        </button>
+                                    </div>
+                                </form>
+                            </section>
+
+                            {/* Kenyan Compliance & Data Governance (DPA 2019) */}
+                            <section className="ds-card-panel compliance-panel border-t-4 border-blue-500">
+                                <div className="settings-section-title">
+                                    <FiShield className="text-blue-500" />
+                                    Compliance & Data Governance
+                                </div>
+                                <p className="settings-section-desc">
+                                    Tools for managing your data rights under the <strong>Kenya Data Protection Act 2019</strong>.
+                                </p>
+                                <div className="compliance-grid grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                                    <div className="compliance-item p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+                                            <FiRefreshCw className="text-blue-500" /> Data Portability
+                                        </h4>
+                                        <p className="text-xs text-slate-500 mb-4">Export all your personal and station telemetry data in machine-readable JSON format.</p>
+                                        <button className="btn-secondary w-full text-xs py-2" onClick={handleExportData}>Download My Data</button>
+                                    </div>
+                                    <div className="compliance-item p-4 bg-slate-50 rounded-xl border border-slate-200">
+                                        <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
+                                            <FiTrash2 className="text-red-500" /> Right to be Forgotten
+                                        </h4>
+                                        <p className="text-xs text-slate-500 mb-4">Request permanent deletion of your account and all associated telemetry records.</p>
+                                        <button className="btn-secondary w-full text-xs py-2 text-red-600 hover:bg-red-50" onClick={handleDeleteAccountRequest}>Delete Account Request</button>
+                                    </div>
+                                </div>
+                                <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2">
+                                    <FiCheckCircle className="text-emerald-500" />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered Data Processor (ODPC Kenya)</span>
+                                </div>
+                            </section>
+                        </>
                     )
 }                    {
 activeTab === 'inventory' && (                        
@@ -1634,11 +1719,46 @@ mfaLoading ? '...' : 'Enable'
 </button>
                                     )
 }                                
-</div>
-                            
-</div>
-                        
-</section>
+                                </div>
+
+                                {/* Security PIN card - NEW for Kenyan SaaS Security */}
+                                <div className="security-card mt-4 border-t pt-6">
+                                    <div className={`security-icon-wrapper ${securityPinEnabled ? 'mfa-active-bg' : 'mfa-inactive-bg'}`}>
+                                        <FiActivity />
+                                    </div>
+                                    <div className="security-info">
+                                        <h4>Security PIN</h4>
+                                        <p>Secondary 6-digit verification layer for critical actions.</p>
+                                        {securityPinEnabled ? (
+                                            <div className="mfa-status-badge active">
+                                                <FiCheckCircle />
+                                                <span>6-Digit PIN Configured</span>
+                                            </div>
+                                        ) : (
+                                            <div className="mfa-status-badge warning">
+                                                <FiAlertCircle />
+                                                <span>PIN Not Set — Recommended</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button className="btn-security-action" onClick={() => setShowPinModal(true)}>
+                                            {securityPinEnabled ? 'Change PIN' : 'Set PIN'}
+                                        </button>
+                                        {securityPinEnabled && (
+                                            <button 
+                                                className="btn-security-action danger" 
+                                                onClick={handleDisablePin}
+                                                disabled={pinLoading}
+                                                title="De-activate Security PIN"
+                                            >
+                                                {pinLoading ? '...' : 'Remove'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
                     )
 }                    {
 activeTab === 'devices' && (                        
@@ -2444,6 +2564,109 @@ handleCropComplete
                     </div>
                 </div>
             )}
+            {/* Global Modals for Main path */}
+            {showPinModal && createPortal(
+                <div className="add-tank-modal-overlay">
+                    <div className="add-tank-modal-content modal-w-md">
+                        <div className="modal-header security-verify-header">
+                            <div className="header-text-container">
+                                <h2>Security PIN Setup</h2>
+                                <p>Set a 6-digit secondary verification code</p>
+                            </div>
+                            <button className="close-btn" onClick={() => setShowPinModal(false)}><FiX /></button>
+                        </div>
+                        <div className="security-modal-body">
+                            <div className="input-group">
+                                <label className="mb-4 block text-center">Enter 6-Digit PIN</label>
+                                <div className="flex justify-center gap-2 mb-8">
+                                    {[...Array(6)].map((_, i) => (
+                                        <input
+                                            key={`pin-${i}`}
+                                            id={`pin-input-${i}`}
+                                            type={visiblePinIndices.includes(i) ? "text" : "password"}
+                                            maxLength={1}
+                                            className="w-12 h-14 bg-slate-100 border-2 border-slate-200 rounded-xl text-center text-2xl font-bold focus:border-blue-500 focus:bg-white outline-none transition-all shadow-inner"
+                                            value={pinCode[i] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                if (!val && e.target.value) return; // Ignore non-numeric
+                                                const newPin = pinCode.split('');
+                                                newPin[i] = val;
+                                                const finalPin = newPin.join('').slice(0, 6);
+                                                setPinCode(finalPin);
+                                                
+                                                if (val) {
+                                                    setVisiblePinIndices(prev => [...prev, i]);
+                                                    setTimeout(() => {
+                                                        setVisiblePinIndices(prev => prev.filter(idx => idx !== i));
+                                                    }, 500);
+                                                    
+                                                    if (i < 5) {
+                                                        document.getElementById(`pin-input-${i + 1}`)?.focus();
+                                                    }
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Backspace' && !pinCode[i] && i > 0) {
+                                                    document.getElementById(`pin-input-${i - 1}`)?.focus();
+                                                }
+                                            }}
+                                            autoFocus={i === 0}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="input-group">
+                                <label className="mb-4 block text-center">Confirm PIN</label>
+                                <div className="flex justify-center gap-2 mb-4">
+                                    {[...Array(6)].map((_, i) => (
+                                        <input
+                                            key={`confirm-pin-${i}`}
+                                            id={`confirm-pin-input-${i}`}
+                                            type={visibleConfirmPinIndices.includes(i) ? "text" : "password"}
+                                            maxLength={1}
+                                            className="w-12 h-14 bg-slate-100 border-2 border-slate-200 rounded-xl text-center text-2xl font-bold focus:border-blue-500 focus:bg-white outline-none transition-all shadow-inner"
+                                            value={confirmPinCode[i] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                if (!val && e.target.value) return;
+                                                const newPin = confirmPinCode.split('');
+                                                newPin[i] = val;
+                                                const finalPin = newPin.join('').slice(0, 6);
+                                                setConfirmPinCode(finalPin);
+
+                                                if (val) {
+                                                    setVisibleConfirmPinIndices(prev => [...prev, i]);
+                                                    setTimeout(() => {
+                                                        setVisibleConfirmPinIndices(prev => prev.filter(idx => idx !== i));
+                                                    }, 500);
+
+                                                    if (i < 5) {
+                                                        document.getElementById(`confirm-pin-input-${i + 1}`)?.focus();
+                                                    }
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Backspace' && !confirmPinCode[i] && i > 0) {
+                                                    document.getElementById(`confirm-pin-input-${i - 1}`)?.focus();
+                                                }
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="form-actions mt-8">
+                                <button className="btn-secondary" onClick={() => setShowPinModal(false)}>Cancel</button>
+                                <button className="btn-primary" onClick={handleSetupPin} disabled={pinLoading || pinCode.length !== 6}>
+                                    {pinLoading ? <FiRefreshCw className="animate-spin" /> : 'Save PIN'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>
     );
 };

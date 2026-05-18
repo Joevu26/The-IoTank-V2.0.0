@@ -8,7 +8,7 @@ const SCRAPER_CONFIG = [
   {
     name: 'EPRA Petroleum Prices',
     domain: 'epra.go.ke',
-    url: 'https://www.epra.go.ke/petroleum-prices/',
+    url: 'https://www.epra.go.ke/pump-prices/',
     type: 'Regulatory'
   }
 ];
@@ -50,13 +50,25 @@ serve(async (req) => {
         console.log(`[OfficialScraper] HIGH-INTENSITY SCAN: Detection window (14th/15th) active.`);
       }
 
-      const response = await fetch(site.url, {
-        headers: { 
-          'User-Agent': 'IoTank-Forensic-Bot/2.0 (+https://the-iotank-project.web.app)',
-          'Accept': 'text/html',
-          'Cache-Control': 'no-cache' // Bypass cache on review days
-        }
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      let response;
+      try {
+        response = await fetch(site.url, {
+          signal: controller.signal,
+          headers: { 
+            'User-Agent': 'IoTank-Forensic-Bot/2.0 (+https://the-iotank-project.web.app)',
+            'Accept': 'text/html',
+            'Cache-Control': 'no-cache'
+          }
+        });
+      } catch (fetchErr: any) {
+        console.warn(`[OfficialScraper] Connect timeout/failure for ${site.name}:`, fetchErr.message);
+        clearTimeout(timeoutId);
+        continue;
+      }
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.warn(`[OfficialScraper] Failed to reach ${site.name}: ${response.statusText}`);

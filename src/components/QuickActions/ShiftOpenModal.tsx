@@ -50,76 +50,6 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
         setIsStarting(true);
         try {
-            // 0. Forensic Handshake: Detect Idle Gaps (Leak/Theft while closed)
-            const { data: lastShift } = await supabase
-                .from('shift_closures')
-                .select('closed_at, pump_readings')
-                .eq('station_id', currentUser.stationId)
-                .order('closed_at', { ascending: false })
-                .limit(1)
-                .single();
-
-            if (lastShift) {
-                const closedAt = new Date(lastShift.closed_at);
-                const hrsClosed = Math.max(0.1, differenceInHours(now, closedAt));
-                const prevReadings = lastShift.pump_readings || {};
-
-            // Forensic Handshake: run all tank checks in parallel and properly await them
-            await Promise.all(tanks.map(async (tank: Tank) => {
-                // Search for this tank's closure in the polymorphic pumpReadings object
-                // In ShiftCloseModal, it's saved as: pumpReadings[t.name] = { start, end }
-                const tankClosureData = prevReadings[tank.name];
-                const prevCloseVol = tankClosureData?.end;
-                const currentOpenVol = readings[tank.id]?.volumeCorrected || readings[tank.id]?.volume || tank.currentVolume || 0;
-
-                if (prevCloseVol !== undefined) {
-                    const forensic = validateIdleStability(prevCloseVol, currentOpenVol, hrsClosed);
-                    
-                    // Notify UI of the change immediately
-                    window.dispatchEvent(new CustomEvent('system-toast', {
-                        detail: {
-                            title: `Idle Sync: ${tank.name}`,
-                            message: `Fuel change during closed shift: ${forensic.delta.toFixed(1)} L (${forensic.rateLhr.toFixed(2)} L/hr)`,
-                            type: forensic.isTheft ? 'error' : (forensic.isLeak ? 'warning' : 'info'),
-                            attribution: 'FORENSIC AUDIT'
-                        }
-                    }));
-
-                    if (forensic.isTheft || forensic.isLeak) {
-                        const violationType = forensic.isTheft ? 'theft-detected' : 'leak-detected';
-                        const severity = forensic.isTheft ? 'critical' : 'warning';
-                        const title = forensic.isTheft ? '🔴 THEFT ALERT' : '⚠️ PRECISION LEAK';
-                        const message = forensic.isTheft 
-                            ? `Forensic Gap: Unexpected drop of ${Math.abs(forensic.delta).toFixed(1)}L detected during idle hours. SUSPECTED THEFT.`
-                            : `Precision Leak: Constant loss of ${forensic.rateLhr.toFixed(2)}L/hr detected while station was closed.`;
-
-                        // Trigger Forensic Alert for Action Queue
-                        if (validateUUID(tank.id)) {
-                            await supabase.from('alerts').insert({
-                                station_id: currentUser.stationId,
-                                tank_id: tank.id,
-                                alert_type: violationType,
-                                severity: severity,
-                                title: title,
-                                message: message,
-                                timestamp: nowString,
-                                alert_data: { delta: forensic.delta, rate: forensic.rateLhr, closedDuration: hrsClosed }
-                            });
-                        }
-
-                        await AuditService.log(
-                            'SECURITY',
-                            forensic.isTheft ? 'THEFT_DETECTED' : 'LEAK_DETECTED',
-                            currentUser.stationId,
-                            `Forensic alert for ${tank.name}: ${message}`,
-                            forensic.isTheft ? 'CRITICAL' : 'WARNING', 
-                            { forensic, tankId: tank.id }
-                        );
-                    }
-                }
-            }));
-            }
-
             // 1. Update stateless shift tracker in DB
             const { error: shiftError } = await supabase
                 .from('current_station_shifts')
@@ -132,33 +62,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
 
             if (shiftError) throw shiftError;
 
-            // 2. Database Notification (Unified Timeline)
-            await AuditService.log(
-                'SHIFT',
-                'SHIFT_STARTED',
-                currentUser.stationId,
-                `Forensic Session Initialized: Shift commenced by personnel [${currentUser.displayName || currentUser.email}] at ${now.toLocaleTimeString()}. Telemetry synchronization verified.`,
-                'INFO',
-                { 
-                    startTime: nowString, 
-                    operator: currentUser.email,
-                    displayName: currentUser.displayName,
-                    stationId: currentUser.stationId
-                }
-            );
-
-            // Legacy alert for backward compatibility with notification bell
-            await supabase.from('alerts').insert({
-                station_id: currentUser.stationId,
-                auth_user_id: currentUser.authUserId,
-                alert_type: 'info',
-                severity: 'info',
-                title: 'Operation Started',
-                message: `Operational shift initialized by ${currentUser.displayName || currentUser.email} at ${now.toLocaleTimeString()}. Telemetry tracking is now active.`,
-                alert_data: { type: 'shift_open', user: currentUser.email, time: nowString }
-            });
-
-            // 3. Persistent Start Volumes (Cloud Synchronized Snapshot)
+            // 2. Persistent Start Volumes (Cloud Synchronized Snapshot)
             const startVolumes: Record<string, { opening_volume: number, captured_at: string, is_manual_override: boolean }> = {};
             tanks.forEach((t: Tank) => {
                 const currentReading = readings[t.id];
@@ -171,7 +75,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 };
             });
 
-            // 4. Update stateful metadata with tank snapshots
+            // 3. Update stateful metadata with tank snapshots
             await supabase
                 .from('current_station_shifts')
                 .update({ 
@@ -183,7 +87,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 })
                 .eq('station_id', currentUser.stationId);
 
-            // 5. Create Forensic Record for Reporting
+            // 4. Create Forensic Record for Reporting
             await createShift(currentUser.stationId, {
                 openedAt: nowString,
                 closedAt: null,
@@ -207,18 +111,6 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 action_label: isManualOverride ? 'Shift Started (Manual Override)' : 'Shift Started (Telemetric Sync)'
             } as any);
 
-            // [NEW] Log the override event for forensics
-            if (isManualOverride) {
-                await AuditService.log(
-                    'SECURITY',
-                    'MANUAL_OVERRIDE',
-                    currentUser.stationId,
-                    `OPERATIONAL ALERT: Sensor bypass activated by ${currentUser.email}. Opening volumes entered manually.`,
-                    'WARNING',
-                    { manualVolumes }
-                );
-            }
-
             // Legacy fallback (maintained for zero-downtime transition)
             localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(
                 Object.fromEntries(Object.entries(startVolumes).map(([id, data]) => [id, data.opening_volume]))
@@ -230,45 +122,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                 display: currentUser.displayName || currentUser.email 
             }));
             
-            // 4. Browser Notification
-            NotificationService.show('🚀 Shift Initialized', {
-                body: `Station: ${currentUser?.stationId}\nTime: ${now.toLocaleTimeString()}\nOperator: ${currentUser.displayName || currentUser.email}`,
-                tag: 'shift-open'
-            });
-
-            // 5. Off-Platform SMTP Tactical Email
-            try {
-                const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
-                const shouldSendUpdateEmail = currentUser?.authUserId
-                    ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
-                    : false;
-
-                if (emailRecipient && shouldSendUpdateEmail) {
-                    await EmailDispatchService.sendSecurityAlert({
-                        to: emailRecipient,
-                        type: 'SYSTEM_CRITICAL',
-                        siteName: currentUser?.companyName || 'Fuel Station',
-                        details: {
-                           timestamp: nowString,
-                           operator: currentUser?.email || 'Unknown',
-                           description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
-                        }
-                    });
-                } else if (emailRecipient && !shouldSendUpdateEmail) {
-                    await AuditService.log(
-                        'SYSTEM',
-                        'EMAIL_SUPPRESSED',
-                        currentUser.stationId,
-                        'Shift-start email suppressed by user notification preferences.',
-                        'INFO',
-                        { userId: currentUser.authUserId, flow: 'shift_open' }
-                    );
-                }
-            } catch (mailErr) {
-                console.error('[ShiftOpen] Tactical email failed:', mailErr);
-            }
-
-            // 6. Instant UI Synchronization (Bypass real-time lag)
+            // 5. Instant UI Synchronization (Bypass real-time lag)
             // Optimistically update the active_shift query to show the new state IMMEDIATELY
             queryClient.setQueryData(['active_shift', currentUser.stationId], {
                 status: 'OPEN',
@@ -280,6 +134,142 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
             queryClient.invalidateQueries({ queryKey: ['shifts', currentUser.stationId] });
 
             onClose();
+
+            // 6. Defer all slow dispatches, audits, and checks to background async block
+            (async () => {
+                try {
+                    // Forensic Handshake: Detect Idle Gaps (Leak/Theft while closed)
+                    const { data: lastShift } = await supabase
+                        .from('shift_closures')
+                        .select('closed_at, pump_readings')
+                        .eq('station_id', currentUser.stationId)
+                        .order('closed_at', { ascending: false })
+                        .limit(1)
+                        .single();
+
+                    if (lastShift) {
+                        const closedAt = new Date(lastShift.closed_at);
+                        const hrsClosed = Math.max(0.1, differenceInHours(now, closedAt));
+                        const prevReadings = lastShift.pump_readings || {};
+
+                        // Forensic Handshake: run all tank checks in parallel
+                        await Promise.all(tanks.map(async (tank: Tank) => {
+                            const tankClosureData = prevReadings[tank.name];
+                            const prevCloseVol = tankClosureData?.end;
+                            const currentOpenVol = readings[tank.id]?.volumeCorrected || readings[tank.id]?.volume || tank.currentVolume || 0;
+
+                            if (prevCloseVol !== undefined) {
+                                const forensic = validateIdleStability(prevCloseVol, currentOpenVol, hrsClosed);
+                                
+                                // Notify UI of the change immediately
+                                window.dispatchEvent(new CustomEvent('system-toast', {
+                                    detail: {
+                                        title: `Idle Sync: ${tank.name}`,
+                                        message: `Fuel change during closed shift: ${forensic.delta.toFixed(1)} L (${forensic.rateLhr.toFixed(2)} L/hr)`,
+                                        type: forensic.isTheft ? 'error' : (forensic.isLeak ? 'warning' : 'info'),
+                                        attribution: 'FORENSIC AUDIT'
+                                    }
+                                }));
+
+                                if (forensic.isTheft || forensic.isLeak) {
+                                    const violationType = forensic.isTheft ? 'theft-detected' : 'leak-detected';
+                                    const severity = forensic.isTheft ? 'critical' : 'warning';
+                                    const title = forensic.isTheft ? '🔴 THEFT ALERT' : '⚠️ PRECISION LEAK';
+                                    const message = forensic.isTheft 
+                                        ? `Forensic Gap: Unexpected drop of ${Math.abs(forensic.delta).toFixed(1)}L detected during idle hours. SUSPECTED THEFT.`
+                                        : `Precision Leak: Constant loss of ${forensic.rateLhr.toFixed(2)}L/hr detected while station was closed.`;
+
+                                    // Trigger Forensic Alert for Action Queue
+                                    if (validateUUID(tank.id)) {
+                                        await supabase.from('alerts').insert({
+                                            station_id: currentUser.stationId,
+                                            tank_id: tank.id,
+                                            alert_type: violationType,
+                                            severity: severity,
+                                            title: title,
+                                            message: message,
+                                            timestamp: nowString,
+                                            alert_data: { delta: forensic.delta, rate: forensic.rateLhr, closedDuration: hrsClosed }
+                                        });
+                                    }
+
+                                    await AuditService.log(
+                                        'SECURITY',
+                                        forensic.isTheft ? 'THEFT_DETECTED' : 'LEAK_DETECTED',
+                                        currentUser.stationId,
+                                        `Forensic alert for ${tank.name}: ${message}`,
+                                        forensic.isTheft ? 'CRITICAL' : 'WARNING', 
+                                        { forensic, tankId: tank.id }
+                                    );
+                                }
+                            }
+                        }));
+                    }
+
+                    // Database Notification (Unified Timeline)
+                    await AuditService.log(
+                        'SHIFT',
+                        'SHIFT_STARTED',
+                        currentUser.stationId,
+                        `Forensic Session Initialized: Shift commenced by personnel [${currentUser.displayName || currentUser.email}] at ${now.toLocaleTimeString()}. Telemetry synchronization verified.`,
+                        'INFO',
+                        { 
+                            startTime: nowString, 
+                            operator: currentUser.email,
+                            displayName: currentUser.displayName,
+                            stationId: currentUser.stationId
+                        }
+                    );
+
+                    // Log override for forensics if active
+                    if (isManualOverride) {
+                        await AuditService.log(
+                            'SECURITY',
+                            'MANUAL_OVERRIDE',
+                            currentUser.stationId,
+                            `OPERATIONAL ALERT: Sensor bypass activated by ${currentUser.email}. Opening volumes entered manually.`,
+                            'WARNING',
+                            { manualVolumes }
+                        );
+                    }
+
+                    // Browser Notification
+                    NotificationService.show('🚀 Shift Initialized', {
+                        body: `Time: ${now.toLocaleTimeString()}\nOperator: ${currentUser.displayName || currentUser.email}`,
+                        tag: 'shift-open'
+                    });
+
+                    // Off-Platform SMTP Tactical Email
+                    const emailRecipient = currentUser?.stationEmail || currentUser?.email || '';
+                    const shouldSendUpdateEmail = currentUser?.authUserId
+                        ? await NotificationPreferencesService.shouldSendEmail(currentUser.authUserId, 'updates')
+                        : false;
+
+                    if (emailRecipient && shouldSendUpdateEmail) {
+                        await EmailDispatchService.sendSecurityAlert({
+                            to: emailRecipient,
+                            type: 'SYSTEM_CRITICAL',
+                            siteName: currentUser?.companyName || 'Fuel Station',
+                            details: {
+                               timestamp: nowString,
+                               operator: currentUser?.email || 'Unknown',
+                               description: `Operational shift initialized at ${now.toLocaleTimeString()} by ${currentUser?.email}. Telemetry tracking is now active.`
+                            }
+                        });
+                    } else if (emailRecipient && !shouldSendUpdateEmail) {
+                        await AuditService.log(
+                            'SYSTEM',
+                            'EMAIL_SUPPRESSED',
+                            currentUser.stationId,
+                            'Shift-start email suppressed by user notification preferences.',
+                            'INFO',
+                            { userId: currentUser.authUserId, flow: 'shift_open' }
+                        );
+                    }
+                } catch (bgErr) {
+                    console.error('[ShiftOpen] Background worker error:', bgErr);
+                }
+            })();
         } catch (err) {
             logger.error('Shift activation failed', err, 'SHIFT_OPEN');
             window.dispatchEvent(new CustomEvent('system-toast', {

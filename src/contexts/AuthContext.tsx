@@ -10,14 +10,15 @@ import { NewsService } from '@/services/NewsService';
 import { logger } from '@/utils/logger';
 
 // HIGH-003: Only emit debug logs in development — never in production
-const debugLog = (msg: string, ctx?: any) => logger.debug(msg, ctx, 'AUTH_CONTEXT');
+const debugLog = (msg: string, ctx?: any) => logger.info(msg, ctx, 'AUTH_CONTEXT_TRACE');
 
-const CACHE_KEY = 'iotank_cached_user';
+const CACHE_KEY = 'IOTANK_USER_CACHE_V2.5'; // [VERSIONED]: Invalidate stale schemas
 // HIGH-001: Fields stored in the localStorage cache — sensitive auth fields (role, authLevel)
 // are intentionally excluded; they are always re-derived from the DB on enrichment.
-const SAFE_CACHE_FIELDS: (keyof User)[] = [
-    'authUserId', 'email', 'displayName', 'photoURL',
-    'stationId', 'companyName', 'logoUrl', 'address', 'phoneNumber', 'siteIds'
+const SAFE_CACHE_FIELDS = [
+    'authUserId', 'email', 'displayName', 'photoURL', 'role', 'authLevel', 
+    'stationId', 'companyName', 'logoUrl', 'siteIds', 'mfaEnabled', 
+    'securityPinEnabled', 'isSystemAccount', 'stationEmail'
 ];
 
 export interface EnrollMFAResult {
@@ -48,6 +49,11 @@ export interface AuthContextType {
     unenrollMFA: () => Promise<void>;
     cancelMFAChallenge: () => void;
     checkMFAChallenge: () => Promise<boolean>;
+    setupSecurityPin: (pin: string) => Promise<void>;
+    disableSecurityPin: () => Promise<void>;
+    verifySecurityPin: (pin: string) => Promise<boolean>;
+    mfaFailures: number;
+    resetMfaFailures: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Stores the pending Supabase challenge ID during an MFA flow
     const mfaChallengeIdRef = useRef<string | null>(null);
     const mfaChallengeInProgressRef = useRef(false);
+    const [mfaFailures, setMfaFailures] = useState(0);
     
     // Concurrency Lock: Prevent multiple enrichment calls from overlapping
     const isEnrichingRef = useRef<string | null>(null);
@@ -86,6 +93,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const handshakeInProgressRef = useRef(false);
     const isProvisionedRef = useRef<boolean>(false);
     const isLoadingRef = useRef<boolean>(true);
+    const mfaFactorsRef = useRef<any>(null); // [OPTIMIZATION]: Cache factors during handshake
+    const pinIntentRef = useRef<{ enabled: boolean, ts: number } | null>(null); // [RESILIENCE]: Prevent refresh-induced PIN resets
 
     const updateLoadingState = (val: boolean) => {
         setLoading(val);
@@ -101,24 +110,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             stationId: '',  // Triggers ProvisioningGuard
             siteIds: [],
             mfaEnabled: false,
+            securityPinEnabled: false,
             isProvisional: false, // [FIX] Ensure provisional is false for unprovisioned state
             createdAt: Date.now(),
             lastLoginAt: Date.now()
         };
     };
 
-    const enrichUserFromSupabase = async (sbUser: any) => {
+    const enrichUserFromSupabase = async (sbUser: any, force: boolean = false) => {
         if (!sbUser?.id) return false;
         
         // Cooldown check: Prevent re-enriching the same user within 15s if we already tried
+        // EXCEPTION: If 'force' is true (e.g. after MFA update), bypass the cooldown.
         const now = Date.now();
-        if (currentUserAuthIdRef.current === sbUser.id && (now - lastEnrichmentAttemptRef.current < 15000)) {
+        if (!force && currentUserAuthIdRef.current === sbUser.id && (now - lastEnrichmentAttemptRef.current < 15000)) {
             debugLog(`[DEBUG_LOG] Enrichment cooldown active for ${sbUser.id}. Skipping.`);
             updateLoadingState(false);
             return false;
         }
 
-        if (enrichmentLockRef.current) {
+        if (enrichmentLockRef.current && !force) {
             // Always ensure loading clears even on skipped enrichment
             updateLoadingState(false);
             return false; // Indicating skipped
@@ -157,11 +168,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 
                 const [bundleResult, mfaResult] = await Promise.all([
                     supabase.rpc('get_user_bundle_v2'),
+                    // [OPTIMIZATION]: Only list factors if we don't already have them in a ref 
+                    // from a preceding checkAndTriggerMFA call, AND the user actually has MFA enrolled.
+                    mfaFactorsRef.current ? Promise.resolve({ data: mfaFactorsRef.current, error: null }) : 
+                    (!sbUser?.app_metadata?.mfa_enrolled) ? Promise.resolve({ data: { totp: [] }, error: null }) :
                     Promise.race([
                         supabase.auth.mfa.listFactors(),
-                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 5000))
+                        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('MFA Timeout')), 5000)) // Increased from 3s to 5s for reliability
                     ]).catch(e => {
-                        logger.warn('[MFA] Factor list deferred or timed out:', e);
+                        logger.warn('[MFA] Factor list deferred or timed out. Falling back to cache/current state.', e);
                         return { data: null, error: e };
                     })
                 ]);
@@ -170,20 +185,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 const { data: bundle, error } = bundleResult;
                 const { data: factors } = mfaResult;
-                const hasVerifiedMfa = factors?.totp?.some((f: any) => f.status === 'verified') || false;
+                
+                // [FIX]: If MFA list timed out or returned null, fallback to metadata, current state, or cache.
+                // We use a strict check to ensure we don't accidentally flip to 'false' on a network hiccup.
+                let hasVerifiedMfa = factors?.totp?.some((f: any) => f.status === 'verified');
+                
+                if (factors === null || factors === undefined) {
+                    // Fallback to source of truth: app_metadata or current state
+                    hasVerifiedMfa = (sbUser?.app_metadata?.mfa_enrolled === true) || 
+                                     (currentUser?.mfaEnabled === true);
+                    debugLog(`[MFA] Factor list unavailable. Falling back to mfaEnabled: ${hasVerifiedMfa}`);
+                }
 
                 if (error) {
                     logger.error(`FATAL: RPC Request failed for ${sbUser.email}:`, error, 'AUTH_HANDSHAKE');
                     
-                    // Forensic Log for failed handshake
-                    await AuditService.log(
+                    // [RESILIENCE]: If we already have a user state (from cache or previous enrichment), 
+                    // DO NOT overwrite it with unprovisioned state on a transient network error.
+                    if (currentUser && currentUser.authUserId === sbUser.id && !currentUser.isProvisional) {
+                        debugLog("[DEBUG_LOG] RPC failed but preserving existing identity state.");
+                        updateLoadingState(false);
+                        return true;
+                    }
+
+                    // Forensic Log for failed handshake (Fire-and-forget to avoid blocking UI)
+                    AuditService.log(
                         'SECURITY',
                         'IDENTITY_MUTATION_ATTEMPT',
                         '',
                         `Identity handshake failed for ${sbUser.email}: RPC Error`,
                         'CRITICAL',
                         { error: error.message, code: error.code }
-                    );
+                    ).catch(err => logger.warn('[Audit Log Failed]', err));
 
                     setCurrentUser(mapToUnprovisionedUser(sbUser)); 
                     updateLoadingState(false);
@@ -193,14 +226,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 if (bundle?.identity_type === 'error') {
                     logger.error(`400 ERROR DETAIL: Schema mismatch or recursive RLS detected.`, null, 'AUTH_HANDSHAKE');
                     
-                    await AuditService.log(
+                    AuditService.log(
                         'SECURITY',
                         'IDENTITY_MUTATION_ATTEMPT',
                         '',
                         `Identity handshake protocol error for ${sbUser.email}`,
                         'CRITICAL',
                         { error_message: bundle.error_message, error_code: bundle.error_code }
-                    );
+                    ).catch(err => logger.warn('[Audit Log Failed]', err));
 
                     // Set provisional to trigger ProvisioningGuard, which can show the DB error now.
                     const errorUser = mapToUnprovisionedUser(sbUser);
@@ -280,11 +313,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     phoneNumber: bundle.phone_number,
                     siteIds: bundle.site_ids || [],
                     mfaEnabled: hasVerifiedMfa,
+                    securityPinEnabled: (pinIntentRef.current && (Date.now() - pinIntentRef.current.ts < 60000)) 
+                        ? pinIntentRef.current.enabled 
+                        : (bundle.security_pin_enabled ?? currentUser?.securityPinEnabled ?? false),
                     isSystemAccount: isSystemUser,
-                    isProvisional: false, // [FIX] Explicitly clear provisional flag to unlock ProtectedRoute
+                    isProvisional: false, 
                     createdAt: bundle.created_at ? new Date(bundle.created_at).getTime() : Date.now(),
                     lastLoginAt: Date.now()
                 };
+
+                // [DEBUG]: Forensic verification of security flags
+                debugLog(`[DEBUG_LOG] ENRICHMENT: Security Flags - MFA: ${finalUser.mfaEnabled}, PIN: ${finalUser.securityPinEnabled}`);
+
 
                 // 4. CACHE: Persist for SWR (Stale-While-Revalidate) bootstrap
                 // HIGH-001: Only cache non-sensitive identity fields — role/authLevel always come from DB
@@ -312,10 +352,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (err) {
             logger.error('FATAL: Identity bundle fetch failed or timed out:', err, 'AUTH_HANDSHAKE');
             
-            // Safety fallback: Treat as unprovisioned if we timed out/failed
-            if (!currentUserAuthIdRef.current || currentUserAuthIdRef.current === sbUser.id) {
+            // Safety fallback: Treat as unprovisioned ONLY if we have no current state
+            if (!currentUser || (currentUserAuthIdRef.current !== sbUser.id)) {
                 isProvisionedRef.current = false;
                 setCurrentUser(mapToUnprovisionedUser(sbUser));
+            } else {
+                debugLog("[DEBUG_LOG] Handshake timed out but preserving current state.");
             }
             updateLoadingState(false);
             return false;
@@ -346,7 +388,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return false;
             }
 
-            const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            const { data, error } = await Promise.race([
+                supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+                new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AAL Timeout')), 5000))
+            ]);
             if (error) throw error;
 
             debugLog(`[MFA] AAL Check: Current=${data.currentLevel}, Next=${data.nextLevel}`);
@@ -354,6 +399,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (data.currentLevel !== data.nextLevel && data.nextLevel === 'aal2') {
                 const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
                 if (factorsError) throw factorsError;
+                
+                mfaFactorsRef.current = factors; // Cache for enrichment
 
                 const totpFactor = factors.totp.find(f => f.status === 'verified');
                 if (totpFactor) {
@@ -383,121 +430,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const isBootingRef = useRef(true);
 
     useEffect(() => {
-        
-        // Safety Timeout: Force clear loading after 12 seconds to prevent permanent hang
-        // Increased from 4s to 12s to prevent race conditions during DB cold-starts
+        // [REFACTOR]: Single sequential boot flow via onAuthStateChange
+        // This prevents the race between getSession() and onAuthStateChange which
+        // frequently caused GoTrue lock contention and 'Security Vault' timeouts.
         const safetyTimer = setTimeout(() => {
             if (isLoadingRef.current) {
                 logger.warn("BOOT: Safety timeout triggered. Unlocking UI.", null, 'AUTH_CONTEXT');
                 updateLoadingState(false);
                 isBootingRef.current = false;
                 handshakeInProgressRef.current = false;
-                
-                // [FIX] Force clear provisional state to unblock ProtectedRoute
-                setCurrentUser(prev => prev ? { ...prev, isProvisional: false } : null);
             }
         }, 12000);
 
-        const initializeAuth = async () => {
-            if (handshakeInProgressRef.current) return;
-            handshakeInProgressRef.current = true;
-            
-            debugLog("[DEBUG_LOG] BOOT: Launching secure handshake...");
-            isBootingRef.current = true;
-
-            // [RECOVERY SCAN]: Detect if the user landed on ANY page with a recovery hash
-            // This is a fail-safe for when Supabase ignores the redirectTo parameter.
-            if (window.location.hash.includes('type=recovery') || window.location.hash.includes('recovery_token=')) {
-                debugLog("[DEBUG_LOG] BOOT: Recovery hash detected. Immediate route to reset module.");
-                
-                // Clear any potentially conflicting state
-                isBootingRef.current = false;
-                handshakeInProgressRef.current = false;
-                
-                const targetUrl = `${window.location.origin}/reset-password${window.location.hash}`;
-                if (window.location.pathname !== '/reset-password') {
-                    window.location.href = targetUrl;
-                }
-                updateLoadingState(false);
-                return;
-            }
-            
-            try {
-                // Determine initial session immediately
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                
-                // CATCH: Invalid Refresh Token or other session recovery failures
-                if (sessionError) {
-                    const isInvalidToken = sessionError.message?.toLowerCase().includes('refresh token') || 
-                                          sessionError.message?.toLowerCase().includes('invalid token') ||
-                                          (sessionError as any).status === 400;
-                    
-                    if (isInvalidToken) {
-                        logger.warn("BOOT: Session data corrupted or expired. Performing silent purge.", null, 'AUTH_BOOT');
-                        localStorage.removeItem(CACHE_KEY);
-                        // Sign out but without throwing more errors
-                        await supabase.auth.signOut().catch(() => {});
-                        setCurrentUser(null);
-                        updateLoadingState(false);
-                        return;
-                    }
-                    throw sessionError;
-                }
-
-                if (session?.user) {
-                    currentUserAuthIdRef.current = session.user.id;
-                    
-                    // 1. BOOT FROM CACHE: Immediate UI unlock if valid
-                    const cachedData = localStorage.getItem(CACHE_KEY);
-                    if (cachedData) {
-                        try {
-                            const parsed = JSON.parse(cachedData);
-                            if (parsed.authUserId === session.user.id) {
-                                debugLog("[DEBUG_LOG] BOOT: Restoring identity from local cache.");
-                                // PREVENT PREMATURE REDIRECTS: Force provisional state on boot so ProtectedRoute shows a loader 
-                                // instead of kicking the user out before the background DB handshake completes.
-                                parsed.isProvisional = true;
-                                parsed.role = 'viewer';
-                                parsed.authLevel = 8;
-                                setCurrentUser(parsed);
-                                updateLoadingState(false);
-                                isProvisionedRef.current = !!parsed.stationId;
-                            }
-                        } catch (e) {
-                            logger.warn("BOOT: Cache invalid.", null, 'AUTH_BOOT');
-                        }
-                    }
-
-                    // 2. BACKGROUND ENRICHMENT: Always verify against DB in background
-                    if (window.location.pathname !== '/reset-password') {
-                        const enrichmentPromise = enrichUserFromSupabase(session.user);
-                        // If no cache hit, we MUST wait for the first enrichment to show anything
-                        if (!cachedData) {
-                            await enrichmentPromise;
-                        }
-                    }
-                } else {
-                    debugLog("[DEBUG_LOG] BOOT: No active session. Public flight mode.");
-                    updateLoadingState(false);
-                }
-            } catch (error) {
-                logger.error("BOOT: Handshake failed:", error, 'AUTH_BOOT');
-                updateLoadingState(false);
-            } finally {
-                isBootingRef.current = false;
-                handshakeInProgressRef.current = false;
-                // Final safety: ensure loading state is derived correctly
-                if (isLoadingRef.current) {
-                    updateLoadingState(false);
-                }
-                clearTimeout(safetyTimer);
-            }
-        };
-
-        initializeAuth();
-
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            setTimeout(async () => {
+            const handleAuthEvent = async () => {
                 debugLog(`[DEBUG_LOG] AUTH_EVENT: ${event} (Booting: ${isBootingRef.current})`);
 
                 if (event === 'PASSWORD_RECOVERY') {
@@ -529,9 +475,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
 
                 // CRITICAL: Suppress background events (token refresh, user update) during boot.
-                // NEVER suppress SIGNED_IN — the user may have just logged in while boot was running.
+                // NEVER suppress SIGNED_IN or INITIAL_SESSION — they carry the critical initial auth payload.
                 // The isEnrichingRef concurrency lock inside enrichUserFromSupabase handles deduplication.
-                if ((isBootingRef.current || handshakeInProgressRef.current) && event !== 'SIGNED_IN') {
+                if ((isBootingRef.current || handshakeInProgressRef.current) && event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') {
                     debugLog(`[DEBUG_LOG] AUTH_EVENT: ${event} suppressed (Handshake in progress)`);
                     return;
                 }
@@ -539,23 +485,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 const isSilentEvent = event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED';
                 const isSameUser = session?.user?.id === currentUserAuthIdRef.current;
 
-                // Handle sign-in events (including OAuth redirects)
-                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                // Handle sign-in events (including OAuth redirects and initial page loads)
+                if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
                     if (session) {
                         const mfaTriggered = await checkAndTriggerMFA(session);
                         if (mfaTriggered) return;
                     }
                 }
 
-                // CRITICAL: isSameUser check should NOT block SIGNED_IN events if we are stuck
+                // CRITICAL: isSameUser check should NOT block SIGNED_IN or INITIAL_SESSION events if we are stuck
                 // in an unprovisioned state, as we need to re-trigger enrichment.
-                if (isSilentEvent || (isSameUser && event === 'SIGNED_IN' && isProvisionedRef.current)) {
+                if (isSilentEvent || (isSameUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && isProvisionedRef.current)) {
                     debugLog(`[DEBUG_LOG] AUTH_EVENT: Skipping redundant update for ${event}`);
                     return;
                 }
 
                 if (session?.user) {
                     let unlockedByCache = false;
+                    
+                    // 1. BOOTSTRAP: Load cache if this is the first encounter
+                    if (isBootingRef.current) {
+                        const cachedData = localStorage.getItem(CACHE_KEY);
+                        if (cachedData) {
+                            try {
+                                const parsed = JSON.parse(cachedData);
+                                if (parsed.authUserId === session.user.id) {
+                                    // [VALIDATION]: Ensure critical fields exist
+                                    if (parsed.role && parsed.stationId) {
+                                        debugLog("[DEBUG_LOG] BOOT: Cache hit during subscription. Restoring.");
+                                        setCurrentUser(parsed);
+                                        updateLoadingState(false);
+                                        unlockedByCache = true;
+                                    } else {
+                                        debugLog("[DEBUG_LOG] BOOT: Cache malformed. Purging.");
+                                        localStorage.removeItem(CACHE_KEY);
+                                    }
+                                }
+                            } catch (e) {
+                                debugLog("[DEBUG_LOG] BOOT: Cache stale or invalid.");
+                            }
+                        }
+                    }
+
+                    // [IMMEDIATE FEEDBACK]: Notify user that identity is being verified
+                    if (!isProvisionedRef.current && !unlockedByCache) {
+                        window.dispatchEvent(new CustomEvent('system-toast', {
+                            detail: {
+                                title: 'Authenticating...',
+                                message: 'Synchronizing secure session with IoTank Cloud.',
+                                type: 'info',
+                                duration: 2000
+                            }
+                        }));
+                    }
+
                     updateLoadingState(true);
                     
                     // PROVISIONAL IDENTITY: Set unprovisioned user immediately so ProtectedRoute
@@ -591,21 +574,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     currentUserAuthIdRef.current = session.user.id;
                 
                     const enrichmentPromise = enrichUserFromSupabase(session.user);
-                
-                    // If we already unlocked the UI with a provisional/cached identity,
-                    // do not block here. Let it finish in the background.
-                    // We use unlockedByCache to bypass the potentially stale 'loading' state.
-                    if (!unlockedByCache && isLoadingRef.current) {
-                        await enrichmentPromise;
+                    
+                    // [FIX]: NEVER await enrichment inside the onAuthStateChange callback.
+                    // The listener often holds the GoTrue lock, and awaiting a call that
+                    // needs the lock (like listFactors or RPC) will cause a DEADLOCK.
+                    // enrichmentPromise handles its own loading state cleanup.
+                    enrichmentPromise.catch((e: any) => {
+                        logger.error("[AUTH] Background enrichment failed:", e);
                         updateLoadingState(false);
-                    }
+                    });
                 } else {
                     debugLog("[DEBUG_LOG] AUTH_EVENT: Clearing identity.");
                     currentUserAuthIdRef.current = null;
                     setCurrentUser(null);
                     updateLoadingState(false);
                 }
-            }, 0);
+                
+                // End of boot sequence regardless of success/fail
+                if (isBootingRef.current) {
+                    isBootingRef.current = false;
+                    updateLoadingState(false);
+                }
+            };
+            
+            // Execute non-blocking to immediately return control to GoTrue and release session locks
+            handleAuthEvent().catch(err => {
+                logger.error("[AUTH_CONTEXT] Error in onAuthStateChange handler:", err);
+                updateLoadingState(false);
+            });
         });
 
         return () => {
@@ -625,21 +621,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const signIn = async (email: string, password: string) => {
         updateLoadingState(true);
  
-        // HIGH-005: Server-side brute-force check before attempting auth
-        try {
-            const { data: allowed, error: rateErr } = await supabase.rpc('check_auth_attempt', { p_email: email });
-            if (!rateErr && allowed === false) {
-                updateLoadingState(false);
-                throw new Error('Account temporarily locked due to too many failed attempts. Please try again later.');
-            }
-        } catch (rateCheckErr: any) {
-            // If the RPC itself fails, continue — don't block login due to rate limiter failure
-            if (rateCheckErr.message?.includes('locked')) throw rateCheckErr;
-            debugLog('[signIn] Rate check RPC unavailable, proceeding:', rateCheckErr.message);
-        }
+        // [OPTIMIZATION]: Rate limit check is already performed in LoginForm.tsx handleSubmit
+        // to avoid redundant RPC calls during the critical auth path.
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
+            // [SELF-HEALING]: If session is corrupted, purge and reload
+            if (error.message?.includes('refresh_token_not_found') || error.message?.includes('Invalid Refresh Token')) {
+                logger.error("FATAL: Session corrupted. Purging all local data.", error);
+                localStorage.clear();
+                window.location.reload();
+                return;
+            }
+
             // Record the failed attempt
             supabase.rpc('log_auth_attempt', { p_email: email, p_is_success: false }).then(({error: rpcErr}) => {
                 if (rpcErr) debugLog('[signIn] log_auth_attempt failed', rpcErr);
@@ -689,7 +683,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (error) {
             logger.warn('[MFA] Verification rejected:', error);
             
-            // [FORENSIC ERROR MAPPING]: Explain IP Mismatch security protocol
+            setMfaFailures(prev => prev + 1);
             if (error.message?.includes('IP addresses mismatch')) {
                 throw new Error('Security Protocol Violation: Your network IP address changed during verification. Please sign in again from a stable connection.');
             }
@@ -710,7 +704,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         if (updatedSession?.user) {
             handshakeInProgressRef.current = true;
-            await enrichUserFromSupabase(updatedSession.user);
+            // [FORCE]: Bypass enrichment cooldown to ensure UI updates after MFA challenge
+            await enrichUserFromSupabase(updatedSession.user, true);
             handshakeInProgressRef.current = false;
         }
 
@@ -718,8 +713,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         mfaChallengeInProgressRef.current = false;
         setMfaFactorId(null);
         mfaChallengeIdRef.current = null;
+        setMfaFailures(0);
         debugLog('[MFA] Verification successful. Session escalated to AAL2.');
     };
+
+    const resetMfaFailures = () => setMfaFailures(0);
 
     const cancelMFAChallenge = () => {
         setMfaChallengeRequired(false);
@@ -730,7 +728,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const enrollMFA = async (): Promise<EnrollMFAResult> => {
-        const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+        // [FIX]: Also unenroll verified factors if re-enrolling (resolves "factor already exists" error)
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        const allFactors = [...(factorsData?.totp || []), ...(factorsData?.phone || [])];
+        for (const factor of allFactors) {
+            debugLog(`[MFA] Cleaning up existing factor ${factor.id} before enrollment.`);
+            await supabase.auth.mfa.unenroll({ factorId: factor.id }).catch(() => {});
+        }
+
+        const { data, error } = await supabase.auth.mfa.enroll({ 
+            factorType: 'totp',
+            friendlyName: `IoTank-${currentUser?.email?.split('@')[0] || 'User'}`
+        });
+        
         if (error) throw error;
         return {
             factorId: data.id,
@@ -753,7 +763,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Refresh session to update AAL (Authenticator Assurance Level)
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) await enrichUserFromSupabase(session.user);
+        if (session?.user) await enrichUserFromSupabase(session.user, true);
     };
 
     const unenrollMFA = async () => {
@@ -767,7 +777,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         // Refresh user to update mfaEnabled flag
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) await enrichUserFromSupabase(session.user);
+        if (session?.user) await enrichUserFromSupabase(session.user, true);
     };
 
     const signUp = async (email: string, password: string, displayName: string, stationId: string) => {
@@ -920,6 +930,103 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setCurrentUser(prev => prev ? { ...prev, ...data } : null);
     };
 
+    const setupSecurityPin = async (pin: string) => {
+        if (!currentUser) throw new Error("Not authenticated");
+        
+        // [OPTIMISTIC UPDATE]: Update local state immediately for "instant" feel
+        const previousState = { ...currentUser };
+        const updatedUser: User = { ...currentUser, securityPinEnabled: true };
+        setCurrentUser(updatedUser);
+        
+        // [RESILIENCE]: Set intent lock to prevent refresh resets during propagation
+        pinIntentRef.current = { enabled: true, ts: Date.now() };
+        
+        // Update cache immediately
+        const safeCache: any = {};
+        SAFE_CACHE_FIELDS.forEach(k => { safeCache[k] = (updatedUser as any)[k]; });
+        localStorage.setItem(CACHE_KEY, JSON.stringify(safeCache));
+
+        // [IMMEDIATE FEEDBACK]: Fire intent notification
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Securing Vault...',
+                message: 'Establishing secondary 6-digit verification layer.',
+                type: 'info'
+            }
+        }));
+
+        const pinHash = btoa(pin); 
+        
+        try {
+            // [FIX]: 30s timeout for slow DB/network, but non-blocking for UI
+            const rpcPromise = supabase.rpc('setup_security_pin', { p_pin_hash: pinHash });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Security Vault Timeout')), 30000));
+            
+            const { error } = await Promise.race([rpcPromise, timeoutPromise]) as any;
+            if (error) throw error;
+        } catch (err) {
+            logger.error('[Security] PIN setup failed:', err);
+            // Rollback on failure
+            setCurrentUser(previousState);
+            const rollbackCache: any = {};
+            SAFE_CACHE_FIELDS.forEach(k => { rollbackCache[k] = (previousState as any)[k]; });
+            localStorage.setItem(CACHE_KEY, JSON.stringify(rollbackCache));
+            throw err;
+        }
+    };
+
+    const disableSecurityPin = async () => {
+        if (!currentUser) return;
+
+        // [OPTIMISTIC UPDATE]: Immediate local change
+        const previousState = { ...currentUser };
+        const updatedUser: User = { ...currentUser, securityPinEnabled: false };
+        setCurrentUser(updatedUser);
+        
+        // [RESILIENCE]: Set intent lock to prevent refresh resets
+        pinIntentRef.current = { enabled: false, ts: Date.now() };
+        
+        // Sync cache immediately
+        const safeCache: any = {};
+        SAFE_CACHE_FIELDS.forEach(k => { safeCache[k] = (updatedUser as any)[k]; });
+        localStorage.setItem(CACHE_KEY, JSON.stringify(safeCache));
+
+        // [IMMEDIATE FEEDBACK]: Fire intent notification
+        window.dispatchEvent(new CustomEvent('system-toast', {
+            detail: {
+                title: 'Removing Protection...',
+                message: 'De-activating secondary verification layer.',
+                type: 'warning'
+            }
+        }));
+
+        try {
+            const rpcPromise = supabase.rpc('disable_security_pin');
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Security Vault Timeout')), 30000));
+            
+            const { error } = await Promise.race([rpcPromise, timeoutPromise]) as any;
+            if (error) throw error;
+        } catch (err) {
+            logger.error('[Security] PIN disable failed:', err);
+            // Rollback
+            if (previousState) setCurrentUser(previousState as User);
+            const rollbackCache: any = {};
+            if (previousState) {
+                SAFE_CACHE_FIELDS.forEach(k => { rollbackCache[k] = (previousState as any)[k]; });
+                localStorage.setItem(CACHE_KEY, JSON.stringify(rollbackCache));
+            }
+            throw err;
+        }
+    };
+
+    const verifySecurityPin = async (pin: string): Promise<boolean> => {
+        if (!currentUser) return false;
+        const pinHash = btoa(pin);
+        const { data, error } = await supabase.rpc('verify_security_pin', { p_pin_hash: pinHash });
+        if (error) throw error;
+        return !!data;
+    };
+
     const hasRole = (requiredRole: UserRole | UserRole[]): boolean => {
         if (!currentUser) return false;
         const roleHierarchy: Record<UserRole, number> = { viewer: 1, operator: 2, supervisor: 3, admin: 4, owner: 4 };
@@ -936,6 +1043,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loading,
         mfaChallengeRequired,
         mfaFactorId,
+        mfaFailures,
         signIn,
         signUp,
         signInWithGoogle,
@@ -953,8 +1061,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         unenrollMFA,
         cancelMFAChallenge,
         checkMFAChallenge,
+        resetMfaFailures,
+        setupSecurityPin,
+        disableSecurityPin,
+        verifySecurityPin,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

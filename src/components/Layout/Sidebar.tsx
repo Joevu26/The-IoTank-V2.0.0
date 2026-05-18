@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: t('inventory'), path: '/inventory', icon: <MdList />, level: 8 },
         { name: 'Shift Audit', path: '/shifts', icon: <MdAssignment />, level: 6 },
         { name: 'Deliveries', path: '/deliveries', icon: <FiTruck />, level: 6 },
-        { name: t('analytics'), path: '/analytics', icon: <MdBarChart />, level: 6 },
+        { name: 'Intelligence Hub', path: '/analytics', icon: <MdBarChart />, level: 6 },
 
         { name: 'INTELLIGENCE & MONITORING', isSection: true, path: 'sec-intel', level: 8 },
         { name: 'Event Log', path: '/event-log', icon: <MdOutlineEventNote />, level: 6 },

@@ -339,6 +339,7 @@ export interface User {
     phoneNumber?: string;
     siteIds: string[]; // Sites user has access to
     mfaEnabled: boolean;
+    securityPinEnabled?: boolean;
     isSystemAccount?: boolean;
     stationEmail?: string;
     isProvisional?: boolean;

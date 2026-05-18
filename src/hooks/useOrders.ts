@@ -50,6 +50,8 @@ export function useOrders(stationId: string) {
 
         fetchOrders();
 
+        if (import.meta.env.VITE_DISABLE_REALTIME === 'true') return;
+
         const channel = supabase
             .channel(`orders-realtime-${stationId}`)
             .on(

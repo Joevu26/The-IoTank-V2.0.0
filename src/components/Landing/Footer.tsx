@@ -42,6 +42,7 @@ const Footer: React.FC = () => {
                     <div className="footer-col">
                         <h4 className="footer-col-title">Compliance</h4>
                         <div className="footer-links">
+                            <a href="/aup" className="footer-link">Acceptable Use Policy (AUP)</a>
                             <a href="#" className="footer-link">EPRA Standards</a>
                             <a href="#" className="footer-link">Environmental Monitoring</a>
                             <a href="#" className="footer-link">Audit Reporting</a>

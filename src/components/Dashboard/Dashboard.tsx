@@ -14,6 +14,7 @@ import { ActionQueue } from './ActionQueue';
 import { TelemetryErrorBoundary } from '../Common/TelemetryErrorBoundary';
 import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
 import { SystemIntegrityCard } from './SystemIntegrityCard';
+import { EPRALivePriceCard } from './EPRALivePriceCard';
 
 import { ExecutiveOverview } from './ExecutiveOverview';
 
@@ -201,6 +202,7 @@ export const Dashboard: React.FC = () => {
                                 tanks={displayTanks} 
                                 alerts={alerts} 
                             />
+                            <EPRALivePriceCard stationId={stationId} />
                         </TelemetryErrorBoundary>
                     </LazyComponent>
                 </aside>

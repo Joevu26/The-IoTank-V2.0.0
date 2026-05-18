@@ -22,7 +22,7 @@ export class NotificationService {
         return (
             this.isSupported() &&
             Notification.permission === 'granted' &&
-            localStorage.getItem(this.storageKey) === 'true'
+            localStorage.getItem(this.storageKey) !== 'false'
         );
     }
 
@@ -160,7 +160,7 @@ export class NotificationService {
      */
     static shouldShowNudge(): boolean {
         if (!this.isSupported()) return false;
-        if (Notification.permission !== 'default') return false;
+        if (Notification.permission === 'granted') return false;
         
         // Don't nudge if dismissed this session
         return sessionStorage.getItem('iotank_notification_nudge_dismissed') !== 'true';
@@ -180,7 +180,7 @@ export class NotificationService {
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding)
-        .replace(/\-/g, '+')
+        .replace(/-/g, '+')
         .replace(/_/g, '/');
 
     const rawData = window.atob(base64);

@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTanks, useTankAnalytics30d } from '@/hooks/useSupabase';
 import { validateUUID } from '@/utils/sanitization';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useShiftStatus } from '@/hooks/useShiftStatus';
 import { Tank, FuelTransaction } from '@/types';
 import {
     ResponsiveContainer, AreaChart, Area,
@@ -38,17 +39,28 @@ export const AnalyticsPage: React.FC = () => {
     const { tanks } = useTanks(stationId);
     const { transactions } = useTransactions(stationId);
     const { activeShift } = useActiveShift(stationId);
+    const { status: shiftStatus, openedAt, closedAt } = useShiftStatus();
+
+    // ─── Shift-Scoped Filtering ──────────────────────
+    const shiftTransactions = transactions.filter((tx: FuelTransaction) => {
+        const txTime = new Date(tx.timestamp).getTime();
+        if (shiftStatus === 'open') {
+            return openedAt ? txTime >= openedAt : false;
+        } else {
+            return (openedAt && closedAt) ? (txTime >= openedAt && txTime <= closedAt) : false;
+        }
+    });
 
     // Aggregate stats from the materialized view data
     const analytics = (analyticsData as any)?.summary || [];
     const stats = analytics.reduce((acc: any, tank: any) => {
-        acc.totalVolume += tank.avg_volume; 
-        acc.readingCount += tank.reading_count;
+        acc.totalVolume += tank.total_volume; 
+        acc.avgDaily += tank.avg_daily;
         return acc;
-    }, { totalVolume: 0, readingCount: 0, totalSale: 0, totalPurchase: 0, totalProfit: 0, litersSold: 0 });
+    }, { totalVolume: 0, avgDaily: 0, totalSale: 0, totalPurchase: 0, totalProfit: 0, litersSold: 0 });
 
-    // Still need transactional stats (financials)
-    transactions.forEach((tx: FuelTransaction) => {
+    // Financial Stats scoped to Shift
+    shiftTransactions.forEach((tx: FuelTransaction) => {
         if (tx.type === 'sale') {
             stats.totalSale += tx.amount * (tx.metadata?.pricePerLiter || 0);
             stats.litersSold += tx.amount;
@@ -68,8 +80,8 @@ export const AnalyticsPage: React.FC = () => {
     }, 0);
 
     const totalMeasured = tanks.reduce((sum: number, t: Tank) => sum + (t.currentVolume || 0), 0);
-    const totalDeliveries = transactions.filter((tx: FuelTransaction) => tx.type === 'delivery').reduce((sum: number, tx: FuelTransaction) => sum + tx.amount, 0);
-    const totalSales = transactions.filter((tx: FuelTransaction) => tx.type === 'sale').reduce((sum: number, tx: FuelTransaction) => sum + tx.amount, 0);
+    const totalDeliveries = shiftTransactions.filter((tx: FuelTransaction) => tx.type === 'delivery').reduce((sum: number, tx: FuelTransaction) => sum + tx.amount, 0);
+    const totalSales = shiftTransactions.filter((tx: FuelTransaction) => tx.type === 'sale').reduce((sum: number, tx: FuelTransaction) => sum + tx.amount, 0);
     const totalExpected = totalOpening + totalDeliveries - totalSales;
     const totalVariance = totalMeasured - totalExpected;
     const totalVariancePct = totalExpected > 0 ? (totalVariance / totalExpected) * 100 : 0;
@@ -84,12 +96,12 @@ export const AnalyticsPage: React.FC = () => {
 
     const recommendations = getStrategicRecommendations(totalVariancePct, daysOfCover, 0);
 
-    const chartData = transactions
-        .filter((t: FuelTransaction) => t.timestamp)
+    const chartData = shiftTransactions
+        .filter((t: FuelTransaction) => t.timestamp && t.type === 'sale')
         .slice(0, 12)
         .reverse()
         .map((t: FuelTransaction) => ({
-            name: format(t.timestamp, 'MMM dd'),
+            name: format(t.timestamp, 'HH:mm'),
             sales: t.amount,
         }));
 
@@ -107,7 +119,7 @@ export const AnalyticsPage: React.FC = () => {
                 action={
                     <div className="acp-header-action-wrap">
                         <div className="acp-header-meta-info">
-                            <span>Data Window: Last 90 Days</span>
+                            <span>Data Window: {shiftStatus === 'open' ? 'Live Shift' : 'Last Closed Shift'}</span>
                             <span className="acp-header-meta-dot"></span>
                             <span>Updated: {lastUpdated}</span>
                         </div>
@@ -123,9 +135,9 @@ export const AnalyticsPage: React.FC = () => {
                 <div className="acp-kpi-card">
                     <div className="acp-kpi-icon green"><FiDollarSign /></div>
                     <div className="acp-kpi-body">
-                        <span className="acp-kpi-label">Net Revenue</span>
+                        <span className="acp-kpi-label">Shift Revenue</span>
                         <span className="acp-kpi-value">Ksh {stats.totalSale.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                        <span className="acp-kpi-sub opacity-60">Based on {transactions.length} operations</span>
+                        <span className="acp-kpi-sub opacity-60">Based on {shiftTransactions.length} operations</span>
                     </div>
                 </div>
                 <div className="acp-kpi-card">
@@ -176,13 +188,36 @@ export const AnalyticsPage: React.FC = () => {
                                 <LazyComponent minHeight="400px">
                                     <WetstockReconciliation
                                         tanks={tanks}
-                                        transactions={transactions}
+                                        transactions={shiftTransactions}
                                         currency="Ksh"
                                         activeShift={activeShift}
                                     />
                                 </LazyComponent>
                             </div>
 
+                            {/* 30-Day Tank Performance */}
+                            <div className="acp-hub-card bg-slate-50/50 p-4 rounded-xl border border-slate-100 mt-4">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">30-Day Tank Drawdown</h4>
+                                {analytics.length === 0 ? (
+                                    <div className="text-sm text-slate-400">Not enough data to calculate trends.</div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {analytics.map((t: any, i: number) => (
+                                            <div key={i} className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm flex flex-col gap-1">
+                                                <div className="text-sm font-black text-slate-800">{t.tank_name}</div>
+                                                <div className="flex justify-between items-center text-xs text-slate-500">
+                                                    <span>Total Vol:</span>
+                                                    <span className="font-bold text-slate-700">{t.total_volume.toLocaleString(undefined, { maximumFractionDigits: 0 })} L</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-xs text-slate-500">
+                                                    <span>Daily Avg:</span>
+                                                    <span className="font-bold text-slate-700">{t.avg_daily.toLocaleString(undefined, { maximumFractionDigits: 1 })} L/day</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                     </div>

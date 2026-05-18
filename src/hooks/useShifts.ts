@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { ShiftDocument } from '@/types';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { logger } from '@/utils/logger';
+import { useQuery } from '@tanstack/react-query';
 import { validateUUID } from '@/utils/sanitization';
 
 interface UseShiftsOptions {
@@ -22,8 +20,6 @@ interface UseShiftsReturn {
  * Hook for Shift Operational Logs (Historical)
  */
 export function useShifts(stationId: string, options: UseShiftsOptions = {}): UseShiftsReturn {
-    const queryClient = useQueryClient();
-
     const query = useQuery({
         queryKey: ['shifts', stationId, options],
         queryFn: async () => {
@@ -90,30 +86,8 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
         },
         enabled: !!stationId,
         staleTime: 5 * 1000,
+        refetchInterval: 30000, // Shift changes come via mutation invalidation; 30s is safety fallback
     });
-
-    useEffect(() => {
-        if (!stationId) return;
-
-        const channelId = `shifts-realtime:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'shift_closures', filter: `station_id=eq.${stationId}` },
-                (payload) => {
-                    logger.debug('[useShifts] Real-time event detected on shift_closures:', payload.eventType, 'SHIFTS_RT');
-                    // Invalidate everything shift-related to be safe
-                    queryClient.invalidateQueries({ queryKey: ['shifts'] });
-                    queryClient.invalidateQueries({ queryKey: ['active_shift'] });
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, queryClient]);
 
     return { 
         shifts: query.data || [], 
@@ -126,8 +100,6 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
  * Hook for Active Shift Tracking (Continuous State)
  */
 export function useActiveShift(stationId: string | undefined) {
-    const queryClient = useQueryClient();
-
     const query = useQuery({
         queryKey: ['active_shift', stationId],
         queryFn: async () => {
@@ -143,30 +115,8 @@ export function useActiveShift(stationId: string | undefined) {
         },
         enabled: !!stationId,
         staleTime: 5 * 1000,
+        refetchInterval: 30000, // Shift changes come via mutation invalidation; 30s is safety fallback
     });
-
-    useEffect(() => {
-        if (!stationId) return;
-
-        const channelId = `active-shift:${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const channel = supabase
-            .channel(channelId)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'current_station_shifts',
-                filter: `station_id=eq.${stationId}` 
-            }, (payload) => {
-                logger.debug('[useActiveShift] Real-time event detected on current_station_shifts:', payload.eventType, 'SHIFTS_RT');
-                queryClient.invalidateQueries({ queryKey: ['active_shift'] });
-                queryClient.invalidateQueries({ queryKey: ['shifts'] });
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [stationId, queryClient]);
 
     return { activeShift: query.data || null, loading: query.isLoading, error: query.error as Error | null };
 }

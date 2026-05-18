@@ -172,7 +172,7 @@ export class IntelligenceAIService {
         try {
             const headers = await this.getSafeAuthHeaders();
             const modelMap: Record<string, string> = {
-                gemini: 'gemini-1.5-flash',
+                gemini: 'gemini-2.0-flash',
                 groq: 'llama-3.3-70b-versatile',
                 deepseek: 'deepseek-chat'
             };
@@ -271,7 +271,7 @@ export class IntelligenceAIService {
                 body: JSON.stringify({
                     action: actionType === 'directive' ? 'intelligence' : actionType,
                     context,
-                    endpoint: 'models/gemini-1.5-flash:generateContent',
+                    endpoint: 'models/gemini-2.0-flash:generateContent',
                     body: {
                         generationConfig: { temperature: 0.7 },
                     }
@@ -280,7 +280,7 @@ export class IntelligenceAIService {
 
             if (!response.ok) {
                 const errorBody = await response.json().catch(() => ({}));
-                throw new Error(`Gemini error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
+                throw new Error(`Gemini error: ${response.statusText}${errorBody.error ? ` - ${JSON.stringify(errorBody.error)}` : ''}`);
             }
 
             const data = await response.json();

@@ -46,6 +46,7 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [showRecaptchaModal, setShowRecaptchaModal] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData((prev: FormData) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -89,10 +90,11 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
           }
         } else {
             console.warn('reCAPTCHA library failed to initialize within 5 seconds.');
+            setShowRecaptchaModal(true);
             // Dispatch premium persistent toast
             const toastEvent = new CustomEvent('system-toast', {
               detail: {
-                title: 'APTCHA service',
+                title: 'reCAPTCHA Service',
                 message: 'Please check your internet connection and reload to get a reCAPTCHA challenge.',
                 type: 'error',
                 persistent: true
@@ -207,6 +209,38 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
 
   return (
     <div className="registration-overlay">
+      {showRecaptchaModal && (
+        <div className="recaptcha-error-modal-overlay">
+          <div className="recaptcha-error-modal-content">
+            <div className="modal-icon-header warning">
+              <FiAlertCircle size={32} />
+            </div>
+            <h3>What is the reCAPTCHA Service?</h3>
+            <p>
+              reCAPTCHA is an automated security gatekeeper designed by Google. It verified that you are a human operator and not a malicious bot attempting to brute-force or spam the enterprise signup pipeline.
+            </p>
+            <p className="mt-2 text-sm text-secondary">
+              Due to a network interruption or ad-blocker filtering, the reCAPTCHA security scripts failed to load.
+            </p>
+            <div className="action-buttons mt-6">
+              <button 
+                type="button" 
+                className="btn-cancel mr-2" 
+                onClick={() => setShowRecaptchaModal(false)}
+              >
+                Dismiss
+              </button>
+              <button 
+                type="button" 
+                className="btn-submit" 
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="registration-modal-content">
         <header className="modal-header">
           <div className="header-text-container">

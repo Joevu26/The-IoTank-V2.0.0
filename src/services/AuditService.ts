@@ -45,7 +45,9 @@ export type EventType =
     | 'CALIBRATION_APPLIED'
     | 'EMAIL_SUPPRESSED'
     | 'SMS_SUPPRESSED'
-    | 'PUSH_ENABLED';
+    | 'PUSH_ENABLED'
+    | 'PIN_SETUP'
+    | 'PRICE_UPDATE';
 
 
 export interface UnifiedEvent {

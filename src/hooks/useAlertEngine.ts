@@ -84,6 +84,10 @@ export function useAlertEngine(
 ) {
     const { currentUser } = useAuth();
     const { tanks } = useTanks(stationId);
+    // ⚠️ HOOKS ORDER CRITICAL: useShiftStatus must come before all useRef/useState.
+    // It internally calls useQuery (react-query) whose internal hook count can vary
+    // under network errors. Placing it mid-block after refs caused hook slot drift.
+    const { status: shiftStatus } = useShiftStatus();
     const [activeAlerts, setActiveAlerts] = useState<Alert[]>([]);
     const [riskIndex, setRiskIndex] = useState<RiskIndex>({
         fuel: { score: 0, label: 'LOW' },
@@ -107,8 +111,12 @@ export function useAlertEngine(
         lastInflowVolume: number;
         classification?: any;
     }>>({});
-    const readingHistoryRef = useRef<Record<string, VolumePoint[]>>({});
-    const { status: shiftStatus } = useShiftStatus();
+    const theftSessionsRef = useRef<Record<string, { 
+        isActive: boolean; 
+        startVolume: number; 
+        lastTime: number; 
+    }>>({});
+    const readingHistoryRef = useRef<Record<string, VolumePoint[]>>({}); // useShiftStatus moved above
     // [PERSISTENCE UPGRADE]: Load from localStorage and purge stale entries (>24h)
     const [toastedAlerts, setToastedAlertsState] = useState<Map<string, number>>(() => {
         const saved = localStorage.getItem(`iotank_toast_memory_${stationId}`);
@@ -259,6 +267,37 @@ export function useAlertEngine(
                     refillDetectionThreshold: thresholds.refillDetectionThreshold,
                     nightDrawdownSensitivity: thresholds.nightDrawdownSensitivity,
                 });
+
+                // 1.5 LIVE CUMULATIVE LOSS TRACKING FOR THEFT/LEAK
+                const theftDrafts = drafts.filter(d => d.type === 'theft_detected' || d.type === 'leak_detected');
+                if (!theftSessionsRef.current[tank.id]) {
+                    theftSessionsRef.current[tank.id] = { isActive: false, startVolume: 0, lastTime: 0 };
+                }
+                const theftSession = theftSessionsRef.current[tank.id];
+                const currentVol = tank.currentVolume || latestReading?.volumeCorrected || latestReading?.volume || 0;
+
+                if (theftDrafts.length > 0) {
+                    if (!theftSession.isActive) {
+                        theftSession.isActive = true;
+                        // Capture the volume immediately preceding the drop as our baseline
+                        const prevVol = previousReading?.volumeCorrected || previousReading?.volume || currentVol;
+                        theftSession.startVolume = prevVol > currentVol ? prevVol : currentVol;
+                    }
+                    theftSession.lastTime = Date.now();
+
+                    // Calculate live cumulative volume lost since the theft began
+                    const cumulativeLost = theftSession.startVolume - currentVol;
+                    theftDrafts.forEach(draft => {
+                        if (draft.metadata) {
+                            draft.metadata.volumeLost = cumulativeLost > 0 ? cumulativeLost : draft.metadata.volumeLost;
+                        }
+                    });
+                } else {
+                    // No theft detected this cycle. If 60 seconds pass without a theft draft, end the session.
+                    if (theftSession.isActive && (Date.now() - theftSession.lastTime > 60000)) {
+                        theftSession.isActive = false;
+                    }
+                }
 
                 // 2. DEAD STOCK DETECTION (Inventory Stagnation > 3 Days)
                 // Logic: If current volume is significant (>500L) but hasn't decreased by >5L in 72 hours
@@ -454,11 +493,17 @@ export function useAlertEngine(
                                 }
                             };
 
-                            supabase.from('alerts')
-                                .upsert(refillAlert, { onConflict: 'station_id,tank_id,alert_type' })
-                                .select()
-                                .single()
-                                .then(({ data: savedAlert }) => {
+                            supabase.rpc('upsert_alert_v2', {
+                                p_station_id: refillAlert.station_id,
+                                p_tank_id: refillAlert.tank_id,
+                                p_alert_type: refillAlert.alert_type,
+                                p_title: refillAlert.title,
+                                p_message: refillAlert.message,
+                                p_severity: refillAlert.severity,
+                                p_metadata: refillAlert.metadata || {}
+                            })
+                                .then(({ data: savedAlerts }) => {
+                                    const savedAlert = Array.isArray(savedAlerts) ? savedAlerts[0] : savedAlerts;
                                     const alertWithId = { ...refillAlert, id: savedAlert?.id };
 
                                     // Finalize notification
