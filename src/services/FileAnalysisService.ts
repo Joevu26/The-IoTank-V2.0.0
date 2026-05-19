@@ -152,6 +152,7 @@ class FileAnalysisService {
 
             // C-05 FIX: Wrap AI response parsing in safe optional chaining.
             // data.candidates[0] can be undefined on rate-limit or empty Gemini responses.
+            const data = await response.json();
             const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!rawText) throw new Error('Gemini returned an empty or malformed response for CSV analysis.');
             const aiResponse = JSON.parse(rawText);
@@ -188,7 +189,7 @@ class FileAnalysisService {
         } catch (error: any) {
             // M-12 FIX: Mark file as 'failed' so UI can show an error state instead of
             // leaving the record stuck in 'pending' indefinitely.
-            await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id).catch(() => {});
+            try { await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id); } catch(e){ logger.error('[FileAnalysisService] Failed to update CSV status', e); }
             logger.error('[FileAnalysisService] CSV Analysis Error:', error);
             throw new Error(`AI Analysis Error: ${error.message}`);
         }
@@ -252,6 +253,7 @@ class FileAnalysisService {
             }
 
             // C-05 FIX: Safe optional chaining on AI response structure.
+            const data = await response.json();
             const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!rawText) throw new Error('Gemini returned an empty or malformed response for PDF analysis.');
             const aiResponse = JSON.parse(rawText);
@@ -286,7 +288,7 @@ class FileAnalysisService {
             return result;
         } catch (error: any) {
             // M-12 FIX: Mark file as 'failed' to prevent infinite 'pending' state.
-            await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id).catch(() => {});
+            try { await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id); } catch(e){ logger.error('[FileAnalysisService] Failed to update PDF status', e); }
             logger.error('[FileAnalysisService] PDF Analysis Error:', error);
             throw new Error(`AI Analysis Error: ${error.message}`);
         }

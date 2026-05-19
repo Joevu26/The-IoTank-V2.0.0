@@ -90,8 +90,8 @@ export function generateTankSpecificAnalysis(
 
     // Calculate financial impact
     const priceChangeSignal = signals.find(s => 
-      s.title.toLowerCase().includes('price') && 
-      (s.title.toLowerCase().includes('increase') || s.title.toLowerCase().includes('hike'))
+      (s.title || '').toLowerCase().includes('price') && 
+      ((s.title || '').toLowerCase().includes('increase') || (s.title || '').toLowerCase().includes('hike'))
     );
     
     const projectedPrice = priceChangeSignal ? currentMarketPrice * 1.07 : currentMarketPrice * 1.02; // 7% increase if signal found
@@ -250,7 +250,7 @@ function calculateMarketVolatility(signals: MarketSignal[]): number {
   const volatilityKeywords = ['volatile', 'uncertain', 'fluctuation', 'instability', 'turbulent'];
   const volatilitySignals = signals.filter(s => 
     volatilityKeywords.some(keyword => 
-      (s.title + ' ' + s.summary).toLowerCase().includes(keyword)
+      ((s.title || '') + ' ' + (s.summary || '')).toLowerCase().includes(keyword)
     )
   );
   
@@ -266,9 +266,9 @@ function generateTankRecommendation(
   currentLevel: number,
   signals: MarketSignal[]
 ): string {
-  const priceSignals = signals.filter(s => s.title.toLowerCase().includes('price'));
+  const priceSignals = signals.filter(s => (s.title || '').toLowerCase().includes('price'));
   const hasPriceIncrease = priceSignals.some(s => 
-    s.title.toLowerCase().includes('increase') || s.title.toLowerCase().includes('hike')
+    (s.title || '').toLowerCase().includes('increase') || (s.title || '').toLowerCase().includes('hike')
   );
 
   if (timeToEmpty < 2) {
@@ -290,8 +290,8 @@ function generateTankRecommendation(
  * Extract market factors from signals
  */
 function extractMarketFactors(signals: MarketSignal[], risks: SupplyRisk[]) {
-  const priceSignals = signals.filter(s => s.title.toLowerCase().includes('price'));
-  const regulatorySignals = signals.filter(s => s.source === 'EPRA' || s.title.toLowerCase().includes('epra'));
+  const priceSignals = signals.filter(s => (s.title || '').toLowerCase().includes('price'));
+  const regulatorySignals = signals.filter(s => s.source === 'EPRA' || (s.title || '').toLowerCase().includes('epra'));
 
   // Determine sentiment
   const bullishKeywords = ['increase', 'rise', 'bullish', 'upward'];
@@ -299,10 +299,10 @@ function extractMarketFactors(signals: MarketSignal[], risks: SupplyRisk[]) {
   
   let sentiment = 'neutral';
   const bullishCount = priceSignals.filter(s => 
-    bullishKeywords.some(keyword => s.title.toLowerCase().includes(keyword))
+    bullishKeywords.some(keyword => (s.title || '').toLowerCase().includes(keyword))
   ).length;
   const bearishCount = priceSignals.filter(s => 
-    bearishKeywords.some(keyword => s.title.toLowerCase().includes(keyword))
+    bearishKeywords.some(keyword => (s.title || '').toLowerCase().includes(keyword))
   ).length;
   
   if (bullishCount > bearishCount) sentiment = 'bullish';

@@ -46,7 +46,7 @@ serve(async (req) => {
                     .select('id')
                     .eq('tank_id', tank.id)
                     .eq('alert_type', 'sensor_offline')
-                    .eq('status', 'active');
+                    .eq('is_resolved', false);
 
                 if (!existingAlerts || existingAlerts.length === 0) {
                     await supabase.from('alerts').insert({
@@ -56,7 +56,7 @@ serve(async (req) => {
                         title: 'Sensor Offline',
                         message: `Tank "${tank.name}" has not reported data for over 15 minutes. Check power and link stability.`,
                         tank_id: tank.id,
-                        status: 'active'
+                        is_resolved: false
                     });
                     console.log(`[Watchdog] Offline alert triggered for Tank: ${tank.id}`);
                 }
@@ -67,13 +67,12 @@ serve(async (req) => {
                     .select('id')
                     .eq('tank_id', tank.id)
                     .eq('alert_type', 'sensor_offline')
-                    .eq('status', 'active');
+                    .eq('is_resolved', false);
 
                 if (staleAlerts && staleAlerts.length > 0) {
                     await supabase
                         .from('alerts')
                         .update({
-                            status: 'resolved',
                             is_resolved: true,
                             resolved_at: new Date().toISOString(),
                             resolution_notes: 'Auto-resolved: Sensor resumed reporting within threshold window.'

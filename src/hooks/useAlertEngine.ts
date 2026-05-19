@@ -23,7 +23,6 @@ import { NotificationPreferencesService } from '../services/NotificationPreferen
 import { detectTankAlerts, filterDuplicates, correlateAlerts } from '../services/AlertDetectionEngine';
 import { useTelemetryQueue } from '@/contexts/TelemetryQueueContext';
 import { THRESHOLDS } from '@/constants/forensicThresholds';
-import { logger } from '@/utils/logger';
 import { validateUUID } from '@/utils/sanitization';
 import { classifyVolumeChange, VolumePoint } from '@/utils/refillClassifier';
 

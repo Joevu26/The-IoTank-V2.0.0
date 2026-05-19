@@ -372,7 +372,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     const createdAtTime = new Date(payload.new.created_at || payload.new.created_at).getTime();
                     const staleThresholdMs = 15000; // 15 seconds
                     if (Date.now() - createdAtTime > staleThresholdMs) {
-                        logger.log(`[Navbar] Suppressed stale event alert (${Date.now() - createdAtTime}ms old): ${messageText}`);
+                        logger.info(`[Navbar] Suppressed stale event alert (${Date.now() - createdAtTime}ms old): ${messageText}`);
                         return;
                     }
 

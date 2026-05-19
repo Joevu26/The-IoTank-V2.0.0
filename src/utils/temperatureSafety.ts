@@ -75,7 +75,7 @@ export function getTemperatureSafetyStatus(
     fuelType: string,
     customThresholds?: Record<string, TemperatureThresholds>
 ): TemperatureSafetyInfo {
-    const normalizedFuelType = fuelType.toLowerCase();
+    const normalizedFuelType = (fuelType || '').toLowerCase();
 
     // Determine which thresholds to use: Custom -> Default -> Fallback (Diesel)
     let thresholds = DEFAULT_TEMPERATURE_THRESHOLDS[normalizedFuelType as keyof typeof DEFAULT_TEMPERATURE_THRESHOLDS];

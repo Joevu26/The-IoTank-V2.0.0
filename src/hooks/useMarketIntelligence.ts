@@ -188,7 +188,8 @@ export const useMarketIntelligence = (stationId: string) => {
                         if (det.commodity !== 'General' && (!isFuel || isEPRA)) {
                             // C-03 FIX: Apply the same >= 0.80 confidence guard that useMarketNews uses.
                             // Without this, low-confidence AI extractions can corrupt production prices.
-                            const detConfidence = (det as any).confidence ?? 0;
+                            // Official EPRA sources are considered 100% verified (confidence = 1.0).
+                            const detConfidence = isEPRA ? 1.0 : ((det as any).confidence ?? 0);
                             if (isFuel && detConfidence < 0.80) return;
 
                             let fuelType = commodityUpper;
@@ -326,6 +327,63 @@ export const useMarketIntelligence = (stationId: string) => {
             clearTimeout(timer);
         };
     }, [stationId, refreshTrigger]);
+
+    // ── Database Real-Time Subscriptions ──
+    useEffect(() => {
+        if (!stationId) return;
+
+        const instanceSuffix = Math.random().toString(36).substring(7);
+
+        // 1. Subscribe to market_prices changes
+        const priceChannelId = `live-prices-${stationId}-${instanceSuffix}`;
+        const priceSubscription = supabase
+            .channel(priceChannelId)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'market_prices' },
+                () => {
+                    refetch();
+                }
+            )
+            .subscribe();
+
+        // 2. Subscribe to market_signals changes
+        const signalChannelId = `live-signals-${stationId}-${instanceSuffix}`;
+        const signalSubscription = supabase
+            .channel(signalChannelId)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'market_signals' },
+                () => {
+                    refetch();
+                }
+            )
+            .subscribe();
+
+        // 3. Subscribe to market_action_queue changes
+        const queueChannelId = `live-queue-${stationId}-${instanceSuffix}`;
+        const queueSubscription = supabase
+            .channel(queueChannelId)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'market_action_queue',
+                    filter: `station_id=eq.${stationId}`
+                },
+                () => {
+                    refetch();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(priceSubscription);
+            supabase.removeChannel(signalSubscription);
+            supabase.removeChannel(queueSubscription);
+        };
+    }, [stationId]);
 
     const completeAction = async (actionId: string) => {
         try {

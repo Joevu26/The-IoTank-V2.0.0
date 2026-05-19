@@ -30,6 +30,30 @@ async function testLogin() {
         console.log('[4] RPC returned successfully! Identity Type:', bundle?.identity_type);
     }
 
+    console.log('[4.5] Calling get_station_dashboard_summary...');
+    const { data: dashboard, error: dashError } = await supabase.rpc('get_station_dashboard_summary', {
+        p_station_id: '9a594b8e-15b2-48a8-b17d-7ef7fa5e9b8a'
+    });
+    if (dashError) {
+        console.error('get_station_dashboard_summary failed:', dashError);
+    } else {
+        console.log('[4.6] get_station_dashboard_summary succeeded! Data:', JSON.stringify(dashboard, null, 2));
+    }
+
+    console.log('[4.7] Testing process_payment...');
+    const { error: payError } = await supabase.rpc('process_payment', {
+        p_station_id: '9a594b8e-15b2-48a8-b17d-7ef7fa5e9b8a',
+        p_amount: 10,
+        p_payment_method: 'MPESA',
+        p_payment_reference: 'TESTREF1234',
+        p_description: 'Test payment'
+    });
+    if (payError) {
+        console.error('[4.8] process_payment failed:', payError);
+    } else {
+        console.log('[4.8] process_payment succeeded!');
+    }
+
     console.time('listFactors');
     console.log('[5] Fetching MFA listFactors...');
     const { data: factors, error: mfaError } = await supabase.auth.mfa.listFactors();

@@ -110,7 +110,8 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
 
       // 2. SUBMIT: Routing via hardened Edge Function (enforces server-side reCAPTCHA & sanitization)
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const response = await fetch('https://suifvborodwergtrbjez.supabase.co/functions/v1/submit-registration-request', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/submit-registration-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

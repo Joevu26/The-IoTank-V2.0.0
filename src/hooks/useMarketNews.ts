@@ -198,7 +198,7 @@ export interface NewsArticle extends MarketSignal {
 // ─── Rule-based helpers ───────────────────────────────────────────────────────
 
 function computeTopicTags(title: string, description: string): string[] {
-    const text = (title + ' ' + description).toLowerCase();
+    const text = ((title || '') + ' ' + (description || '')).toLowerCase();
     const tags: string[] = [];
     if (text.includes('epra') || text.includes('energy and petroleum regulatory') || text.includes('epra_kenya')) tags.push('EPRA');
     if (text.includes('price') || text.includes('pump price') || text.includes('petroleum price') || text.includes('retail price')) tags.push('PriceAlert');
@@ -212,7 +212,7 @@ function computeTopicTags(title: string, description: string): string[] {
 }
 
 function computeImplication(title: string, summary: string): 'Price' | 'Supply' | 'Compliance' | 'Logistics' | 'Political' | 'General' {
-    const text = (title + ' ' + summary).toLowerCase();
+    const text = ((title || '') + ' ' + (summary || '')).toLowerCase();
     if (text.includes('epra') || text.includes('regulation') || text.includes('tax') || text.includes('vat') || text.includes('mandate') || text.includes('policy')) return 'Compliance';
     if (text.includes('government') || text.includes('president') || text.includes('court') || text.includes('sanctions') || text.includes('war') || text.includes('unrest') || text.includes('political')) return 'Political';
     if (text.includes('pipeline') || text.includes('port') || text.includes('logistics') || text.includes('terminal') || text.includes('shipping')) return 'Logistics';
@@ -222,7 +222,7 @@ function computeImplication(title: string, summary: string): 'Price' | 'Supply' 
 }
 
 function computeRelevanceScore(title: string, summary: string, sourceType: string, externalUrl?: string): number {
-    const text = (title + ' ' + summary).toLowerCase();
+    const text = ((title || '') + ' ' + (summary || '')).toLowerCase();
     let score = 0.65;
     if (text.includes('epra')) score += 0.3;
     if (text.includes('fuel') || text.includes('petroleum') || text.includes('diesel') || text.includes('petrol')) score += 0.15;
@@ -269,7 +269,7 @@ export function extractPricesFromText(text: string, basePrices?: Record<string, 
         // Valid EPRA prices in Kenya are typically 150-300 KES. 
         if (val < 100 || val > 300) continue; 
         
-        const snippet = text.substring(Math.max(0, match.index - 80), Math.min(text.length, match.index + 80)).toLowerCase();
+        const snippet = (text || '').substring(Math.max(0, match.index - 80), Math.min(text.length, match.index + 80)).toLowerCase();
         
         let commodity: PriceDetection['commodity'] = 'General';
         if (snippet.includes('petrol') || snippet.includes('pms') || snippet.includes('super')) commodity = 'Petrol';
@@ -287,7 +287,7 @@ export function extractPricesFromText(text: string, basePrices?: Record<string, 
     }
 
     // 2. Relative Change Parser (e.g. "petrol increased by sh 10")
-    const lowerText = text.toLowerCase();
+    const lowerText = (text || '').toLowerCase();
     const commodities = [
         { name: 'Petrol' as const, aliases: ['petrol', 'super', 'pms'] },
         { name: 'Diesel' as const, aliases: ['diesel', 'ago'] },
@@ -419,7 +419,8 @@ function buildSignalFromArticle(
         timestamp: publishedAt,
         relevanceScore,
         confidenceScore: source.type === 'Regulatory' ? 0.95 : 0.7,
-        verificationStatus: 'unverified',
+        verificationStatus: (source.type === 'Regulatory' || relevanceScore >= 0.80) ? 'verified' : 'unverified',
+        isCorroborated: (source.type === 'Regulatory' || relevanceScore >= 0.80),
         url: link,
         attribution: source.shortLabel,
         region: source.region,
@@ -725,7 +726,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                 const isKenyanNews = article.region === 'Kenya' && (article.feedSource === 'BD Africa' || article.feedSource === 'Nation' || article.feedSource === 'Standard');
                 
                 // [FORENSIC EXTRACTION]: Cap AI processing at 1 article per source fetch cycle to protect API limits and eliminate UI lag
-                if (aiProcessedCount < 1 && ((isVerifiedSource && relevance > 0.65) || (isKenyanNews && (article.title + article.summary).toLowerCase().includes('price')))) {
+                if (aiProcessedCount < 1 && ((isVerifiedSource && relevance > 0.65) || (isKenyanNews && ((article.title || '') + (article.summary || '')).toLowerCase().includes('price')))) {
                     try {
                         const directive = await aiService.generateArticleDirective(article, Array.isArray(tanks) ? tanks : []);
                         enriched.push({ ...article, aiDirective: directive });
@@ -753,14 +754,14 @@ export function useMarketNews(): UseMarketNewsReturn {
                         // bad AI extraction. This does NOT fully replace server-side validation
                         // (tracked as a future Edge Function migration) but reduces invalid writes.
                         const isHighConfidenceEPRA =
-                            (p as any).confidence >= 0.80 &&
-                            article.topicTags?.includes('EPRA') &&
+                            (article.aiDirective?.confidence ?? 0) >= 0.80 &&
+                            (article.topicTags?.includes('EPRA') || article.feedSource === 'EPRA' || article.attribution === 'EPRA' || article.isOfficial) &&
                             p.price > 0 &&
                             p.price < 500; // Sanity check: KES fuel prices are always < 500/L
 
                         if (!isHighConfidenceEPRA) {
                             logger.warn(
-                                `[useMarketNews] Skipping low-confidence price write for ${p.fuelType}: ${p.price} (confidence: ${(p as any).confidence ?? 'N/A'})`,
+                                `[useMarketNews] Skipping low-confidence price write for ${p.fuelType}: ${p.price} (confidence: ${article.aiDirective?.confidence ?? 'N/A'})`,
                                 null, 'MARKET_SENSE'
                             );
                             continue;
@@ -768,21 +769,14 @@ export function useMarketNews(): UseMarketNewsReturn {
 
                         try {
                             const effectiveDate = p.effectiveDate || new Date().toISOString().split('T')[0];
-                            await supabase.from('market_prices').upsert({
-                                fuel_type: p.fuelType,
-                                price_per_liter: p.price,
-                                currency: p.currency || 'KES',
-                                source: 'epra',
-                                region: 'kenya',
-                                effective_date: effectiveDate,
-                                metadata: { 
-                                    source_detail: 'EPRA_AUTO', 
-                                    article_id: article.id, 
-                                    isOfficial: article.isOfficial || false, 
-                                    isLiveExtraction: true,
-                                    extracted_at: new Date().toISOString()
-                                }
-                            }, { onConflict: 'fuel_type,source,region,effective_date' });
+                            await supabase.rpc('forensic_update_market_price', {
+                                p_fuel_type: p.fuelType,
+                                p_new_price: p.price,
+                                p_effective_date: new Date(effectiveDate).toISOString(),
+                                p_source_url: article.url || null,
+                                p_is_official: true,
+                                p_signal_id: article.id || null
+                            });
                             
                             // Premium Global Notification for Price Shift
                             window.dispatchEvent(new CustomEvent('system-toast', {

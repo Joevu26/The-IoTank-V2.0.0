@@ -116,7 +116,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             const croppedBlob = await getCroppedImg(image, croppedAreaPixels, rotation, cropObjectFit);
             onCropComplete(croppedBlob);
         } catch (e) {
-            logger.error(e);
+            logger.error('Image crop failed', e);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Crop Failed',

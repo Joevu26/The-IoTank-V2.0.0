@@ -50,13 +50,13 @@ const decodeHTMLEntities = (text: string) => {
 // ─── Small helper components ──────────────────────────────────────────────────
 
 const PriorityBadge: React.FC<{ score: number }> = ({ score }) => {
-    if (score > 0.85) return <span className="mi-pill mi-pill--high">HIGH PRIORITY</span>;
+    if (score > 0.90) return <span className="mi-pill mi-pill--high">HIGH PRIORITY</span>;
     if (score > 0.6) return <span className="mi-pill mi-pill--med">MEDIUM</span>;
     return <span className="mi-pill mi-pill--normal">NORMAL</span>;
 };
 
 const RegionChip: React.FC<{ region: 'Kenya' | 'Global' }> = ({ region }) => (
-    <span className={`mi-pill mi-pill--${region.toLowerCase()}`}>{region}</span>
+    <span className={`mi-pill mi-pill--${(region || 'Global').toLowerCase()}`}>{region || 'Global'}</span>
 );
 
 // ─── News Card ────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ const NewsCard: React.FC<{
     tanks?: any[];
 }> = ({ article, onBookmark, bookmarked, isArchive, onDelete, onIgnore, tanks }) => {
     const [expanded, setExpanded] = useState(false);
-    const isHighPriority = (article.relevanceScore ?? 0) > 0.85;
+    const isHighPriority = (article.relevanceScore ?? 0) > 0.90;
     const isBookmarked = bookmarked.has(article.id);
     
     // Check if within 48 hours for "RECENT" badge
@@ -94,7 +94,7 @@ const NewsCard: React.FC<{
             {/* Top severity strap */}
             <div className={`mi-news-top-strap mi-news-top-strap--${
                 article.verificationStatus === 'flagged' ? 'flagged' :
-                (article.relevanceScore ?? 0) > 0.85 ? 'high' : 
+                (article.relevanceScore ?? 0) > 0.90 ? 'high' : 
                 (article.relevanceScore ?? 0) > 0.6 ? 'med' : 'normal'
             }`} />
 
@@ -134,7 +134,7 @@ const NewsCard: React.FC<{
                             <h3 className="mi-news-title">
                                 {decodeHTMLEntities(article.title)}
                             </h3>
-                            {article.summary && decodeHTMLEntities(article.summary).toLowerCase() !== decodeHTMLEntities(article.title).toLowerCase() && (
+                            {article.summary && (decodeHTMLEntities(article.summary) || '').toLowerCase() !== (decodeHTMLEntities(article.title) || '').toLowerCase() && (
                                 <p className="mi-news-summary line-clamp-2">
                                     {decodeHTMLEntities(article.summary)}
                                 </p>
@@ -151,7 +151,7 @@ const NewsCard: React.FC<{
                         <div className="mi-relevance-sidebar-bar">
                             <div 
                                 className={`mi-relevance-sidebar-fill mi-relevance-sidebar-fill--${
-                                    (article.relevanceScore ?? 0) > 0.85 ? 'high' : 
+                                    (article.relevanceScore ?? 0) > 0.90 ? 'high' : 
                                     (article.relevanceScore ?? 0) > 0.6 ? 'med' : 'normal'
                                 }`} 
                                 style={{ width: `${Math.max(15, (article.relevanceScore ?? 0) * 100)}%` }}
@@ -180,7 +180,7 @@ const NewsCard: React.FC<{
                                     const brief = decodeHTMLEntities(article.briefingSummary || article.summary || '');
                                     const title = decodeHTMLEntities(article.title);
                                     // If brief is just the title, don't show it or show something more useful
-                                    if (!brief || brief.toLowerCase() === title.toLowerCase()) {
+                                    if (!brief || brief.toLowerCase() === (title || '').toLowerCase()) {
                                         return article.topicTags.length > 0 
                                             ? `Strategic analysis of ${article.topicTags.join(', ')} market signals. Impacts ${article.implicationCategory.toLowerCase()} operations.`
                                             : "Analyzing market volatility and regulatory shifts for tactical station response.";
@@ -500,7 +500,7 @@ export const MarketPage: React.FC = () => {
 
         const mappedSignals: NewsArticle[] = signals.map(s => ({
             ...s,
-            region: (s as any).region || ((s.title.toLowerCase().includes('kenya') || (s.source ?? '').toLowerCase().includes('kenya')) ? 'Kenya' : 'Global'),
+            region: (s as any).region || (((s.title || '').toLowerCase().includes('kenya') || (s.source ?? '').toLowerCase().includes('kenya')) ? 'Kenya' : 'Global'),
             topicTags: (s as any).topicTags || [],
             implicationCategory: (s as any).implicationCategory || 'General',
             briefingSummary: (s as any).briefingSummary || s.summary,
@@ -523,7 +523,7 @@ export const MarketPage: React.FC = () => {
 
             // Fuel Filter
             if (fuelFilter !== 'all') {
-                const searchStr = (a.title + ' ' + a.summary).toLowerCase();
+                const searchStr = ((a.title || '') + ' ' + (a.summary || '')).toLowerCase();
                 const matchesFuel = searchStr.includes(fuelFilter.toLowerCase()) || 
                                    (a as any).topicTags?.some((t: string) => t.toLowerCase() === fuelFilter.toLowerCase());
                 if (!matchesFuel) return false;
@@ -568,11 +568,11 @@ export const MarketPage: React.FC = () => {
     const filterList = (list: NewsArticle[]) => {
         return list.filter(a => {
             if (searchTerm) {
-                const q = searchTerm.toLowerCase();
-                if (!a.title.toLowerCase().includes(q) && !a.summary.toLowerCase().includes(q)) return false;
+                const q = (searchTerm || '').toLowerCase();
+                if (!(a.title || '').toLowerCase().includes(q) && !(a.summary || '').toLowerCase().includes(q)) return false;
             }
-            if (priorityFilter === 'high' && (a.relevanceScore ?? 0) <= 0.85) return false;
-            if (priorityFilter === 'med' && ((a.relevanceScore ?? 0) <= 0.6 || (a.relevanceScore ?? 0) > 0.85)) return false;
+            if (priorityFilter === 'high' && (a.relevanceScore ?? 0) <= 0.90) return false;
+            if (priorityFilter === 'med' && ((a.relevanceScore ?? 0) <= 0.6 || (a.relevanceScore ?? 0) > 0.90)) return false;
             return true;
         });
     };
@@ -610,7 +610,6 @@ export const MarketPage: React.FC = () => {
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
                         <div>
                             <h1 className="text-2xl md:text-4xl font-black text-[#323264] uppercase tracking-tight flex items-center gap-4">
-                                <FiGlobe className="text-accent" />
                                 Market Intelligence
                             </h1>
                             <p className="text-[#7A7A95] font-medium text-sm mt-3 max-w-2xl leading-relaxed">

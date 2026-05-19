@@ -25,7 +25,7 @@ export const useEPRANotifier = () => {
                 // Query for the latest EPRA market intelligence signal (from market_prices)
                 const { data, error } = await supabase
                     .from('market_prices')
-                    .select('effective_date, fuel_type, price')
+                    .select('effective_date, fuel_type, price_per_liter')
                     .eq('source', 'epra')
                     .order('effective_date', { ascending: false })
                     .limit(1)
@@ -52,7 +52,7 @@ export const useEPRANotifier = () => {
                 window.dispatchEvent(new CustomEvent('system-toast', {
                     detail: {
                         title: '⚠️ EPRA MANDATE: RETAIL PRICE UPDATE REQUIRED',
-                        message: `The system detected new official EPRA price limits for ${data.fuel_type} (KES ${data.price}).\n\nYou must update your local retail pump prices immediately to maintain operational margin tracking.`,
+                        message: `The system detected new official EPRA price limits for ${data.fuel_type} (KES ${data.price_per_liter}).\n\nYou must update your local retail pump prices immediately to maintain operational margin tracking.`,
                         type: 'error',
                         persistent: true,
                         actions: [

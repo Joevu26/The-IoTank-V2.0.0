@@ -139,7 +139,7 @@ export function calculateMarketSentiment(
   
   // Source agreement
   const bullishSources = safeSignals.filter(s => {
-    const text = (s.title + ' ' + s.summary).toLowerCase();
+    const text = ((s.title || '') + ' ' + (s.summary || '')).toLowerCase();
     return bullishKeywords.some(keyword => text.includes(keyword));
   }).length;
   

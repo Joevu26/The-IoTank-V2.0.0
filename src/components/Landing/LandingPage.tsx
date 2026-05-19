@@ -284,7 +284,7 @@ export const LandingPage: React.FC = () => {
                 playsInline
                 preload="metadata"
                 crossOrigin="anonymous"
-                onError={(e) => { logger.error("Local video failed:", videos[0], e); setVideoFailed(true); }}
+                onError={(e) => { logger.error("Local video failed:", e); setVideoFailed(true); }}
                 poster={brandMark}
                 title="Modern Data Flow Animation"
                 onCanPlay={(e) => (e.currentTarget.muted = true)}

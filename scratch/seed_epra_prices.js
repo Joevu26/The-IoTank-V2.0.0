@@ -21,6 +21,18 @@ const EFFECTIVE_DATE = '2026-05-15';
 const SOURCE_URL = 'https://www.epra.go.ke/petroleum-prices/';
 
 async function run() {
+  console.log('Logging in as authenticated user...');
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email: 'joereademm@gmail.com',
+    password: 'Joe@26$.s'
+  });
+
+  if (authError) {
+    console.error('Authentication failed:', authError.message);
+    return;
+  }
+  console.log('Login successful! User ID:', authData.user.id);
+
   console.log('Upserting current EPRA prices into market_prices table...\n');
 
   for (const p of CURRENT_EPRA_PRICES) {

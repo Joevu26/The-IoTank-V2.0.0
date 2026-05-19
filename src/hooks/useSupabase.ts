@@ -695,7 +695,7 @@ export function useProfile(authUserId: string | undefined) {
     // Stable channel key prevents duplicate subscriptions during auth transitions
     useEffect(() => {
         if (!authUserId || import.meta.env.VITE_DISABLE_REALTIME === 'true') return;
-        const channelId = `profile:${authUserId}`;
+        const channelId = `profile:${authUserId}-${Math.random().toString(36).substring(7)}`;
         const channel = supabase
             .channel(channelId)
             .on(
@@ -867,12 +867,31 @@ export async function deleteTank(tankId: string) {
         .eq('tank_id', tankId);
     if (alertErr) throw new Error(`[deleteTank] Cascade failed on alerts: ${alertErr.message}`);
 
-    // B. Delete sensor readings
+    // B. Delete sensor readings and partitioned readings
     const { error: readingsErr } = await supabase
         .from('sensor_readings')
         .delete()
         .eq('tank_id', tankId);
     if (readingsErr) throw new Error(`[deleteTank] Cascade failed on sensor_readings: ${readingsErr.message}`);
+
+    const { error: partitionedReadingsErr } = await supabase
+        .from('sensor_readings_partitioned')
+        .delete()
+        .eq('tank_id', tankId);
+    if (partitionedReadingsErr) throw new Error(`[deleteTank] Cascade failed on sensor_readings_partitioned: ${partitionedReadingsErr.message}`);
+
+    // B2. Delete daily summaries and device tokens
+    const { error: summariesErr } = await supabase
+        .from('daily_summaries')
+        .delete()
+        .eq('tank_id', tankId);
+    if (summariesErr) throw new Error(`[deleteTank] Cascade failed on daily_summaries: ${summariesErr.message}`);
+
+    const { error: tokensErr } = await supabase
+        .from('device_tokens')
+        .delete()
+        .eq('tank_id', tankId);
+    if (tokensErr) throw new Error(`[deleteTank] Cascade failed on device_tokens: ${tokensErr.message}`);
 
     // C. Delete deliveries
     const { error: deliveriesErr } = await supabase

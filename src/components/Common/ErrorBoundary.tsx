@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        logger.error('Uncaught error:', error, errorInfo);
+        logger.error('Uncaught error:', { error, errorInfo }, 'ErrorBoundary');
     }
 
     private handleReset = () => {

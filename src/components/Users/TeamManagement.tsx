@@ -203,7 +203,7 @@ export const TeamManagement: React.FC = () => {
                         const body = await (functionError as any).context.json();
                         msg = body.error || body.message || msg;
                     }
-                } catch(e) {}
+                } catch(e) { logger.warn('[TeamManagement] Failed to parse function error context', e); }
                 throw new Error(msg);
             }
 

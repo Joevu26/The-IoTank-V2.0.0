@@ -1,6 +1,5 @@
 import { supabase } from '@/config/supabase';
 import { format, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
-import { format, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
 import { validateUUID } from './sanitization';
 import { logger } from './logger';
 

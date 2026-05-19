@@ -84,6 +84,7 @@ export async function requireAuthenticatedUser(req: Request, corsHeaders: CorsHe
     };
   }
 
+  // Verify JWT using the admin client directly
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
   if (error) {
