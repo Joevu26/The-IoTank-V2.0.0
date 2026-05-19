@@ -3,6 +3,7 @@ import { supabase } from '../../config/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
 import { AuditService } from '@/services/AuditService';
+import { logger } from '@/utils/logger';
 import './TeamManagement.css';
 
 interface TeamMember {
@@ -102,7 +103,7 @@ export const TeamManagement: React.FC = () => {
 
             setActivities(mappedActivities);
         } catch (error) {
-            console.error('Error fetching team data:', error);
+            logger.error('[TeamManagement] Error fetching team data:', error);
         } finally {
             setLoading(false);
         }

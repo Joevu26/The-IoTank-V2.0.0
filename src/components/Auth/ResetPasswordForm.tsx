@@ -4,6 +4,7 @@ import { FaLock, FaCheckCircle, FaExclamationTriangle, FaShieldAlt, FaTimesCircl
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { PasswordInput } from './PasswordInput';
+import { logger } from '@/utils/logger';
 import './LoginForm.css';
 
 export const ResetPasswordForm: React.FC = () => {
@@ -96,7 +97,7 @@ export const ResetPasswordForm: React.FC = () => {
                 navigate('/login');
             }, 3000);
         } catch (err: any) {
-            console.error('Password update error:', err);
+            logger.error('Password update error:', err);
             setError(err.message || 'Failed to update password. Please try again.');
         } finally {
             setLoading(false);
@@ -124,7 +125,7 @@ export const ResetPasswordForm: React.FC = () => {
                 }
             }));
         } catch (err: any) {
-            console.error('MFA Verification Error:', err);
+            logger.error('MFA Verification Error:', err);
             setError(err.message || 'Invalid verification code. Please try again.');
         } finally {
             setMfaLoading(false);

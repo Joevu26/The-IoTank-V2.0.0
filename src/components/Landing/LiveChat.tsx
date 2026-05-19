@@ -5,6 +5,7 @@ import { FaWhatsapp } from 'react-icons/fa';
 import './LiveChat.css';
 import { ChatAIService, RateLimitError } from '../../services/ChatAIService';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/utils/logger';
 
 interface Message {
     id: string;
@@ -185,7 +186,7 @@ export const LiveChat: React.FC = () => {
                     : s
             ));
         } catch (error: any) {
-            console.error('Chat error:', error);
+            logger.error('Chat error:', error);
             if (error instanceof RateLimitError) {
                 setRateLimitResetAt(new Date(error.resetAt).getTime());
                 setSecondsRemaining(Math.max(0, Math.ceil((new Date(error.resetAt).getTime() - Date.now()) / 1000)));

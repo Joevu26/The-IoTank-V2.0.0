@@ -32,6 +32,7 @@ const LeadMagnetNewsletter = React.lazy(() => import('./LeadMagnetNewsletter'));
 
 import { DocViewer } from './DocViewer';
 import { LiveChat } from './LiveChat';
+import { logger } from '@/utils/logger';
 import {
     LossCalculatorModal,
     CrisisIntro,
@@ -107,7 +108,7 @@ export const LandingPage: React.FC = () => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          videoElement.play().catch(err => console.warn("Video play interrupted:", err));
+          videoElement.play().catch(err => logger.warn("Video play interrupted:", err));
         } else {
           videoElement.pause();
         }
@@ -283,7 +284,7 @@ export const LandingPage: React.FC = () => {
                 playsInline
                 preload="metadata"
                 crossOrigin="anonymous"
-                onError={(e) => { console.error("Local video failed:", videos[0], e); setVideoFailed(true); }}
+                onError={(e) => { logger.error("Local video failed:", videos[0], e); setVideoFailed(true); }}
                 poster={brandMark}
                 title="Modern Data Flow Animation"
                 onCanPlay={(e) => (e.currentTarget.muted = true)}

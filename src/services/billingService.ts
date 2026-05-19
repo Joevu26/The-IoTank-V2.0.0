@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 export interface ClientBillingSummary {
   station: {
@@ -41,7 +42,7 @@ export const billingService = {
 
       return data as ClientBillingSummary;
     } catch (error) {
-      console.error('Error fetching station dashboard summary:', error);
+      logger.error('[billingService] Error fetching station dashboard summary:', error);
       return null;
     }
   },
@@ -64,7 +65,7 @@ export const billingService = {
       
       return data;
     } catch (error) {
-      console.error('Error fetching client billing:', error);
+      logger.error('[billingService] Error fetching client billing:', error);
       return null;
     }
   },
@@ -88,7 +89,7 @@ export const billingService = {
       
       return data;
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      logger.error('[billingService] Error fetching transactions:', error);
       return [];
     }
   }

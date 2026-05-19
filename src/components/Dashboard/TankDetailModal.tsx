@@ -10,6 +10,7 @@ import { FiX, FiActivity, FiSettings, FiDownload, FiShare2, FiRefreshCw } from '
 import { formatVolume } from '@/utils/formatUtils';
 import { exportToCSV } from '@/utils/exportUtils';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/utils/logger';
 import './TankDetailModal.css';
 
 interface TankDetailModalProps {
@@ -81,7 +82,7 @@ export const TankDetailModal: React.FC<TankDetailModalProps> = ({
                 }
             }));
         } catch (error) {
-            console.error('Error updating config:', error);
+            logger.error('Error updating config:', error);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Sync Failed',

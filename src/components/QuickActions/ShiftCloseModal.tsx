@@ -47,7 +47,7 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                 .maybeSingle();
             
             if (error) {
-                console.error('Error fetching shift snapshot:', error);
+                logger.error('[ShiftClose] Error fetching shift snapshot:', error);
                 return;
             }
 
@@ -492,11 +492,11 @@ export const ShiftCloseModal: React.FC<ShiftCloseModalProps> = ({ isOpen, onClos
                                 );
                             }
                         } catch (tankErr) {
-                            console.error(`[ShiftClose] Reorder scan failed for ${tank.name}:`, tankErr);
+                            logger.error(`[ShiftClose] Reorder scan failed for ${tank.name}:`, tankErr);
                         }
                     }
                 } catch (bgErr) {
-                    console.error('[ShiftClose] Background worker error:', bgErr);
+                    logger.error('[ShiftClose] Background worker error:', bgErr);
                 }
             })();
         } catch (err) {

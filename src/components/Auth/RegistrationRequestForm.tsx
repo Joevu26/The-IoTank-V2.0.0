@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react';
 import { sanitizeText, validateEmail } from '@/utils/sanitization';
+import { logger } from '@/utils/logger';
 import { 
   FiX, 
   FiUser, 
@@ -86,10 +87,10 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
           try {
             recaptchaToken = await window.grecaptcha.execute(siteKey, { action: 'register' });
           } catch (execError) {
-            console.error('reCAPTCHA execution failed:', execError);
+            logger.error('reCAPTCHA execution failed:', execError);
           }
         } else {
-            console.warn('reCAPTCHA library failed to initialize within 5 seconds.');
+            logger.warn('reCAPTCHA library failed to initialize within 5 seconds.');
             setShowRecaptchaModal(true);
             // Dispatch premium persistent toast
             const toastEvent = new CustomEvent('system-toast', {
@@ -103,7 +104,7 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
             window.dispatchEvent(toastEvent);
         }
       } catch (recaptchaError) {
-        console.warn('reCAPTCHA v3 error (non-blocking):', recaptchaError);
+        logger.warn('reCAPTCHA v3 error (non-blocking):', recaptchaError);
         // Continue without token - registration can still proceed
       }
 
@@ -141,7 +142,7 @@ export const RegistrationRequestForm: React.FC<RegistrationRequestFormProps> = (
       
       setSubmitted(true);
     } catch (err: any) {
-      console.error('registration request error:', err);
+      logger.error('registration request error:', err);
       const errMsg = err.message || '';
       
       if (errMsg.includes('Email already exists') || errMsg.includes('pending request')) {

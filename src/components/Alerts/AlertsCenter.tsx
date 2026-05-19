@@ -14,6 +14,7 @@ import { getSeverityClass } from '../../services/AlertScoringEngine';
 import { SkeletonDashboard, SkeletonTable } from '../Common/SkeletonLoader';
 import { resolveAllAlerts, propagateStationThresholds } from '@/hooks/useSupabase';
 import { sanitizeIds } from '@/utils/formatUtils';
+import { logger } from '@/utils/logger';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Tab = 'mission' | 'thresholds' | 'preferences';
@@ -183,7 +184,7 @@ export const AlertsCenter: React.FC = () => {
             // but we can add a toast or similar if we had a toast provider here.
             // For now, the Audit log is enough for the backend.
         } catch (err) {
-            console.error('Failed to propagate logic:', err);
+            logger.error('Failed to propagate logic:', err);
         } finally {
             setIsPropagating(false);
         }
@@ -245,7 +246,7 @@ export const AlertsCenter: React.FC = () => {
                 'INFO'
             );
         } catch (err) {
-            console.error('Error resolving all alerts:', err);
+            logger.error('Error resolving all alerts:', err);
         } finally {
             setIsClearing(false);
         }

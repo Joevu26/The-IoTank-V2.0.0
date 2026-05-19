@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FiCheckCircle, FiChevronRight, FiChevronLeft, FiMapPin, FiBox, FiCpu } from 'react-icons/fi';
 import { supabase } from '@/config/supabase';
 import { User, Tank } from '@/types';
+import { logger } from '@/utils/logger';
 import './OnboardingModal.css';
 
 interface OnboardingModalProps {
@@ -103,7 +104,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, user, 
 
             onComplete();
         } catch (error: any) {
-            console.error(`Onboarding Save Error (${saveStatus}):`, error);
+            logger.error(`Onboarding Save Error (${saveStatus}):`, error);
             const errorMsg = error.message || 'Unknown error';
             setLoading(false);
             window.dispatchEvent(new CustomEvent('system-toast', {

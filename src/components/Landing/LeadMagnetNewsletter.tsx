@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { FiMail, FiDownload, FiCheck, FiArrowRight } from 'react-icons/fi';
 import './LeadMagnetNewsletter.css';
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 const LeadMagnetNewsletter: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ const LeadMagnetNewsletter: React.FC = () => {
       setStatus('success');
       setEmail('');
     } catch (err: any) {
-      console.error('Lead capture error:', err);
+      logger.error('Lead capture error:', err);
       setStatus('error');
       setErrorMessage('Something went wrong. Please try again.');
       setTimeout(() => setStatus('idle'), 3000);

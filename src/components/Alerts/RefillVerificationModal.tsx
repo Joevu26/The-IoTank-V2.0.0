@@ -9,6 +9,7 @@ import { Alert } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { NotificationService } from '@/services/NotificationService';
 import { validateUUID } from '@/utils/sanitization';
+import { logger } from '@/utils/logger';
 import '../Inventory/AddTankModal.css';
 import './RefillVerificationModal.css';
 
@@ -129,7 +130,7 @@ export const RefillVerificationModal: React.FC<RefillVerificationModalProps> = (
 
             onClose();
         } catch (error: any) {
-            console.error('Reconciliation error:', error);
+            logger.error('Reconciliation error:', error);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Sync Error',

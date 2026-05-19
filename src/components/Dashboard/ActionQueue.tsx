@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { resolveAlert } from '@/hooks/useSupabase';
 import { Toast } from '../Common/Toast';
 import { useModals } from '@/contexts/ModalContext';
+import { logger } from '@/utils/logger';
 import './ActionQueue.css';
 import '../Common/DesignSystemCards.css';
 
@@ -89,7 +90,7 @@ export const ActionQueue: React.FC = () => {
                     clearEvent(item.id);
                 })
                 .catch(err => {
-                    console.error('[ActionQueue] Failed to resolve alert:', err);
+                    logger.error('[ActionQueue] Failed to resolve alert:', err);
                     setToast({
                         message: 'Sync Error: Could not resolve alert on server.',
                         type: 'error'

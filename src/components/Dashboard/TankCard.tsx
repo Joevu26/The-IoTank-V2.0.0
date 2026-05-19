@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuditService } from '@/services/AuditService';
 import { useAuth } from '@/hooks/useAuth';
 import { deleteTank } from '@/hooks/useSupabase';
+import { logger } from '@/utils/logger';
 
 import '../Common/DesignSystemCards.css';
 import './TankCard.css';
@@ -190,7 +191,7 @@ export const TankCard: React.FC<TankCardProps> = React.memo(({ tank, stationId, 
             // 4. Close and Refresh (UI will handle the disappearance via useTanks invalidation)
             setShowDeleteModal(false);
         } catch (err: any) {
-            console.error("Deletion Failed:", err);
+            logger.error("Deletion Failed:", err);
             setDeleteError(err.message || "Authorization failed. Please verify password.");
         } finally {
             setIsDeleting(false);

@@ -15,6 +15,7 @@ import {
     FaCreditCard
 } from 'react-icons/fa';
 import { FiArrowRight, FiActivity } from 'react-icons/fi';
+import { logger } from '@/utils/logger';
 import './BillingPage.css';
 
 interface BillingInfo {
@@ -143,7 +144,7 @@ export const BillingPage: React.FC = () => {
                     setLoading(false);
                 }
             } catch (err) {
-                console.error("[BILLING_SYSTEM_FAILURE]", err);
+                logger.error("[BILLING_SYSTEM_FAILURE]", err);
                 setBilling(null);
                 setLoading(false);
             } finally {

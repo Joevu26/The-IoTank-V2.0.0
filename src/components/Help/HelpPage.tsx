@@ -12,6 +12,7 @@ import { supabase } from '@/config/supabase';
 import { SupportCategory, SupportSeverity } from '@/types';
 import { FAQ_CATEGORIES } from './HelpConstants';
 import { HelpModals } from './HelpModals';
+import { logger } from '@/utils/logger';
 import './HelpPage.css';
 
 export const HelpPage: React.FC = () => {
@@ -57,7 +58,7 @@ export const HelpPage: React.FC = () => {
             setTicketForm({ category: 'telemetry_offline', severity: 'medium', siteId: '', tankId: '', description: '' });
             setTimeout(() => setShowSuccess(false), 5000);
         } catch (error) {
-            console.error('Error creating ticket:', error);
+            logger.error('Error creating ticket:', error);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Submission Failed',

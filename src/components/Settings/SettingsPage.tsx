@@ -14,6 +14,7 @@ import { useTanks, updateTank as syncTankToDb, createAlert, useSites, deleteTank
 import { AddTankModal } from '../Inventory/AddTankModal';
 import { AuditService } from '@/services/AuditService';
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 import { Toast } from '../Common/Toast';
 import { ImageCropperModal } from '../Common/ImageCropperModal';
 import './SettingsPage.css';
@@ -254,7 +255,7 @@ export const SettingsPage: React.FC = () => {
             ).catch(() => {});
             
         } catch (err: any) {
-            console.error('[SettingsPage] Delete tank failed:', err);
+            logger.error('[SettingsPage] Delete tank failed:', err);
             
             // Step 4: Log the failure to the security audit trail
             await AuditService.log(
@@ -353,9 +354,9 @@ export const SettingsPage: React.FC = () => {
                 title: 'Fuel Price Calibration',
                 message: `${fuelName} unit price adjusted from ${oldPrice} to ${normalizedPrice} Ksh. Shift valuation updated.`,
                 metadata: { oldPrice, newPrice: normalizedPrice, tankName: fuelName }
-            }).catch(e => console.error('Failed to trigger price alert:', e));
+            }).catch(e => logger.error('[SettingsPage] Failed to trigger price alert:', e));
         } catch (err) {
-            console.error('Price update error:', err);
+            logger.error('[SettingsPage] Price update error:', err);
             setToast({ message: 'Update failed. Please check connection.', type: 'error' });
         }
     };
@@ -446,7 +447,7 @@ export const SettingsPage: React.FC = () => {
             setRecentCommands(cmds as any);
             setLocalPendingIds(DeviceCommandService.getLocalPendingIds());
         } catch (err) {
-            console.error("Failed to load commands:", err);
+            logger.error('[SettingsPage] Failed to load commands:', err);
         }
     };
 
@@ -572,12 +573,10 @@ currentUser.stationId
             });
         
 } catch (err: any) {
-            console.error('Logo upload error:', err);
+            logger.error('[SettingsPage] Logo upload error:', err);
             setToast({
- message: `Upload failed: ${
-err.message
-}`, type: 'error' 
-});
+                message: `Upload failed: ${err.message}`, type: 'error' 
+            });
         
 } finally {
             setIsUploadingLogo(false);
@@ -603,7 +602,7 @@ err.message
             await AuditService.log('SYSTEM', 'UPLOAD_AVATAR', currentUser.stationId || 'SYSTEM', `Identity signature updated: Profile photo synchronized to ${filePath}`);
             setToast({ message: 'Profile photo updated.', type: 'success' });
         } catch (err: any) {
-            console.error('Profile photo upload error:', err);
+            logger.error('[SettingsPage] Profile photo upload error:', err);
             setToast({ message: `Upload failed: ${err.message}`, type: 'error' });
         } finally {
             setIsUploadingPhoto(false);
@@ -625,7 +624,7 @@ err.message
             await AuditService.log('SYSTEM', 'UPDATE_COMPANY', currentUser.stationId, `Operational profile modified: Station identity set to "${orgForm.name}"`, 'INFO', {});
             setToast({ message: `Station profile for "${orgForm.name}" has been synchronized.`, type: 'success' });
         } catch (err) {
-            console.error(err);
+            logger.error('[SettingsPage] Station profile sync failed:', err);
             setToast({ message: 'Failed to save station information.', type: 'error' });
         } finally {
             setIsSaving(false);
@@ -643,7 +642,7 @@ err.message
             await AuditService.log('SYSTEM', 'UPDATE_PROFILE', currentUser?.stationId || 'SYSTEM', `Operator identity modified: Profile name set to "${profileForm.displayName}"`, 'INFO', {});
             setToast({ message: `Identity updated: Profile saved for ${profileForm.displayName}.`, type: 'success' });
         } catch (err) {
-            console.error(err);
+            logger.error('[SettingsPage] Profile save failed:', err);
             setToast({ message: 'Failed to update profile.', type: 'error' });
         } finally {
             setIsSaving(false);

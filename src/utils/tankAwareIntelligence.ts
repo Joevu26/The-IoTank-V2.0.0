@@ -6,6 +6,7 @@
 
 import { Tank, MarketSignal, SupplyRisk, GeminiInsight } from '@/types';
 import { IntelligenceAIService } from '@/services/IntelligenceAIService';
+import { logger } from '@/utils/logger';
 
 export interface TankSpecificAnalysis {
   tankId: string;
@@ -218,7 +219,7 @@ export async function generateTankAwareInsights(
 
     return [...criticalTankInsights, fleetInsight];
   } catch (err) {
-    console.warn('[TankIQ] AI Fleet insight failed, falling back to heuristic:', err);
+    logger.warn('[TankIQ] AI Fleet insight failed, falling back to heuristic:', err);
     
     // Fallback: Create fleet-level strategic insight using heuristics
     const fleetInsight: GeminiInsight = {

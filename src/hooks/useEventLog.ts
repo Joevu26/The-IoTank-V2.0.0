@@ -228,7 +228,7 @@ export function useEventLog(stationId: string) {
         if (!stationId) return;
         
         try {
-            console.log('[useEventLog] Starting full dataset export...');
+            logger.info('[useEventLog] Starting full dataset export...', null, 'AUDIT');
             // Fetch up to 1000 records for the current filters (bypassing pagination)
             let query = supabase
                 .from('unified_events')

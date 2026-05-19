@@ -8,6 +8,7 @@ import '../Inventory/AddTankModal.css';
 import './QuickActions.css';
 
 import { NotificationService } from '@/services/NotificationService';
+import { logger } from '@/utils/logger';
 
 interface OrderModalProps {
     isOpen: boolean;
@@ -95,7 +96,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({ isOpen, onClose, onSucce
 
             onClose();
         } catch (err: any) {
-             console.error('[OrderModal] Submission crash:', err);
+             logger.error('[OrderModal] Submission crash:', err);
              NotificationService.show('Order Recording Failed', { body: err.message || 'Check terminal connection.' });
         } finally {
             setSubmitting(false);

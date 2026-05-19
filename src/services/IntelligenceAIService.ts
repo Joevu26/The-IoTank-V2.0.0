@@ -88,7 +88,7 @@ export class IntelligenceAIService {
                 const response = await this.callProvider(provider, context, 'intelligence');
                 if (response) {
                     logger.info(`[IntelligenceAIService] Success with: ${provider}`);
-                    return this.parseResponse(provider as any, response, promptLog, provider, signals, risks, tankId);
+                    return this.parseResponse(response, promptLog, provider, signals, risks, tankId);
                 }
             } catch (error) {
                 logger.warn(`[IntelligenceAIService] ${provider} failed, falling back to next provider...`, error);
@@ -355,8 +355,12 @@ export class IntelligenceAIService {
             const cleanedText = this.cleanJSONResponse(text);
             const data = JSON.parse(cleanedText);
             
+            const rawStatus = (data.status || 'STABLE').toUpperCase();
+            const validStatuses = ['CRITICAL', 'CAUTION', 'STABLE'];
+            const status = validStatuses.includes(rawStatus) ? rawStatus as ArticleAIDirective['status'] : 'STABLE';
+            
             return {
-                status: (data.status || 'STABLE').toUpperCase() as any,
+                status,
                 recommendation: data.recommendation || data.text || 'Monitor market conditions.',
                 actionRequired: !!data.actionRequired || !!data.suggestsAction,
                 actionDetails: data.actionDetails || data.details,
@@ -387,7 +391,6 @@ export class IntelligenceAIService {
     }
 
     private parseResponse(
-        _unused: any,
         text: string,
         prompt: string,
         provider: string,

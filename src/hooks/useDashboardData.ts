@@ -36,7 +36,9 @@ export const useDashboardData = () => {
     // ─── Real-Time "Live Listening" ────────────────────────────────
     
     // 1. Subscribe to Tank Updates
-    const tankChannelId = `live-tanks-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    // C-06 FIX: Stable channel name — Date.now()+Math.random() was creating a new orphaned
+    // Supabase channel on every re-render, exhausting the 200-slot connection pool.
+    const tankChannelId = `live-tanks-${stationId}`;
     const tankSubscription = supabase
       .channel(tankChannelId)
       .on(
@@ -72,7 +74,7 @@ export const useDashboardData = () => {
       .subscribe();
 
     // 2. Subscribe to Alerts
-    const alertChannelId = `live-alerts-${stationId}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    const alertChannelId = `live-alerts-${stationId}`;
     const alertSubscription = supabase
       .channel(alertChannelId)
       .on(

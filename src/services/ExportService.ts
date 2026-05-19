@@ -9,6 +9,15 @@ interface jsPDFWithAutoTable extends jsPDF {
     lastAutoTable?: { finalY: number };
 }
 
+/** Daily snapshot type for compliance pack generation (L-06: replaces any[]) */
+export interface DailyLog {
+    date: string;
+    opening?: number;
+    deliveries?: number;
+    sales?: number;
+    closing?: number;
+}
+
 /**
  * Core Export Service for client-side PDF and CSV generation.
  * Spark-plan safe (zero functions required).
@@ -397,7 +406,9 @@ export class ExportService {
 
         // --- NOTES SECTION ---
         if (delivery.notes || delivery.explanation) {
-            const notesY = (doc as any).lastAutoTable.finalY + 15;
+            // C-04 FIX: lastAutoTable can be undefined if no autoTable rendered above (e.g. empty delivery).
+            // Use optional chaining + fallback to prevent TypeError crash during PDF export.
+            const notesY = (doc.lastAutoTable?.finalY ?? 135) + 15;
             doc.setFontSize(12);
             doc.text('Auditor / Operator Notes', 14, notesY);
             

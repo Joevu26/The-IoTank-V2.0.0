@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 import {
     FileUpload,
     CSVAnalysisResult,
@@ -24,7 +25,7 @@ class FileAnalysisService {
                 headers['Authorization'] = `Bearer ${session.access_token}`;
             }
         } catch (e) {
-            console.warn('[FileAnalysisService] Auth check failed, proceeding with limited headers.');
+            logger.warn('[FileAnalysisService] Auth check failed, proceeding with limited headers.');
         }
 
         return headers;
@@ -149,8 +150,11 @@ class FileAnalysisService {
                 throw new Error(`AI Analysis Error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
             }
 
-            const data = await response.json();
-            const aiResponse = JSON.parse(data.candidates[0].content.parts[0].text);
+            // C-05 FIX: Wrap AI response parsing in safe optional chaining.
+            // data.candidates[0] can be undefined on rate-limit or empty Gemini responses.
+            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!rawText) throw new Error('Gemini returned an empty or malformed response for CSV analysis.');
+            const aiResponse = JSON.parse(rawText);
 
             const result: CSVAnalysisResult = {
                 id: crypto.randomUUID(),
@@ -177,17 +181,15 @@ class FileAnalysisService {
 
             if (historyError) throw historyError;
 
-            // Update file status
-            const { error: statusError } = await supabase
-                .from('file_uploads')
-                .update({ analysis_status: 'completed' })
-                .eq('id', fileRecord.id);
-
-            if (statusError) throw statusError;
+            // Update file status to completed
+            await supabase.from('file_uploads').update({ analysis_status: 'completed' }).eq('id', fileRecord.id);
 
             return result;
         } catch (error: any) {
-            console.error('File Analysis Error:', error);
+            // M-12 FIX: Mark file as 'failed' so UI can show an error state instead of
+            // leaving the record stuck in 'pending' indefinitely.
+            await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id).catch(() => {});
+            logger.error('[FileAnalysisService] CSV Analysis Error:', error);
             throw new Error(`AI Analysis Error: ${error.message}`);
         }
     }
@@ -249,8 +251,10 @@ class FileAnalysisService {
                 throw new Error(`AI Analysis Error: ${response.statusText}${errorBody.error ? ` - ${errorBody.error}` : ''}`);
             }
 
-            const data = await response.json();
-            const aiResponse = JSON.parse(data.candidates[0].content.parts[0].text);
+            // C-05 FIX: Safe optional chaining on AI response structure.
+            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!rawText) throw new Error('Gemini returned an empty or malformed response for PDF analysis.');
+            const aiResponse = JSON.parse(rawText);
 
             const result: PDFAnalysisResult = {
                 id: crypto.randomUUID(),
@@ -277,17 +281,13 @@ class FileAnalysisService {
 
             if (historyError) throw historyError;
 
-            // Update file status
-            const { error: statusError } = await supabase
-                .from('file_uploads')
-                .update({ analysis_status: 'completed' })
-                .eq('id', fileRecord.id);
-
-            if (statusError) throw statusError;
+            await supabase.from('file_uploads').update({ analysis_status: 'completed' }).eq('id', fileRecord.id);
 
             return result;
         } catch (error: any) {
-            console.error('File Analysis Error:', error);
+            // M-12 FIX: Mark file as 'failed' to prevent infinite 'pending' state.
+            await supabase.from('file_uploads').update({ analysis_status: 'failed' }).eq('id', fileRecord.id).catch(() => {});
+            logger.error('[FileAnalysisService] PDF Analysis Error:', error);
             throw new Error(`AI Analysis Error: ${error.message}`);
         }
     }

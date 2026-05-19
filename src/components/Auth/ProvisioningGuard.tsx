@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { FiRefreshCw, FiCheckCircle, FiLoader, FiShield, FiCpu, FiActivity, FiServer, FiLock } from 'react-icons/fi';
+import { logger } from '@/utils/logger';
 import './ProvisioningGuard.css';
 
 interface ProvisioningGuardProps {
@@ -71,7 +72,7 @@ export const ProvisioningGuard: React.FC<ProvisioningGuardProps> = ({ children }
                 }
             }));
         } catch (err) {
-            console.error('[DEBUG_LOG] Diagnostic failed:', err);
+            logger.error('[DEBUG_LOG] Diagnostic failed:', err);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Diagnostic Failed',

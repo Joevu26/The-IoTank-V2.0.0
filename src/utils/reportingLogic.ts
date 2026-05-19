@@ -1,6 +1,8 @@
 import { supabase } from '@/config/supabase';
 import { format, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
+import { format, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
 import { validateUUID } from './sanitization';
+import { logger } from './logger';
 
 export interface DailySnapshot {
     date: string;
@@ -156,7 +158,7 @@ export async function scanStationHistory(
 
         return { logs, metrics };
     } catch (error) {
-        console.error('[scanStationHistory] Error:', error);
+        logger.error('[scanStationHistory] Error:', error);
         return { logs: [], metrics: { totalThroughput: 0, totalDeliveries: 0, avgVariancePct: 0, incidentCount: 0, netVariance: 0 } };
     }
 }

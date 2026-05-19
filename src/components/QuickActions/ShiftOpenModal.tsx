@@ -267,7 +267,7 @@ export const ShiftOpenModal: React.FC<ShiftOpenModalProps> = ({ isOpen, onClose 
                         );
                     }
                 } catch (bgErr) {
-                    console.error('[ShiftOpen] Background worker error:', bgErr);
+                    logger.error('[ShiftOpen] Background worker error:', bgErr);
                 }
             })();
         } catch (err) {

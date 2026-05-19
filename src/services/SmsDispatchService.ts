@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 export interface SmsPayload {
     to: string;
@@ -22,7 +23,7 @@ export class SmsDispatchService {
                 headers['Authorization'] = `Bearer ${session.access_token}`;
             }
         } catch (e) {
-            console.warn('[SmsDispatchService] Auth check failed, proceeding anonymously.');
+            logger.warn('[SmsDispatchService] Auth check failed, proceeding anonymously.');
         }
 
         return headers;
@@ -53,7 +54,7 @@ export class SmsDispatchService {
             const data = await response.json();
             return data;
         } catch (err) {
-            console.error('[SmsDispatch] Failed to dispatch SMS:', err);
+            logger.error('[SmsDispatchService] Failed to dispatch SMS:', err);
             return null;
         }
     }

@@ -35,6 +35,7 @@ import officialBadge from '../../assets/images/official-badge.png';
 import { FiCpu } from 'react-icons/fi';
 import { NotificationService } from '@/services/NotificationService';
 import { generateTacticalDirective } from '@/utils/directiveEngine';
+import { logger } from '@/utils/logger';
 
 /**
  * Clean up HTML entities like &nbsp; or &amp; from RSS strings safely
@@ -475,7 +476,7 @@ export const MarketPage: React.FC = () => {
                 });
             if (error) throw error;
         } catch (err) {
-            console.warn('[Market] Bookmark save failed:', err);
+            logger.warn('[Market] Bookmark save failed:', err);
         }
     }, [bookmarked, stationId]);
 
@@ -1235,7 +1236,7 @@ export const MarketPage: React.FC = () => {
 
                                         await completeAction(confirmingAction.id);
                                     } catch (err) {
-                                        console.error('[MarketPage] Retail update failed:', err);
+                                        logger.error('[MarketPage] Retail update failed:', err);
                                         window.dispatchEvent(new CustomEvent('system-toast', {
                                             detail: {
                                                 title: 'Update Failed',

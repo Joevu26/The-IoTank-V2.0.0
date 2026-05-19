@@ -42,7 +42,7 @@ export class NotificationService {
             localStorage.setItem(this.storageKey, 'false');
             return false;
         } catch (err) {
-            console.error('Permission request failed:', err);
+            logger.error('[NotificationService] Permission request failed:', err, 'NOTIFICATIONS');
             return false;
         }
     }

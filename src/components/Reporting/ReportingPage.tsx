@@ -18,6 +18,7 @@ import { validateUUID } from '@/utils/sanitization';
 import { ExportService } from '@/services/ExportService';
 import { format, subDays } from 'date-fns';
 import { scanStationHistory, getReportHighlights } from '@/utils/reportingLogic';
+import { logger } from '@/utils/logger';
 import '../Common/DesignSystemCards.css';
 import './ReportingPage.css';
 
@@ -285,7 +286,7 @@ export const ReportingPage: React.FC = () => {
             setIsGenerated(true);
             refreshReports(); // Refresh the list from DB
         } catch (err) {
-            console.error('Failed to generate report:', err);
+            logger.error('[ReportingPage] Failed to generate report:', err);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Report Generation Failed',
@@ -377,7 +378,7 @@ export const ReportingPage: React.FC = () => {
                 }
             }));
         } catch (error) {
-            console.error('Export failed:', error);
+            logger.error('[ReportingPage] Export failed:', error);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Export Failed',

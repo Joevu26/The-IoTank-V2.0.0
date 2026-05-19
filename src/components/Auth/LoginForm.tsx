@@ -12,6 +12,7 @@ import { RegistrationRequestForm } from './RegistrationRequestForm';
 import { supabase } from '@/config/supabase';
 import { getAuthFriendlyErrorMessage } from '@/utils/authErrors';
 import brandMark from '@/assets/iotank-official-logo.png';
+import { logger } from '@/utils/logger';
 
 
 
@@ -57,7 +58,7 @@ export const LoginForm: React.FC = () => {
             // mfaChallengeRequired to true and loading to false, the UI will 
             // naturally swap to the MFA form.
         } catch (err: any) {
-            console.error('Auth Error:', err);
+            logger.error('Auth Error:', err);
             
             const friendlyMsg = getAuthFriendlyErrorMessage(err);
             setError(friendlyMsg);
@@ -96,7 +97,7 @@ export const LoginForm: React.FC = () => {
             setRemainingAttempts(limit?.remaining_attempts || 0);
             await processSignIn();
         } catch (err) {
-            console.error('Rate limit check failed:', err);
+            logger.error('Rate limit check failed:', err);
             // Fallback: allow attempt if RPC fails (don't lock out users due to infra issues)
             await processSignIn();
         }
@@ -115,7 +116,7 @@ export const LoginForm: React.FC = () => {
             await verifyMFA(codeToVerify);
             // Navigation is safely handled by the reactive useEffect hook once currentUser is enriched.
         } catch (err: any) {
-            console.error('MFA Verification Error:', err);
+            logger.error('MFA Verification Error:', err);
             setError(err.message || 'Invalid verification code. Please try again.');
             setShouldShake(true);
             setTimeout(() => setShouldShake(false), 600);
@@ -169,7 +170,7 @@ export const LoginForm: React.FC = () => {
             // and the useEffect above handles navigation to /dashboard.
             await signInWithGoogle();
         } catch (err: any) {
-            console.error("Google Auth Error:", err);
+            logger.error("Google Auth Error:", err);
             setError(getAuthFriendlyErrorMessage(err));
             setLoading(false);
         }

@@ -6,6 +6,7 @@ import { TankIQService } from '@/services/TankIQService';
 import { useAuth } from '@/hooks/useAuth';
 import { ExportService } from '@/services/ExportService';
 import { formatDistanceToNow } from 'date-fns';
+import { logger } from '@/utils/logger';
 import './TankIQSidebar.css';
 
 interface Message extends ChatMessage {
@@ -121,7 +122,7 @@ export const TankIQSidebar: React.FC<TankIQSidebarProps> = ({ isOpen, onClose, o
                 ));
             });
         } catch (error) {
-            console.error('TankIQ Error:', error);
+            logger.error('TankIQ Error:', error);
         } finally {
             setIsTyping(false);
         }

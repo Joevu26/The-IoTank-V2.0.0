@@ -12,6 +12,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { EmailDispatchService } from '@/services/EmailDispatchService';
 import { SignaturePad } from '../Common/SignaturePad';
 import { useModals } from '@/contexts/ModalContext';
+import { logger } from '@/utils/logger';
 
 
 interface DeliveryModalProps {
@@ -203,7 +204,7 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                 // [AUTO-RESOLUTION]: If this modal was opened via an automated refill alert, resolve it now
                 if (activeModal === 'refill_verification' && modalData?.id) {
                     resolveAlert(modalData.id, currentUser.authUserId).catch(err => {
-                        console.warn('[DeliveryModal] Failed to auto-resolve refill alert:', err);
+                        logger.warn('[DeliveryModal] Failed to auto-resolve refill alert:', err);
                     });
                 }
 
@@ -261,15 +262,15 @@ export const DeliveryModal: React.FC<DeliveryModalProps> = ({ isOpen, onClose, o
                         operator: currentUser.displayName || currentUser.email,
                         varianceValue: variance
                     }
-                }).catch(err => console.warn('[DeliveryModal] Failed to dispatch delivery email:', err));
+                }).catch(err => logger.warn('[DeliveryModal] Failed to dispatch delivery email:', err));
 
             } catch (auxErr) {
-                console.warn('[DeliveryModal] Background reporting delay:', auxErr);
+                logger.warn('[DeliveryModal] Background reporting delay:', auxErr);
             }
 
             onClose();
         } catch (err: any) {
-             console.error('[DeliveryModal] Verification Error:', err);
+             logger.error('[DeliveryModal] Verification Error:', err);
              NotificationService.show('Verification Failed', { body: err.message || 'System error. Please check your connection.' });
         } finally {
             setSubmitting(false);

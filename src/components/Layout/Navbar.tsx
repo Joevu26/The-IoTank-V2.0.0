@@ -32,6 +32,7 @@ import { NotificationService } from '@/services/NotificationService';
 import { DeviceCommandService } from '@/services/DeviceCommandService';
 import { FiActivity } from 'react-icons/fi';
 import tankIQRobot from '@/assets/tankiq-robot.png';
+import { logger } from '@/utils/logger';
 
 interface NavbarProps {
     onToggleSidebar: () => void;
@@ -118,7 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             // Re-fetch events to ensure consistency
             if ((window as any).__fetchUnifiedEvents) await (window as any).__fetchUnifiedEvents();
         } catch (err) {
-            console.error('Error resolving alert:', err);
+            logger.error('Error resolving alert:', err);
             // Rollback on failure
             setResolvingIds(prev => {
                 const next = new Set(prev);
@@ -156,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             const { error: rpcError } = await supabase.rpc('resolve_unified_event', { p_event_id: eventId });
             
             if (rpcError) {
-                console.warn('[Navbar] RPC resolution failed, attempting fallback...', rpcError);
+                logger.warn('[Navbar] RPC resolution failed, attempting fallback...', rpcError);
                 // Fallback attempt (might fail if RLS is strict, but worth a shot)
                 await supabase.from('unified_events').update({ is_resolved: true }).eq('id', eventId);
             }
@@ -175,7 +176,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             });
 
         } catch (err: any) {
-            console.error('Error resolving event:', err);
+            logger.error('Error resolving event:', err);
             // Rollback optimistic UI
             setUnifiedEvents(previousEvents);
         } finally {
@@ -211,7 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
             // 4. Final Sync
             if ((window as any).__fetchUnifiedEvents) await (window as any).__fetchUnifiedEvents();
         } catch (err) {
-            console.error('Error clearing notifications:', err);
+            logger.error('Error clearing notifications:', err);
             // Rollback on fatal failure
             setHiddenAlerts(new Set([...hiddenAlerts].filter(id => !prevAlerts.find(a => a.id === id))));
             setUnifiedEvents(prevEvents);
@@ -371,7 +372,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onToggleTankIQ 
                     const createdAtTime = new Date(payload.new.created_at || payload.new.created_at).getTime();
                     const staleThresholdMs = 15000; // 15 seconds
                     if (Date.now() - createdAtTime > staleThresholdMs) {
-                        console.log(`[Navbar] Suppressed stale event alert (${Date.now() - createdAtTime}ms old): ${messageText}`);
+                        logger.log(`[Navbar] Suppressed stale event alert (${Date.now() - createdAtTime}ms old): ${messageText}`);
                         return;
                     }
 

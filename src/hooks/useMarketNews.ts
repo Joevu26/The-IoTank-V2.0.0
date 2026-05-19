@@ -621,7 +621,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                     collected.push(...signals);
                 }
             } catch (e) {
-                console.warn(`[useMarketNews] Scraper fail for ${source.shortLabel}:`, e);
+                logger.warn(`[useMarketNews] Scraper fail for ${source.shortLabel}:`, e);
             }
         }
 
@@ -872,7 +872,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                         anySuccess = true;
                     }
                 } catch (e) {
-                    console.error(`[useMarketNews] Batch error for ${src.shortLabel}:`, e);
+                    logger.error(`[useMarketNews] Batch error for ${src.shortLabel}:`, e);
                 }
                 // [Rate Limit Shield]: Increased stagger delay between source requests to prevent gateway 429s
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -888,7 +888,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                 .delete()
                 .lt('timestamp', purgeThreshold)
                 .then(({ error }) => {
-                    if (error) console.error('[useMarketNews] Database signals purge failed:', error);
+                    if (error) logger.error('[useMarketNews] Database signals purge failed:', error);
                     else logger.info('[useMarketNews] Successfully purged database market signals older than 14 days.');
                 });
 
@@ -909,7 +909,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                 setStatus('no-signal');
             }
         } catch (e) {
-            console.error('[useMarketNews] Fetch failure:', e);
+            logger.error('[useMarketNews] Fetch failure:', e);
             setStatus(prev => (prev === 'ok' || prev === 'cached-stale') ? 'cached-stale' : 'no-signal');
         } finally {
             setIsRefreshing(false);

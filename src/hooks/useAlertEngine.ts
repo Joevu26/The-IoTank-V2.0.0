@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, TankReading, RiskIndex, Tank } from '@/types';
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 import { useTanks } from './useSupabase';
 import { useShiftStatus } from './useShiftStatus';
 import { useAuth } from './useAuth';
@@ -203,7 +204,7 @@ export function useAlertEngine(
                     });
                 }
             } catch (err) {
-                console.error('[AlertEngine] Alert fetch error:', err);
+                logger.error('[AlertEngine] Alert fetch error:', err);
             }
         };
 
@@ -650,7 +651,7 @@ export function useAlertEngine(
                         // Real-time subscription handles activeAlerts state updates.
                     }
                 } catch (err) {
-                    console.error('[useAlertEngine] Alert insertion failed:', err);
+                    logger.error('[useAlertEngine] Alert insertion failed:', err);
                 } finally {
                     // Cleanup pending refs after a safety delay to allow realtime sync to catch up
                     setTimeout(() => {
@@ -829,7 +830,7 @@ export function useAlertEngine(
                 });
             }
         } catch (err) {
-            console.warn('[AlertEngine] Scan error:', err);
+            logger.warn('[AlertEngine] Scan error:', err);
         } finally {
             isScanningRef.current = false;
             setIsScanning(false);

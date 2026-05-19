@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/config/supabase';
 import { FiCpu, FiX } from 'react-icons/fi';
 import { useTanks, updateTank } from '@/hooks/useSupabase';
+import { logger } from '@/utils/logger';
 
 export const AutoUpdatePriceModal: React.FC<{ stationId: string }> = ({ stationId }) => {
     const [pendingAction, setPendingAction] = useState<any>(null);
@@ -139,7 +140,7 @@ export const AutoUpdatePriceModal: React.FC<{ stationId: string }> = ({ stationI
             window.dispatchEvent(new CustomEvent('market-action-resolved', { detail: pendingAction.id }));
 
         } catch (err) {
-            console.error('[AutoUpdatePriceModal] Retail update failed:', err);
+            logger.error('[AutoUpdatePriceModal] Retail update failed:', err);
             window.dispatchEvent(new CustomEvent('system-toast', {
                 detail: {
                     title: 'Update Failed',
