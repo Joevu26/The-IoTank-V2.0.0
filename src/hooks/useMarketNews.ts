@@ -754,7 +754,7 @@ export function useMarketNews(): UseMarketNewsReturn {
                         // (tracked as a future Edge Function migration) but reduces invalid writes.
                         const isHighConfidenceEPRA =
                             (p as any).confidence >= 0.80 &&
-                            article.topics?.includes('EPRA') &&
+                            article.topicTags?.includes('EPRA') &&
                             p.price > 0 &&
                             p.price < 500; // Sanity check: KES fuel prices are always < 500/L
 

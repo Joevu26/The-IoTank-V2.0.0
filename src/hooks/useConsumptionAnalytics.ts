@@ -6,6 +6,19 @@ import { useShiftStatus } from './useShiftStatus';
 import { supabase } from '@/config/supabase';
 import { calculateETE, calculateRate, TELEMETRY_CONSTANTS } from '@/utils/telemetryMath';
 import { validateUUID } from '@/utils/sanitization';
+import { logger } from '@/utils/logger';
+
+/** Safe localStorage JSON parser — prevents crashes from corrupted or tampered storage. */
+function safeParseLocalStorage<T>(key: string, fallback: T): T {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        return JSON.parse(raw) as T;
+    } catch {
+        logger.warn(`[useConsumptionAnalytics] localStorage parse failed for key: "${key}". Returning fallback.`);
+        return fallback;
+    }
+}
 
 
 export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading[]) {
@@ -43,7 +56,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
                     setAvgDailyRate(5); 
                 }
             } catch (err) {
-                console.warn('Failed to fetch historical average:', err);
+                logger.warn('[useConsumptionAnalytics] Failed to fetch historical average:', err);
             }
         };
 
@@ -55,7 +68,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
     useEffect(() => {
         if (shiftStatus === 'closed' && tank?.id) {
             try {
-                const volumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
+                const volumes = safeParseLocalStorage<Record<string, number>>('iotank_shift_start_volumes', {});
                 if (volumes[tank.id] !== undefined) {
                     delete volumes[tank.id];
                     localStorage.setItem('iotank_shift_start_volumes', JSON.stringify(volumes));
@@ -88,7 +101,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
             // 1. Current Shift Dispense Rate (Rate of Change) using unified math
             let currentShiftRate = 0;
             if (shiftStatus === 'open' && openedAt) {
-                const shiftStartVolumes = JSON.parse(localStorage.getItem('iotank_shift_start_volumes') || '{}');
+                const shiftStartVolumes = safeParseLocalStorage<Record<string, number>>('iotank_shift_start_volumes', {});
                 const startVol = shiftStartVolumes[tank.id] || latestVolume;
                 const hrsPassed = Math.max(0.1, (Date.now() - openedAt) / (1000 * 60 * 60));
                 currentShiftRate = calculateRate(startVol, latestVolume, hrsPassed);
@@ -159,7 +172,7 @@ export function useConsumptionAnalytics(tank: Tank | null, readings: TankReading
                 error: null
             };
         } catch (e: any) {
-            console.error('Telemetry Analytics Crash:', e);
+            logger.error('[useConsumptionAnalytics] Telemetry Analytics Crash:', e);
             return {
                 defillRate: 0,
                 ete: 'Error',

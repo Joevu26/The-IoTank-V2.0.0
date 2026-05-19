@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 export interface UserNotificationPreferences {
     email_enabled: boolean;
@@ -47,7 +48,7 @@ export class NotificationPreferencesService {
                 .maybeSingle();
 
             if (error) {
-                console.warn('[NotificationPreferences] Error fetching preferences:', error);
+                logger.warn('[NotificationPreferences] Error fetching preferences:', error);
                 return DEFAULT_PREFERENCES;
             }
 
@@ -68,7 +69,7 @@ export class NotificationPreferencesService {
 
             return mergedPrefs;
         } catch (err) {
-            console.error('[NotificationPreferences] Unexpected error:', err);
+            logger.error('[NotificationPreferences] Unexpected error:', err);
             return DEFAULT_PREFERENCES;
         }
     }
@@ -96,7 +97,7 @@ export class NotificationPreferencesService {
             
             return true;
         } catch (err) {
-            console.error('[NotificationPreferences] Error checking shouldSendSms:', err);
+            logger.error('[NotificationPreferences] Error checking shouldSendSms:', err);
             return false;
         }
     }
@@ -118,7 +119,7 @@ export class NotificationPreferencesService {
             
             return true;
         } catch (err) {
-            console.error('[NotificationPreferences] Error checking shouldSendEmail:', err);
+            logger.error('[NotificationPreferences] Error checking shouldSendEmail:', err);
             // Email defaults to true for backward compatibility
             return true;
         }

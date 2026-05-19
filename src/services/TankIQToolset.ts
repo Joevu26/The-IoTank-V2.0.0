@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 /**
  * TankIQ Toolset
@@ -16,7 +17,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_station_summary] Error:', err);
+            logger.error('TankIQ Tool [get_station_summary] Error:', err);
             return { error: 'Failed to fetch station summary.' };
         }
     },
@@ -33,7 +34,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_consumption_analytics] Error:', err);
+            logger.error('TankIQ Tool [get_consumption_analytics] Error:', err);
             return { error: 'Failed to fetch consumption statistics.' };
         }
     },
@@ -50,7 +51,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_delivery_logs] Error:', err);
+            logger.error('TankIQ Tool [get_delivery_logs] Error:', err);
             return { error: 'Failed to fetch delivery logs.' };
         }
     },
@@ -64,7 +65,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_market_context] Error:', err);
+            logger.error('TankIQ Tool [get_market_context] Error:', err);
             return { error: 'Failed to fetch market context.' };
         }
     },
@@ -81,7 +82,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_shift_analytics] Error:', err);
+            logger.error('TankIQ Tool [get_shift_analytics] Error:', err);
             return { error: 'Failed to fetch shift analytics.' };
         }
     },
@@ -97,7 +98,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_financial_status] Error:', err);
+            logger.error('TankIQ Tool [get_financial_status] Error:', err);
             return { error: 'Failed to fetch financial status.' };
         }
     },
@@ -113,7 +114,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_hardware_health] Error:', err);
+            logger.error('TankIQ Tool [get_hardware_health] Error:', err);
             return { error: 'Failed to fetch hardware health diagnostics.' };
         }
     },
@@ -130,7 +131,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_audit_logs] Error:', err);
+            logger.error('TankIQ Tool [get_audit_logs] Error:', err);
             return { error: 'Failed to fetch audit logs.' };
         }
     },
@@ -146,7 +147,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_support_summary] Error:', err);
+            logger.error('TankIQ Tool [get_support_summary] Error:', err);
             return { error: 'Failed to fetch support summary.' };
         }
     },
@@ -163,7 +164,7 @@ export const TankIQToolset = {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('TankIQ Tool [get_usage_insights] Error:', err);
+            logger.error('TankIQ Tool [get_usage_insights] Error:', err);
             return { error: 'Failed to fetch usage insights.' };
         }
     }

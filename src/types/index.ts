@@ -190,6 +190,10 @@ export interface Alert {
         tankName?: string;
         maxPumpFlow?: number;
         volumeLost?: number;
+        // Correlation
+        correlatedCount?: number;
+        correlatedIds?: string[];
+        correlatedTypes?: string[];
     };
 }
 

@@ -337,17 +337,17 @@ export function detectTankAlerts(ctx: DetectionContext): DraftAlert[] {
             }
         }
 
-        // â”€â”€ 6. REFILL DETECTION (Automated Delivery Sensing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // --- 6. REFILL DETECTION (Automated Delivery Sensing) ---
         //
-        // âš ï¸  OWNERSHIP NOTE
-        // All volume-increase events â€” whether authorized (open shift) or
-        // unauthorized (closed shift) â€” are exclusively tracked and finalized
+        // [WARNING] OWNERSHIP NOTE
+        // All volume-increase events (whether authorized (open shift) or
+        // unauthorized (closed shift)) are exclusively tracked and finalized
         // by the STATEFUL engine in useAlertEngine.ts.
         //
         // That engine:
-        //   â€¢ applies multi-cycle confirmation (eliminates sensor noise)
-        //   â€¢ captures accurate start/end volumes across the delivery window
-        //   â€¢ writes the single, definitive alert to the database
+        //   - applies multi-cycle confirmation (eliminates sensor noise)
+        //   - captures accurate start/end volumes across the delivery window
+        //   - writes the single, definitive alert to the database
         //
         // This stateless engine must NOT emit 'unauthorized_refill' or normal
         // 'refill_detected' drafts for volume increases, as doing so creates

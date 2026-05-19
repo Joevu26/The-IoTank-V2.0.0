@@ -1,5 +1,6 @@
 import { IntelligenceAIService, ChatMessage } from './IntelligenceAIService';
 import { TankIQToolset, TANKIQ_TOOLS_METADATA } from './TankIQToolset';
+import { logger } from '@/utils/logger';
 
 const STORAGE_KEY = 'tankiq_history';
 const MAX_HISTORY = 20;
@@ -84,7 +85,7 @@ YOUR MANDATE:
             try {
                 response = await this.aiService.chat(currentProvider, messagesToSend, TANKIQ_TOOLS_METADATA);
             } catch (err) {
-                console.warn(`TankIQ: Provider ${currentProvider} failed, retrying...`, err);
+                logger.warn(`TankIQ: Provider ${currentProvider} failed, retrying...`, err);
                 retryCount++;
                 if (retryCount >= providers.length) throw new Error('All AI providers failed.');
                 turn--; // Retry the same turn with new provider
@@ -106,7 +107,7 @@ YOUR MANDATE:
                     try {
                         args = JSON.parse(toolCall.function.arguments);
                     } catch (e) {
-                        console.error('[TankIQ] Tool argument parse failed:', e);
+                        logger.error('[TankIQ] Tool argument parse failed:', e);
                         this.history.push({
                             role: 'tool',
                             content: JSON.stringify({ error: "Invalid JSON in function arguments. Please retry with valid JSON." }),

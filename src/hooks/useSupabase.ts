@@ -911,7 +911,7 @@ export async function deleteTank(tankId: string) {
         `Tank '${tankName}' (ID: ${tankId}) permanently purged from system.`,
         'CRITICAL',
         { tankId, tankName }
-    ).catch(() => {});
+    ).catch((err) => { logger.error('[useSupabase] Audit logging failed for DELETE_TANK:', err); });
 
     return true;
 }
@@ -947,16 +947,7 @@ export async function createAlert(alert: Partial<Alert> & { station_id: string }
     return data;
 }
 
-/**
- * @deprecated — Use AlertDetectionEngine refill sensing for centralized forensic logic.
- * This hook is a no-op and will be removed in a future release.
- */
-export function useRefuelMonitor(_stationId: string, _tankId: string) {
-    if (import.meta.env.DEV) {
-        console.warn('[DEPRECATED] useRefuelMonitor is retired. Use AlertDetectionEngine for refill detection.');
-    }
-    return { isRefuelling: false };
-}
+
 
 /**
  * Hook to fetch all stations (Super Admin only)

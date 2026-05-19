@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { validateUUID } from '../utils/sanitization';
+import { logger } from '../utils/logger';
 
 export const tankService = {
   /**
@@ -20,7 +21,7 @@ export const tankService = {
 
       return data;
     } catch (error) {
-      console.error('Error fetching tanks:', error);
+      logger.error('Error fetching tanks:', error);
       return null;
     }
   },
@@ -43,7 +44,7 @@ export const tankService = {
 
       return data;
     } catch (error) {
-      console.error('Error fetching tank details:', error);
+      logger.error('Error fetching tank details:', error);
       return null;
     }
   },
@@ -67,7 +68,7 @@ export const tankService = {
 
       return data;
     } catch (error) {
-      console.error('Error fetching sensor readings:', error);
+      logger.error('Error fetching sensor readings:', error);
       return null;
     }
   }
