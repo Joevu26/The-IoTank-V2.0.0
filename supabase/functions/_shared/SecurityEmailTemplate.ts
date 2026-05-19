@@ -54,8 +54,9 @@ export const renderSecurityEmail = (params: {
 
         <!-- Intelligence Summary -->
         <div style="background: rgba(168, 85, 247, 0.05); border-left: 4px solid #a855f7; padding: 16px; margin-bottom: 32px; border-radius: 0 8px 8px 0;">
-            <b style="color: #a855f7; display: block; margin-bottom: 4px;">Forensic Intelligence Summary:</b>
+            <b style="color: #a855f7; display: block; margin-bottom: 4px;">Issue Context & Intelligence:</b>
             <span style="font-size: 14px; color: #cbd5e1; line-height: 1.5;">
+                ${params.details ? `<strong style="color: #f8fafc;">Specific Issue: ${params.details}</strong><br/><br/>` : ''}
                 ${params.type === 'THEFT' ? 'Rapid volumetric drawdown detected during zero-movement window (Shift Closed). Immediate verification of physical locks and pump status required.' : 
                   params.type === 'COLLUSION' ? 'Financial deficit exceeds 0.5% system error margin for this shift. Discrepancy between metered sales and ATG drawdown indicates possible internal manipulation.' : 
                   params.type === 'REFILL' ? 'Inbound fuel delivery successfully detected and verified against system expectations. Volume has been updated in the primary ledger.' :
