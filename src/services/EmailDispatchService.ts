@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 export interface EmailPayload {
     to: string;
@@ -35,7 +36,7 @@ export class EmailDispatchService {
                 headers['Authorization'] = `Bearer ${session.access_token}`;
             }
         } catch (e) {
-            console.warn('[EmailDispatchService] Auth check failed, proceeding anonymously.');
+            logger.warn('[EmailDispatchService] Auth check failed, proceeding anonymously.');
         }
 
         return headers;
@@ -80,7 +81,7 @@ export class EmailDispatchService {
             // Tactical alert sent successfully
             return data;
         } catch (err) {
-            console.error('[EmailDispatch] Failed to dispatch tactical email:', err);
+            logger.error('[EmailDispatchService] Failed to dispatch tactical email:', err);
             // Fallback: Log to Audit directly if function fails
             return null;
         }

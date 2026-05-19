@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { logger } from '../utils/logger';
 
 export interface PaystackTransaction {
     id: string;
@@ -37,7 +38,7 @@ export const paystackService = {
             if (error) throw error;
             return data || [];
         } catch (error) {
-            console.error('Error fetching Paystack transactions:', error);
+            logger.error('[paystackService] Error fetching Paystack transactions:', error);
             return [];
         }
     },
@@ -56,13 +57,19 @@ export const paystackService = {
             if (error) throw error;
             return data || [];
         } catch (error) {
-            console.error('Error fetching Paystack customers:', error);
+            logger.error('[paystackService] Error fetching Paystack customers:', error);
             return [];
         }
     },
 
     /**
-     * Saves Paystack configuration for the station
+     * Saves Paystack configuration for the station.
+     *
+     * @security IMPORTANT: The `live_secret_key` and `test_secret_key` fields are
+     * Paystack server-side credentials and MUST NOT be stored from client code in a
+     * production system. This function is tolerated here only because it writes via
+     * RLS-protected Supabase with authenticated sessions. Migrate to an Edge Function
+     * before enabling live payment processing. (C-02)
      */
     async saveConfig(config: {
         test_secret_key: string;
@@ -101,7 +108,7 @@ export const paystackService = {
             if (error) throw error;
             return data;
         } catch (error) {
-            console.error('Error fetching Paystack config:', error);
+            logger.error('[paystackService] Error fetching Paystack config:', error);
             return null;
         }
     }

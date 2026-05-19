@@ -101,7 +101,7 @@ export class MarketIntelligenceService {
             const uniqueArticles = Array.from(new Map(allArticles.map(a => [a.url, a])).values());
             return uniqueArticles.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()).map((article: any) => {
                 const title = article.title.toLowerCase();
-                let sourceType: SignalSourceType = 'General News' as any;
+                let sourceType: SignalSourceType = 'General News';
                 let relevanceScore = 0.8;
                 if (title.includes('epra') || title.includes('legislation')) {
                     sourceType = 'Regulatory';
@@ -179,18 +179,12 @@ export class MarketIntelligenceService {
     }
 
     async fetchEPRANotices(): Promise<RegulatoryNotice[]> {
-        const now = new Date();
-        const currentMonth = now.toLocaleString('default', { month: 'long' });
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleString('default', { month: 'long' });
-        return [{
-            id: `epra-${now.getFullYear()}-${now.getMonth()}`,
-            authority: 'EPRA',
-            noticeType: 'price_cycle',
-            title: `Monthly Petroleum Price Review: ${currentMonth} - ${nextMonth} ${now.getFullYear()}`,
-            effectiveDate: now.getTime(),
-            summary: `EPRA announces the latest pump prices based on stabilized landing costs.`,
-            documentUrl: 'https://www.epra.go.ke/petroleum-prices/'
-        }];
+        // M-04 FIX: The previous implementation returned a hardcoded mock EPRA notice on every
+        // call, causing syncAll() to upsert the same fake record indefinitely and polluting
+        // regulatory_notices. EPRA scraping is handled by the 'official-scraper' Edge Function
+        // via useMarketNews.ts. This client-side method intentionally returns nothing.
+        logger.info('[MarketIntelligenceService] fetchEPRANotices() deferred to Edge Function scraper.');
+        return [];
     }
 
     async syncAll(stationId: string): Promise<boolean> {

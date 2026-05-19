@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -139,7 +140,11 @@ export function useEventLog(stationId: string) {
                 if (filters.triggeredBy === 'system') {
                     query = query.ilike('metadata->>actor_name', '%system%');
                 } else if (filters.triggeredBy === 'user') {
-                    query = query.not('metadata->>actor_name', 'ilike', '%system%');
+                    query = query.not('metadata->>actor_name', 'ilike', '%system%')
+                                 .not('metadata->>actor_name', 'ilike', '%ai%');
+                } else if (filters.triggeredBy === 'ai') {
+                    // M-06 FIX: Previously unhandled — ai-triggered events use 'TankIQ' or 'ai' in actor_name
+                    query = query.ilike('metadata->>actor_name', '%ai%');
                 }
             }
 
@@ -147,11 +152,11 @@ export function useEventLog(stationId: string) {
                 .range((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE - 1);
 
             if (error) {
-                console.error(`[useEventLog] Fetch failed for station ${stationId}:`, error);
+                logger.error(`[useEventLog] Fetch failed for station ${stationId}:`, error);
                 throw error;
             }
 
-            console.log(`[useEventLog] Fetched ${data?.length || 0} events for station ${stationId} (Total in DB: ${count})`);
+            logger.info(`[useEventLog] Fetched ${data?.length || 0} events (total in DB: ${count})`, { stationId });
 
             const mapped: EventLogEntry[] = (data || []).map(log => ({
                 id: log.id,
@@ -172,7 +177,7 @@ export function useEventLog(stationId: string) {
             setEvents(mapped);
             setTotal(count || 0);
         } catch (err) {
-            console.error('Error fetching audit logs:', err);
+            logger.error('[useEventLog] Error fetching audit logs:', err);
         } finally {
             setLoading(false);
         }
@@ -185,30 +190,25 @@ export function useEventLog(stationId: string) {
             if (error) throw error;
             fetchEvents();
         } catch (err) {
-            console.error('Error resolving event:', err);
+            logger.error('[useEventLog] Error resolving event:', err);
         }
     }
 
     async function acknowledgeAll() {
         if (!stationId) {
-            console.warn('[useEventLog] Cannot acknowledge: No stationId provided.');
+            logger.warn('[useEventLog] Cannot acknowledge: No stationId provided.');
             return;
         }
         try {
-            // Try both parameter patterns to overcome 400 errors
-            let res = await supabase.rpc('resolve_all_station_events', { p_station_id: stationId });
-            
-            if (res.error && res.error.message?.includes('parameter')) {
-                console.log('[useEventLog] retrying acknowledgeAll with alternative parameter name...');
-                res = await supabase.rpc('resolve_all_station_events', { station_id: stationId });
-            }
-            
+            // M-05 FIX: Removed fragile dual-parameter retry that silently swallowed
+            // non-parameter RPC errors. Using the correct parameter name only.
+            const res = await supabase.rpc('resolve_all_station_events', { p_station_id: stationId });
             if (res.error) throw res.error;
-            
-            console.log('[useEventLog] All events acknowledged for station:', stationId);
+
+            logger.info('[useEventLog] All events acknowledged for station:', stationId);
             fetchEvents();
         } catch (err) {
-            console.error('Error acknowledging all events:', err);
+            logger.error('[useEventLog] Error acknowledging all events:', err);
         }
     }
 
@@ -251,7 +251,7 @@ export function useEventLog(stationId: string) {
             if (error) throw error;
 
             if (!data || data.length === 0) {
-                console.warn('[useEventLog] No events found for export.');
+                logger.warn('[useEventLog] No events found for export.');
                 return;
             }
 
@@ -277,9 +277,9 @@ export function useEventLog(stationId: string) {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
             
-            console.log(`[useEventLog] Exported ${data.length} events to CSV.`);
+            logger.info(`[useEventLog] Exported ${data.length} events to CSV.`);
         } catch (err) {
-            console.error('[useEventLog] CSV Export failed:', err);
+            logger.error('[useEventLog] CSV Export failed:', err);
         }
     }
 

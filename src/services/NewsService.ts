@@ -1,5 +1,6 @@
 import { supabase } from '@/config/supabase';
 import { MarketSignal } from '@/types';
+import { logger } from '@/utils/logger';
 
 /**
  * Service to handle real-time news delivery.
@@ -33,7 +34,7 @@ export class NewsService {
     private static scheduleNextPoll(fn: () => Promise<void>): void {
         const delay = this.getBackoffMs();
         if (delay > this.BASE_POLL_MS) {
-            console.warn(
+            logger.warn(
                 `[NewsService] Circuit breaker active — next poll in ${delay / 1000}s ` +
                 `(consecutive failures: ${this.consecutiveFailures})`
             );
@@ -61,7 +62,6 @@ export class NewsService {
 
         this.isInitializing = true;
 
-        const { logger } = await import('@/utils/logger');
         logger.debug('Initializing Real-time News Poller...', { listeners: this.listenerCount }, 'NEWS_SERVICE');
 
         // Fetch initial article to set lastSeenId (failure here is non-critical)
@@ -84,7 +84,7 @@ export class NewsService {
 
                 // ✅ SUCCESS — reset circuit breaker
                 if (this.consecutiveFailures > 0) {
-                    console.info('[NewsService] Supabase connection restored. Resetting circuit breaker.');
+                    logger.info('[NewsService] Supabase connection restored. Resetting circuit breaker.');
                     this.consecutiveFailures = 0;
                 }
 
@@ -125,7 +125,7 @@ export class NewsService {
             .limit(limit);
 
         if (error) {
-            console.error('Failed to fetch historical news:', error);
+            logger.error('[NewsService] Failed to fetch historical news:', error);
             return [];
         }
 

@@ -4,6 +4,16 @@ import { useActiveShift } from './useShifts';
 
 export type ShiftStatus = 'OPEN' | 'CLOSED';
 
+/** M-01 FIX: Safely parse a stored ISO date string to epoch ms. Returns null if the
+ * stored value is missing, unparseable, or produces an invalid Date. Without this guard,
+ * new Date(corrupted_string).getTime() === NaN flows into all uptime/rate calculations. */
+function safeParseStoredTime(key: string): number | null {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const ts = new Date(raw).getTime();
+    return isNaN(ts) ? null : ts;
+}
+
 export const useShiftStatus = () => {
     const { currentUser } = useAuth();
     const stationId = currentUser?.stationId;
@@ -63,9 +73,7 @@ export const useShiftStatus = () => {
 
     const openedAt = useMemo(() => {
         if (!activeShift) {
-            const localStart = localStorage.getItem('iotank_shift_start_time');
-            if (localStart) return new Date(localStart).getTime();
-            return null;
+            return safeParseStoredTime('iotank_shift_start_time');
         }
         const time = activeShift.created_at ? new Date(activeShift.created_at).getTime() : null;
 
@@ -74,9 +82,8 @@ export const useShiftStatus = () => {
         } else {
             const metadata = activeShift.metadata || {};
             let lastOpened = metadata.last_opened_at ? new Date(metadata.last_opened_at).getTime() : null;
-            if (!lastOpened) {
-                const localStart = localStorage.getItem('iotank_shift_start_time');
-                if (localStart) lastOpened = new Date(localStart).getTime();
+            if (!lastOpened || isNaN(lastOpened)) {
+                lastOpened = safeParseStoredTime('iotank_shift_start_time');
             }
             return lastOpened;
         }

@@ -210,7 +210,7 @@ export interface MarketData {
     metadata?: any;
 }
 
-export type SignalSourceType = 'API' | 'Public Notice' | 'Corporate Announcement' | 'News Outlet' | 'Commodity' | 'Operational Alert' | 'Price Impact' | 'Supply Chain' | 'Regulatory';
+export type SignalSourceType = 'API' | 'Public Notice' | 'Corporate Announcement' | 'News Outlet' | 'Commodity' | 'Operational Alert' | 'Price Impact' | 'Supply Chain' | 'Regulatory' | 'General News';
 
 export interface MarketSignal {
     id: string;

@@ -3,6 +3,7 @@ import { supabase } from '@/config/supabase';
 import { DeliveryDocument } from '@/types';
 import { validateUUID } from '@/utils/sanitization';
 import { EXPANSION_COEFFICIENTS, REF_TEMP_C } from '@/utils/thermalCorrection';
+import { logger } from '@/utils/logger';
 
 // Fuel type alias resolver for thermal correction
 const FUEL_ALIASES: Record<string, keyof typeof EXPANSION_COEFFICIENTS> = {
@@ -140,7 +141,7 @@ export function useDeliveries(stationId: string, options: UseDeliveriesOptions =
             setDeliveries(mappedDeliveries);
             setError(null);
         } catch (err: any) {
-            console.error('Error fetching deliveries:', err);
+            logger.error('[useDeliveries] Error fetching deliveries:', err);
             setError(err.message);
         } finally {
             setLoading(false);

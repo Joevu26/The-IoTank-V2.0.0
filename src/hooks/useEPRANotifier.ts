@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/config/supabase';
+import { logger } from '@/utils/logger';
 
 const EPRA_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 const EPRA_SNOOZE_DURATION = 60 * 60 * 1000; // 1 hour snooze
@@ -13,9 +14,11 @@ export const useEPRANotifier = () => {
 
         const checkEPRAPrice = async () => {
             try {
-                // Check local storage to see if we are currently snoozing an EPRA alert
+                // M-02 FIX: parseInt on a corrupted value returns NaN, making Date.now() < NaN
+                // always false — flooding the user with EPRA alerts. Use a safe parse with isNaN guard.
                 const snoozeUntil = localStorage.getItem('iotank_epra_snooze_until');
-                if (snoozeUntil && Date.now() < parseInt(snoozeUntil)) {
+                const snoozeTime = snoozeUntil ? parseInt(snoozeUntil, 10) : NaN;
+                if (!isNaN(snoozeTime) && Date.now() < snoozeTime) {
                     return; // Still snoozing
                 }
 
@@ -29,7 +32,7 @@ export const useEPRANotifier = () => {
                     .single();
 
                 if (error && error.code !== 'PGRST116') {
-                    console.error('[EPRA Notifier] Failed to fetch latest EPRA notice:', error);
+                    logger.error('[useEPRANotifier] Failed to fetch latest EPRA notice:', error);
                     return;
                 }
 
@@ -79,7 +82,7 @@ export const useEPRANotifier = () => {
                 }));
 
             } catch (err) {
-                console.error('[EPRA Notifier] Exception:', err);
+                logger.error('[useEPRANotifier] Exception during price check:', err);
             }
         };
 

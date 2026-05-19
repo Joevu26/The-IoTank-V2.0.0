@@ -85,8 +85,8 @@ export function useShifts(stationId: string, options: UseShiftsOptions = {}): Us
             });
         },
         enabled: !!stationId,
-        staleTime: 1000, // 1s — shift changes must propagate instantly
-        refetchInterval: 2000, // 2s live polling
+        staleTime: 1000,
+        refetchInterval: 5000, // M-03: Increased from 2s — historical shift data doesn't need sub-2s accuracy
     });
 
     return { 
@@ -114,8 +114,8 @@ export function useActiveShift(stationId: string | undefined) {
             return data || null;
         },
         enabled: !!stationId,
-        staleTime: 1000, // 1s — active shift status must be immediate
-        refetchInterval: 2000, // 2s live polling
+        staleTime: 1000,
+        refetchInterval: 3000, // M-03: Increased from 2s — active shift state detection at 3s is sufficient
     });
 
     return { activeShift: query.data || null, loading: query.isLoading, error: query.error as Error | null };

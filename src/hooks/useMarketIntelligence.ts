@@ -3,6 +3,7 @@ import { supabase } from '@/config/supabase';
 import { MarketSignal, SupplyRisk, RegulatoryNotice, MarketData, MarketActionItem } from '@/types';
 import { NewsService } from '@/services/NewsService';
 import { extractPricesFromText } from './useMarketNews';
+import { logger } from '@/utils/logger';
 
 export const useMarketIntelligence = (stationId: string) => {
     // Cache key for news feed
@@ -51,6 +52,13 @@ export const useMarketIntelligence = (stationId: string) => {
 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    /**
+     * Triggers a background data reload.
+     * NOTE (L-02): This is NOT a synchronous fetch — it increments a counter to
+     * re-trigger the useEffect. The returned Promise resolves after 500ms as a
+     * minimum delay hint, not after data is actually fetched. Callers should
+     * observe the `loading` state to know when the refresh completes.
+     */
     const refetch = async () => {
         setRefreshTrigger(prev => prev + 1);
         setLoading(true);
@@ -67,7 +75,7 @@ export const useMarketIntelligence = (stationId: string) => {
                 const updated = [newSignal, ...prev].slice(0, 50); // Keep last 50
                 try {
                     localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(updated));
-                } catch (err) { console.warn('Cache update failed', err); }
+                } catch (err) { logger.warn('[useMarketIntelligence] Cache update failed:', err); }
                 return updated;
             });
         };
@@ -178,6 +186,11 @@ export const useMarketIntelligence = (stationId: string) => {
                         const isFuel = ['PETROL', 'DIESEL', 'KEROSENE', 'PMS', 'AGO', 'IK'].includes(commodityUpper);
                         
                         if (det.commodity !== 'General' && (!isFuel || isEPRA)) {
+                            // C-03 FIX: Apply the same >= 0.80 confidence guard that useMarketNews uses.
+                            // Without this, low-confidence AI extractions can corrupt production prices.
+                            const detConfidence = (det as any).confidence ?? 0;
+                            if (isFuel && detConfidence < 0.80) return;
+
                             let fuelType = commodityUpper;
                             if (fuelType === 'PETROL') fuelType = 'PMS';
                             else if (fuelType === 'DIESEL') fuelType = 'AGO';
@@ -196,13 +209,13 @@ export const useMarketIntelligence = (stationId: string) => {
                                 }).then(
                                     ({ error }) => {
                                         if (error) {
-                                            console.error(`[useMarketIntelligence] Sync extracted price failed for ${fuelType}:`, error.message);
+                                            logger.error(`[useMarketIntelligence] Sync extracted price failed for ${fuelType}:`, error.message);
                                         } else {
-                                            console.log(`[useMarketIntelligence] Forensic update success for ${fuelType} to KES ${det.value}`);
+                                            logger.info(`[useMarketIntelligence] Forensic update success for ${fuelType} to KES ${det.value}`);
                                         }
                                     },
                                     (err: any) => {
-                                        console.error(`[useMarketIntelligence] Sync error for ${fuelType}:`, err);
+                                        logger.error(`[useMarketIntelligence] Sync error for ${fuelType}:`, err);
                                     }
                                 );
                             }
@@ -288,14 +301,14 @@ export const useMarketIntelligence = (stationId: string) => {
                         localStorage.setItem(MI_CACHE_KEY_SIGNALS, JSON.stringify(mergedSignals));
                         localStorage.setItem('mi_cache_prices', JSON.stringify(finalPrices));
                     } catch (e) {
-                        console.warn('Failed to cache market data', e);
+                        logger.warn('[useMarketIntelligence] Failed to cache market data:', e);
                     }
                     setRisks(mappedRisksValue);
                     setNotices(mappedNoticesValue);
                     setLoading(false);
                 }
             } catch (err: unknown) {
-                console.warn('MarketIntelligence: Fetch Error:', err);
+                logger.warn('[useMarketIntelligence] Fetch error:', err);
                 if (isMounted) setLoading(false);
             }
         };
@@ -323,7 +336,7 @@ export const useMarketIntelligence = (stationId: string) => {
             if (error) throw error;
             setActionQueue(prev => prev.filter(a => a.id !== actionId));
         } catch (err) {
-            console.error('[MarketIntelligence] Failed to complete action:', err);
+            logger.error('[useMarketIntelligence] Failed to complete action:', err);
         }
     };
 

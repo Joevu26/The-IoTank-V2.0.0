@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/config/supabase';
 import { FuelOrder } from '@/types';
+import { logger } from '@/utils/logger';
 
 export function useOrders(stationId: string) {
     const [orders, setOrders] = useState<FuelOrder[]>([]);
@@ -38,7 +39,7 @@ export function useOrders(stationId: string) {
             setOrders(mappedOrders);
             setError(null);
         } catch (err: any) {
-            console.error('Error fetching orders:', err);
+            logger.error('[useOrders] Error fetching orders:', err);
             setError(err.message);
         } finally {
             setLoading(false);
