@@ -236,7 +236,7 @@ export const AddTankModal: React.FC<AddTankModalProps> = ({
                                 required
                             >
                                 <option value="">Select Depot / Site...</option>
-                                {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                {sites.map(s => <option key={s.id} value={s.id}>{s.siteName}</option>)}
                             </select>
                         </div>
                         <div className="form-group">
